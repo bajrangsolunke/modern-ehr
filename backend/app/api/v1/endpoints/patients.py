@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 
 from app.api.deps import CurrentUser, DbSession, require_roles
 from app.models.patient import PatientStatus, RiskLevel
@@ -41,9 +41,7 @@ async def list_patients(
     risk: RiskLevel | None = None,
     physician_id: UUID | None = None,
 ) -> Page[PatientListItem]:
-    filters = PatientFilters(
-        q=q, status=status, risk=risk, physician_id=physician_id
-    )
+    filters = PatientFilters(q=q, status=status, risk=risk, physician_id=physician_id)
     return await PatientService(db).list(filters, page=page, page_size=page_size)
 
 
@@ -54,10 +52,14 @@ async def list_patients(
     dependencies=[write_role_dep],
 )
 async def create_patient(
-    payload: PatientCreate, db: DbSession, current: CurrentUser
+    payload: PatientCreate,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
 ) -> PatientOut:
     patient = await PatientService(db).create(payload)
-    await AuditService(db).record(
+    await AuditService(db).record_request(
+        request,
         user_id=current.id,
         action="patient.create",
         resource_type="patient",
@@ -68,10 +70,14 @@ async def create_patient(
 
 @router.get("/{patient_id}", response_model=PatientOut)
 async def get_patient(
-    patient_id: UUID, db: DbSession, current: CurrentUser
+    patient_id: UUID,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
 ) -> PatientOut:
     patient = await PatientService(db).get(patient_id)
-    await AuditService(db).record(
+    await AuditService(db).record_request(
+        request,
         user_id=current.id,
         action="patient.read",
         resource_type="patient",
@@ -88,11 +94,13 @@ async def get_patient(
 async def update_patient(
     patient_id: UUID,
     payload: PatientUpdate,
+    request: Request,
     db: DbSession,
     current: CurrentUser,
 ) -> PatientOut:
     patient = await PatientService(db).update(patient_id, payload)
-    await AuditService(db).record(
+    await AuditService(db).record_request(
+        request,
         user_id=current.id,
         action="patient.update",
         resource_type="patient",
@@ -108,10 +116,14 @@ async def update_patient(
     dependencies=[write_role_dep],
 )
 async def delete_patient(
-    patient_id: UUID, db: DbSession, current: CurrentUser
+    patient_id: UUID,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
 ) -> None:
     await PatientService(db).delete(patient_id)
-    await AuditService(db).record(
+    await AuditService(db).record_request(
+        request,
         user_id=current.id,
         action="patient.delete",
         resource_type="patient",
