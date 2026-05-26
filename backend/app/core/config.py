@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, computed_field
+from pydantic import Field, computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -60,6 +60,24 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.BACKEND_CORS_ORIGINS.split(",") if o.strip()]
+
+    @model_validator(mode="after")
+    def _enforce_prod_secrets(self) -> "Settings":
+        # In production, refuse to boot with the dev-default secret key or a key
+        # that's too short to be useful for HS256 (JWT spec recommends ≥ 32 bytes).
+        if self.ENVIRONMENT == "production":
+            if self.SECRET_KEY.startswith("dev-") or len(self.SECRET_KEY) < 32:
+                raise ValueError(
+                    "SECRET_KEY must be set to a strong production secret "
+                    "(≥ 32 chars, not starting with 'dev-') when "
+                    "ENVIRONMENT=production."
+                )
+            if self.POSTGRES_PASSWORD in {"padmavat", "symptra", "postgres", ""}:
+                raise ValueError(
+                    "POSTGRES_PASSWORD looks like a dev default; refusing to "
+                    "boot with ENVIRONMENT=production."
+                )
+        return self
 
 
 @lru_cache
