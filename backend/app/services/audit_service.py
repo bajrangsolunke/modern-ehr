@@ -2,6 +2,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import Request
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_log import AuditLog
@@ -22,6 +23,10 @@ class AuditService:
         user_agent: str | None = None,
         payload: dict[str, Any] | None = None,
     ) -> AuditLog:
+        # JSONB can't hold native date/datetime/UUID/Enum/etc. — endpoints
+        # often pass model_dump() output that contains them. Encode to
+        # plain JSON-safe values up front so callers never have to think
+        # about it.
         log = AuditLog(
             user_id=user_id,
             action=action,
@@ -29,7 +34,7 @@ class AuditService:
             resource_id=resource_id,
             ip_address=ip_address,
             user_agent=user_agent,
-            payload=payload,
+            payload=jsonable_encoder(payload) if payload is not None else None,
         )
         self.db.add(log)
         await self.db.flush()
