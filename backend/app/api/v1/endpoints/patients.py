@@ -1,8 +1,10 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Depends, Query, status
 
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, require_roles
+from app.models.patient import PatientStatus, RiskLevel
+from app.models.user import UserRole
 from app.schemas.common import Page
 from app.schemas.patient import (
     PatientCreate,
@@ -11,9 +13,19 @@ from app.schemas.patient import (
     PatientOut,
     PatientUpdate,
 )
-from app.models.patient import PatientStatus, RiskLevel
-from app.services.patient_service import PatientService
 from app.services.audit_service import AuditService
+from app.services.patient_service import PatientService
+
+# Writes (create/update/delete) are restricted to clinicians + admins.
+# Reads stay open to any active authenticated user (nurses + coordinators
+# still need to see patient lists).
+write_role_dep = Depends(
+    require_roles(
+        UserRole.physician,
+        UserRole.surgeon,
+        UserRole.admin,
+    )
+)
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
@@ -35,7 +47,12 @@ async def list_patients(
     return await PatientService(db).list(filters, page=page, page_size=page_size)
 
 
-@router.post("", response_model=PatientOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=PatientOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[write_role_dep],
+)
 async def create_patient(
     payload: PatientCreate, db: DbSession, current: CurrentUser
 ) -> PatientOut:
@@ -63,7 +80,11 @@ async def get_patient(
     return PatientOut.model_validate(patient)
 
 
-@router.patch("/{patient_id}", response_model=PatientOut)
+@router.patch(
+    "/{patient_id}",
+    response_model=PatientOut,
+    dependencies=[write_role_dep],
+)
 async def update_patient(
     patient_id: UUID,
     payload: PatientUpdate,
@@ -81,7 +102,11 @@ async def update_patient(
     return PatientOut.model_validate(patient)
 
 
-@router.delete("/{patient_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{patient_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[write_role_dep],
+)
 async def delete_patient(
     patient_id: UUID, db: DbSession, current: CurrentUser
 ) -> None:
