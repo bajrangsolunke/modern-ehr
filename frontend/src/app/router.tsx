@@ -1,13 +1,9 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { Shell } from "@/components/layout/Shell";
 import { ProtectedRoute, PublicRoute } from "@/components/auth";
 import { LoginPage } from "@/features/auth";
 import { DashboardPage } from "@/features/dashboard";
-import {
-  PatientsPage,
-  PatientProfilePage,
-  PatientEditPage,
-} from "@/features/patients";
+import { PatientsPage, PatientProfilePage } from "@/features/patients";
 import { InsightsPage } from "@/features/analytics";
 import { AppointmentsPage } from "@/features/appointments";
 import { MobilePage } from "@/features/mobile";
@@ -24,13 +20,14 @@ export function AppRouter() {
         <Route element={<Shell />}>
           <Route path={ROUTES.dashboard} element={<DashboardPage />} />
           <Route path={ROUTES.patients} element={<PatientsPage />} />
-          {/* /patients/new is now a drawer on /patients; redirect any old links/bookmarks */}
+          {/* /patients/new and /patients/:id/edit are now drawers on the
+              listing and profile pages; redirect stale bookmarks. */}
           <Route
             path="/patients/new"
             element={<Navigate to={ROUTES.patients} replace />}
           />
           <Route path="/patients/:patientId" element={<PatientProfilePage />} />
-          <Route path="/patients/:patientId/edit" element={<PatientEditPage />} />
+          <Route path="/patients/:patientId/edit" element={<EditRedirect />} />
           <Route path={ROUTES.insights} element={<InsightsPage />} />
           <Route path={ROUTES.appointments} element={<AppointmentsPage />} />
           <Route path={ROUTES.docs} element={<Placeholder title="Docs" />} />
@@ -42,6 +39,11 @@ export function AppRouter() {
       <Route path="*" element={<Navigate to={ROUTES.dashboard} replace />} />
     </Routes>
   );
+}
+
+function EditRedirect() {
+  const { patientId } = useParams();
+  return <Navigate to={`/patients/${patientId}`} replace />;
 }
 
 function Placeholder({ title }: { title: string }) {

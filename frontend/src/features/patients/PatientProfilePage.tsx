@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PatientDrawer } from "@/features/patients/components/PatientDrawer";
 import { ProfileSkeleton } from "@/features/patients/components/ProfileSkeleton";
 import { useDeletePatient } from "@/features/patients/hooks/use-delete-patient";
 import { PatientHeader } from "@/features/patients/components/PatientHeader";
@@ -26,6 +27,7 @@ export function PatientProfilePage() {
   const { patientId } = useParams<{ patientId: string }>();
   const navigate = useNavigate();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const remove = useDeletePatient();
   const { data: patient, isLoading, isError, error, refetch, isFetching } = usePatient(
     patientId
@@ -46,7 +48,7 @@ export function PatientProfilePage() {
               <Button
                 variant="secondary"
                 className="h-10"
-                onClick={() => navigate(`/patients/${patient.id}/edit`)}
+                onClick={() => setEditOpen(true)}
               >
                 <Pencil className="size-4" />
                 Edit
@@ -120,6 +122,12 @@ export function PatientProfilePage() {
           setConfirmingDelete(false);
           navigate("/patients", { replace: true });
         }}
+      />
+
+      <PatientDrawer
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        patientId={patient?.id}
       />
     </>
   );

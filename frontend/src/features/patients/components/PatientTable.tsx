@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { ChevronsUpDown, Pencil, Trash2 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { UserAvatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StatusPill } from "@/components/ui/status-pill";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PatientDrawer } from "@/features/patients/components/PatientDrawer";
 import { useDeletePatient } from "@/features/patients/hooks/use-delete-patient";
 import { formatDate } from "@/lib/utils";
 import type { Patient } from "@/types";
@@ -16,9 +17,9 @@ const HEADER_BG = "#FFFFFF";
 const HEADER_SHADOW = "0 4px 12px rgba(17,24,39,0.06)";
 
 export function PatientTable({ data }: { data: Patient[] }) {
-  const navigate = useNavigate();
   const remove = useDeletePatient();
   const [pendingDelete, setPendingDelete] = useState<Patient | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   return (
     <>
@@ -127,7 +128,7 @@ export function PatientTable({ data }: { data: Patient[] }) {
                         size="icon"
                         className="size-7 rounded-full bg-white hover:bg-white/80 text-foreground/70"
                         aria-label="Edit patient"
-                        onClick={() => navigate(`/patients/${p.id}/edit`)}
+                        onClick={() => setEditingId(p.id)}
                       >
                         <Pencil className="size-3" />
                       </Button>
@@ -162,6 +163,12 @@ export function PatientTable({ data }: { data: Patient[] }) {
           await remove.mutateAsync(pendingDelete.id);
           setPendingDelete(null);
         }}
+      />
+
+      <PatientDrawer
+        open={Boolean(editingId)}
+        onOpenChange={(open) => !open && setEditingId(null)}
+        patientId={editingId ?? undefined}
       />
     </>
   );

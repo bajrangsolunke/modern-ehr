@@ -17,7 +17,7 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { PatientTable } from "@/features/patients/components/PatientTable";
 import { PatientCardGrid } from "@/features/patients/components/PatientCardGrid";
-import { PatientNewDrawer } from "@/features/patients/components/PatientNewDrawer";
+import { PatientDrawer } from "@/features/patients/components/PatientDrawer";
 import { usePatients } from "@/features/patients/hooks/use-patients";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useAppStore } from "@/stores/app-store";
@@ -154,7 +154,7 @@ export function PatientsPage() {
         </>
       )}
 
-      <PatientNewDrawer open={newDrawerOpen} onOpenChange={setNewDrawerOpen} />
+      <PatientDrawer open={newDrawerOpen} onOpenChange={setNewDrawerOpen} />
     </>
   );
 }
