@@ -53,13 +53,18 @@ def create_app() -> FastAPI:
     app.add_middleware(SlowAPIMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+
+    cors_kwargs: dict = {
+        "allow_credentials": True,
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+    }
+    if settings.ENVIRONMENT == "development":
+        # In dev, accept any localhost / 127.0.0.1 port (Vite picks a free port).
+        cors_kwargs["allow_origin_regex"] = r"http://(localhost|127\.0\.0\.1):\d+"
+    else:
+        cors_kwargs["allow_origins"] = settings.cors_origins
+    app.add_middleware(CORSMiddleware, **cors_kwargs)
 
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
