@@ -1,26 +1,38 @@
 from datetime import date
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.models.patient import PatientStatus, RiskLevel
+
+# ASA Physical Status Classification — only these values are clinically valid.
+AsaClass = Literal["I", "II", "III", "IV"]
+Sex = Literal["F", "M", "O"]
 
 
 class PatientBase(BaseModel):
     mrn: str = Field(min_length=1, max_length=64)
-    first_name: str
-    last_name: str
-    sex: str = Field(pattern="^(F|M|O)$")
+    first_name: str = Field(min_length=1, max_length=128)
+    last_name: str = Field(min_length=1, max_length=128)
+    sex: Sex
     dob: date
-    email: str | None = None
-    phone: str | None = None
-    city: str | None = None
+    email: EmailStr | None = None
+    phone: str | None = Field(default=None, max_length=64)
+    city: str | None = Field(default=None, max_length=255)
     avatar_url: str | None = None
-    procedure: str | None = None
+    procedure: str | None = Field(default=None, max_length=255)
     procedure_date: date | None = None
-    asa: str | None = None
+    asa: AsaClass | None = None
     icu_needed: bool = False
     tags: list[str] | None = None
+
+    @field_validator("dob")
+    @classmethod
+    def _dob_not_future(cls, v: date) -> date:
+        if v > date.today():
+            raise ValueError("Date of birth cannot be in the future")
+        return v
 
 
 class PatientCreate(PatientBase):
@@ -30,18 +42,21 @@ class PatientCreate(PatientBase):
 
 
 class PatientUpdate(BaseModel):
-    first_name: str | None = None
-    last_name: str | None = None
-    phone: str | None = None
-    procedure: str | None = None
+    first_name: str | None = Field(default=None, min_length=1, max_length=128)
+    last_name: str | None = Field(default=None, min_length=1, max_length=128)
+    email: EmailStr | None = None
+    phone: str | None = Field(default=None, max_length=64)
+    city: str | None = Field(default=None, max_length=255)
+    procedure: str | None = Field(default=None, max_length=255)
     procedure_date: date | None = None
-    asa: str | None = None
+    asa: AsaClass | None = None
     icu_needed: bool | None = None
     status: PatientStatus | None = None
     risk: RiskLevel | None = None
-    risk_score: int | None = None
     tags: list[str] | None = None
     assigned_physician_id: UUID | None = None
+    # Intentionally NOT exposed: risk_score (server-derived), mrn (immutable
+    # after create), sex/dob (clinically immutable — needs a separate flow).
 
 
 class PatientOut(PatientBase):
