@@ -24,7 +24,8 @@ export function formatTime(value: string | Date) {
   }).format(d);
 }
 
-export function initials(name: string) {
+export function initials(name: string | null | undefined) {
+  if (!name) return "?";
   return name
     .split(" ")
     .map((p) => p[0])

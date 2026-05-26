@@ -61,16 +61,17 @@ export interface PatientPage {
 }
 
 function mapPatient(dto: BackendPatientDto): Patient {
-  const firstName = dto.first_name;
-  const lastName = dto.last_name;
+  const firstName = dto.first_name ?? "";
+  const lastName = dto.last_name ?? "";
+  const fullName = `${firstName} ${lastName}`.trim() || "Unknown";
   return {
     id: dto.id,
     mrn: dto.mrn,
-    name: `${firstName} ${lastName}`,
+    name: fullName,
     firstName,
     lastName,
     sex: dto.sex,
-    dob: dto.dob,
+    dob: dto.dob ?? "",
     email: dto.email ?? undefined,
     phone: dto.phone ?? undefined,
     city: dto.city ?? undefined,
@@ -92,7 +93,8 @@ function mapPatient(dto: BackendPatientDto): Patient {
  * year's birthday hasn't happened yet — the prior naive `diff / 365.25`
  * formula was off by a day around birthdays.
  */
-function computeAge(dob: string): number {
+function computeAge(dob: string | null | undefined): number {
+  if (!dob || typeof dob !== "string") return 0;
   const [y, m, d] = dob.split("-").map(Number);
   if (!y || !m || !d) return 0;
   const today = new Date();
