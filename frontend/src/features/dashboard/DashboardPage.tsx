@@ -19,12 +19,21 @@ import {
 } from "@/features/dashboard/components/MiniCharts";
 import { UpcomingAppointments } from "@/features/dashboard/components/UpcomingAppointments";
 import { AppointmentRequests } from "@/features/dashboard/components/AppointmentRequests";
+import { useAuthStore } from "@/stores/auth-store";
+
+function useGreetingName() {
+  const user = useAuthStore((s) => s.user);
+  if (!user) return "Doctor";
+  const first = user.name.replace(/^Dr\.\s*/, "").split(" ")[0];
+  return `Dr. ${first}`;
+}
 
 export function DashboardPage() {
+  const greetingName = useGreetingName();
   return (
     <>
       <PageHeader
-        title="Welcome back, Dr. Robert! ☀️"
+        title={`Welcome back, ${greetingName}! ☀️`}
         right={
           <>
             <Input
