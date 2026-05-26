@@ -39,9 +39,25 @@ async def list_patients(
     q: str | None = None,
     status: PatientStatus | None = None,
     risk: RiskLevel | None = None,
+    asa: str | None = Query(None, pattern="^(I|II|III|IV)$"),
+    icu_needed: bool | None = None,
     physician_id: UUID | None = None,
+    sort_by: str = Query(
+        "created_at",
+        pattern="^(mrn|first_name|procedure_date|risk_score|created_at)$",
+    ),
+    sort_dir: str = Query("desc", pattern="^(asc|desc)$"),
 ) -> Page[PatientListItem]:
-    filters = PatientFilters(q=q, status=status, risk=risk, physician_id=physician_id)
+    filters = PatientFilters(
+        q=q,
+        status=status,
+        risk=risk,
+        asa=asa,  # type: ignore[arg-type]
+        icu_needed=icu_needed,
+        physician_id=physician_id,
+        sort_by=sort_by,  # type: ignore[arg-type]
+        sort_dir=sort_dir,  # type: ignore[arg-type]
+    )
     return await PatientService(db).list(filters, page=page, page_size=page_size)
 
 

@@ -1,10 +1,8 @@
 import { useState } from "react";
 import {
-  ArrowDownAZ,
   ChevronLeft,
   ChevronRight,
   Download,
-  Filter,
   LayoutGrid,
   Plus,
   Rows3,
@@ -18,24 +16,36 @@ import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { PatientTable } from "@/features/patients/components/PatientTable";
 import { PatientCardGrid } from "@/features/patients/components/PatientCardGrid";
 import { PatientDrawer } from "@/features/patients/components/PatientDrawer";
+import { PatientFiltersPopover } from "@/features/patients/components/PatientFiltersPopover";
+import { PatientSortPopover } from "@/features/patients/components/PatientSortPopover";
+import { PatientActiveFilters } from "@/features/patients/components/PatientActiveFilters";
 import { usePatients } from "@/features/patients/hooks/use-patients";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useAppStore } from "@/stores/app-store";
 import { cn } from "@/lib/utils";
+import type { PatientFilters } from "@/features/patients/api/patients-api";
+
+const DEFAULT_FILTERS: PatientFilters = {
+  page: 1,
+  page_size: 20,
+  sort_by: "created_at",
+  sort_dir: "desc",
+};
 
 export function PatientsPage() {
   const viewMode = useAppStore((s) => s.viewMode);
   const setViewMode = useAppStore((s) => s.setViewMode);
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, 300);
-  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<PatientFilters>(DEFAULT_FILTERS);
   const [newDrawerOpen, setNewDrawerOpen] = useState(false);
 
   const { data, isLoading, isError, error, refetch, isFetching } = usePatients({
+    ...filters,
     q: debouncedQuery || undefined,
-    page,
-    page_size: 20,
   });
+
+  const setPage = (p: number) => setFilters((f) => ({ ...f, page: p }));
 
   return (
     <>
@@ -52,23 +62,13 @@ export function PatientsPage() {
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
-                  setPage(1);
+                  setFilters((f) => ({ ...f, page: 1 }));
                 }}
                 className="bg-white"
               />
             </div>
-            <Button variant="secondary" className="h-10 pl-1.5 gap-2">
-              <span className="grid place-items-center size-7 rounded-full bg-[#F1F4F9] text-foreground/70">
-                <Filter className="size-3.5" />
-              </span>
-              Filter
-            </Button>
-            <Button variant="secondary" className="h-10 pl-1.5 gap-2">
-              <span className="grid place-items-center size-7 rounded-full bg-[#F1F4F9] text-foreground/70">
-                <ArrowDownAZ className="size-3.5" />
-              </span>
-              Sort by
-            </Button>
+            <PatientFiltersPopover filters={filters} onChange={setFilters} />
+            <PatientSortPopover filters={filters} onChange={setFilters} />
             <div className="flex items-center bg-white border border-border rounded-full p-1 h-10 shadow-soft">
               <button
                 onClick={() => setViewMode("table")}
@@ -105,6 +105,8 @@ export function PatientsPage() {
         }
       />
 
+      <PatientActiveFilters filters={filters} onChange={setFilters} className="mb-3" />
+
       {isLoading && <TableSkeleton rows={8} cols={9} />}
 
       {isError && !isLoading && (
@@ -133,7 +135,7 @@ export function PatientsPage() {
                 variant="secondary"
                 size="icon"
                 className="size-9 rounded-full"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={() => setPage(Math.max(1, (filters.page ?? 1) - 1))}
                 disabled={data.page <= 1}
               >
                 <ChevronLeft className="size-3.5" />
@@ -144,7 +146,7 @@ export function PatientsPage() {
               <Button
                 size="icon"
                 className="size-9 rounded-full"
-                onClick={() => setPage((p) => Math.min(data.pages, p + 1))}
+                onClick={() => setPage(Math.min(data.pages, (filters.page ?? 1) + 1))}
                 disabled={data.page >= data.pages}
               >
                 <ChevronRight className="size-3.5" />

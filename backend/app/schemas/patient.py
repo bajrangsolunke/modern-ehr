@@ -85,8 +85,16 @@ class PatientListItem(BaseModel):
     assigned_physician_id: UUID | None
 
 
+SortBy = Literal["mrn", "first_name", "procedure_date", "risk_score", "created_at"]
+SortDir = Literal["asc", "desc"]
+
+
 class PatientFilters(BaseModel):
     q: str | None = None
     status: PatientStatus | None = None
     risk: RiskLevel | None = None
+    asa: AsaClass | None = None
+    icu_needed: bool | None = None
     physician_id: UUID | None = None
+    sort_by: SortBy = "created_at"
+    sort_dir: SortDir = "desc"

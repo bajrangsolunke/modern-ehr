@@ -104,7 +104,11 @@ class PatientService:
             q=filters.q,
             status=filters.status,
             risk=filters.risk,
+            asa=filters.asa,
+            icu_needed=filters.icu_needed,
             physician_id=filters.physician_id,
+            sort_by=filters.sort_by,
+            sort_dir=filters.sort_dir,
             offset=(page - 1) * page_size,
             limit=page_size,
         )

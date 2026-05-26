@@ -31,10 +31,23 @@ interface PageDto<T> {
   pages: number;
 }
 
+export type PatientSortBy =
+  | "mrn"
+  | "first_name"
+  | "procedure_date"
+  | "risk_score"
+  | "created_at";
+export type PatientSortDir = "asc" | "desc";
+
 export interface PatientFilters {
   q?: string;
   status?: Patient["status"];
   risk?: Patient["risk"];
+  asa?: "I" | "II" | "III" | "IV";
+  icu_needed?: boolean;
+  physician_id?: string;
+  sort_by?: PatientSortBy;
+  sort_dir?: PatientSortDir;
   page?: number;
   page_size?: number;
 }
@@ -101,6 +114,11 @@ export const patientsApi = {
         q: filters.q,
         status: filters.status,
         risk: filters.risk,
+        asa: filters.asa,
+        icu_needed: filters.icu_needed,
+        physician_id: filters.physician_id,
+        sort_by: filters.sort_by,
+        sort_dir: filters.sort_dir,
         page: filters.page ?? 1,
         page_size: filters.page_size ?? 20,
       },
