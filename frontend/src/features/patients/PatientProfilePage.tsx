@@ -160,7 +160,7 @@ export function PatientProfilePage() {
 
             <TabsContent value="vitals" className="mt-0">
               <div className="grid grid-cols-1 gap-4">
-                <Vitals />
+                <Vitals patientId={patient.id} />
                 <Labs />
               </div>
             </TabsContent>
