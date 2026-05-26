@@ -9,11 +9,11 @@ def test_health() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
-    assert body["service"] == "symptra-backend"
+    assert body["service"] == "padmavat-backend"
 
 
 def test_root() -> None:
     client = TestClient(app)
     response = client.get("/")
     assert response.status_code == 200
-    assert "Symptra" in response.json()["name"]
+    assert "Padmavat" in response.json()["name"]

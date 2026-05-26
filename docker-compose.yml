@@ -1,25 +1,25 @@
 services:
   db:
     image: pgvector/pgvector:pg16
-    container_name: symptra-db
+    container_name: padmavat-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: symptra
-      POSTGRES_PASSWORD: symptra
-      POSTGRES_DB: symptra
+      POSTGRES_USER: padmavat
+      POSTGRES_PASSWORD: padmavat
+      POSTGRES_DB: padmavat
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U symptra"]
+      test: ["CMD-SHELL", "pg_isready -U padmavat"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   redis:
     image: redis:7-alpine
-    container_name: symptra-redis
+    container_name: padmavat-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -31,7 +31,7 @@ services:
 
   backend:
     build: ./backend
-    container_name: symptra-backend
+    container_name: padmavat-backend
     restart: unless-stopped
     depends_on:
       db:
@@ -52,7 +52,7 @@ services:
 
   worker:
     build: ./backend
-    container_name: symptra-worker
+    container_name: padmavat-worker
     restart: unless-stopped
     depends_on:
       - backend
@@ -70,7 +70,7 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: symptra-frontend
+    container_name: padmavat-frontend
     restart: unless-stopped
     depends_on:
       - backend

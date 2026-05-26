@@ -13,7 +13,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    PROJECT_NAME: str = "Symptra"
+    PROJECT_NAME: str = "Padmavat"
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api/v1"
@@ -25,9 +25,9 @@ class Settings(BaseSettings):
 
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
-    POSTGRES_DB: str = "symptra"
-    POSTGRES_USER: str = "symptra"
-    POSTGRES_PASSWORD: str = "symptra"
+    POSTGRES_DB: str = "padmavat"
+    POSTGRES_USER: str = "padmavat"
+    POSTGRES_PASSWORD: str = "padmavat"
 
     REDIS_URL: str = "redis://localhost:6379/0"
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"

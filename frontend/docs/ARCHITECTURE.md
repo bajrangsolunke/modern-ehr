@@ -1,6 +1,6 @@
 # Frontend architecture
 
-Symptra uses the **feature-first** architecture popularized by *Bulletproof React* and used by Linear, Vercel, Plaid, and most modern React teams. The codebase is organized by **what a thing does for the product**, not by **what kind of file** it is.
+Padmavat uses the **feature-first** architecture popularized by *Bulletproof React* and used by Linear, Vercel, Plaid, and most modern React teams. The codebase is organized by **what a thing does for the product**, not by **what kind of file** it is.
 
 ## Folder map
 

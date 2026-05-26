@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Wire the Symptra React frontend to the FastAPI backend with real auth, real data, demo-mode fallback, and a complete form/error/loading UX kit — enabling end-to-end functionality for downstream phases (Patient/Dashboard polish, AI integration, new screens).
+**Goal:** Wire the Padmavat React frontend to the FastAPI backend with real auth, real data, demo-mode fallback, and a complete form/error/loading UX kit — enabling end-to-end functionality for downstream phases (Patient/Dashboard polish, AI integration, new screens).
 
 **Architecture:** Zustand auth store + extended `api-client` (Bearer auth, silent refresh, connectivity fallback) + per-feature `api/` + `hooks/` (TanStack React Query) + RHF/Zod forms + Sonner toasts. Mocks remain as the demo-mode fallback data source — zero duplication.
 
@@ -93,7 +93,7 @@ function readBool(key: string, fallback: boolean): boolean {
 export const env: AppEnv = {
   API_BASE_URL: read("VITE_API_BASE_URL", "http://localhost:8000/api/v1"),
   WS_URL: read("VITE_WS_URL", "ws://localhost:8000/ws"),
-  APP_NAME: read("VITE_APP_NAME", "Symptra"),
+  APP_NAME: read("VITE_APP_NAME", "Padmavat"),
   MODE: (import.meta.env.MODE as AppEnv["MODE"]) ?? "development",
   DEMO_FALLBACK: readBool("VITE_DEMO_FALLBACK", import.meta.env.MODE !== "production"),
 };
@@ -691,7 +691,7 @@ Replace `frontend/src/lib/api-client.ts`:
 
 ```ts
 /**
- * Typed fetch wrapper for the Symptra backend.
+ * Typed fetch wrapper for the Padmavat backend.
  * - Attaches the access token from the auth store
  * - On 401, attempts a single refresh + retry; if that also fails, logs out
  * - On connectivity failure, returns demoFallback() if provided and DEMO_FALLBACK
@@ -1229,7 +1229,7 @@ export function LoginForm() {
     formState: { errors },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "robert.fox@symptra.health", password: "symptra123" },
+    defaultValues: { email: "robert.fox@padmavat.health", password: "padmavat123" },
   });
   const login = useLogin();
 
@@ -1342,14 +1342,14 @@ export function LoginPage() {
               </svg>
             </div>
             <div className="font-display text-[22px] font-bold tracking-tight">
-              Symptra
+              Padmavat
             </div>
           </div>
 
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Sign in to your Symptra account to continue.
+              Sign in to your Padmavat account to continue.
             </p>
           </div>
 
@@ -1358,7 +1358,7 @@ export function LoginPage() {
           <p className="text-xs text-muted-foreground">
             Demo creds:{" "}
             <span className="font-mono text-foreground/70">
-              robert.fox@symptra.health / symptra123
+              robert.fox@padmavat.health / padmavat123
             </span>
           </p>
         </div>
@@ -1372,7 +1372,7 @@ export function LoginPage() {
             doctors actually want to use.
           </h2>
           <p className="text-white/80 mt-4 leading-relaxed">
-            Symptra brings clinical intelligence to your daily practice. Spend
+            Padmavat brings clinical intelligence to your daily practice. Spend
             less time on paperwork and more time with patients.
           </p>
         </div>
@@ -1615,7 +1615,7 @@ export function Topbar() {
               />
             </svg>
           </div>
-          <div className="font-display text-[22px] font-bold tracking-tight">Symptra</div>
+          <div className="font-display text-[22px] font-bold tracking-tight">Padmavat</div>
         </div>
 
         <nav className="hidden lg:flex items-center gap-1 mx-auto bg-[#F1F4F9] rounded-full p-1">
@@ -2786,7 +2786,7 @@ Expected: dev server at `http://localhost:5173`.
 For each item, verify and check the box:
 
 - [ ] AC1: Visit `/` while logged out → redirected to `/login`
-- [ ] AC2: Submit `robert.fox@symptra.health` / `symptra123` → land on `/`, no errors
+- [ ] AC2: Submit `robert.fox@padmavat.health` / `padmavat123` → land on `/`, no errors
 - [ ] AC3: Topbar shows "Dr. Robert Fox" and the role
 - [ ] AC4: `/patients` shows real patients from `/api/v1/patients` (devtools Network tab shows the request)
 - [ ] AC5: Click any patient → `/patients/:id` loads their real data

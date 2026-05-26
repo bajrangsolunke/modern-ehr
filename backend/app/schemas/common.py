@@ -8,7 +8,7 @@ T = TypeVar("T")
 
 class HealthResponse(BaseModel):
     status: str = "ok"
-    service: str = "symptra-backend"
+    service: str = "padmavat-backend"
     version: str = "1.0.0"
     timestamp: datetime
 

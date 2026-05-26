@@ -1,4 +1,4 @@
-export const APP_NAME = "Symptra";
+export const APP_NAME = "Padmavat";
 export const APP_TAGLINE = "AI-native EHR platform";
 
 export const ROUTES = {
@@ -36,9 +36,9 @@ export const QUERY_KEYS = {
 };
 
 export const STORAGE_KEYS = {
-  accessToken: "symptra.access_token",
-  refreshToken: "symptra.refresh_token",
-  theme: "symptra.theme",
+  accessToken: "padmavat.access_token",
+  refreshToken: "padmavat.refresh_token",
+  theme: "padmavat.theme",
 } as const;
 
 export const PAGE_SIZE = 20;

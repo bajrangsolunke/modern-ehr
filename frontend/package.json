@@ -1,9 +1,9 @@
 {
-  "name": "symptra-ehr-frontend",
+  "name": "padmavat-ehr-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Symptra — AI-native EHR/EMR platform frontend",
+  "description": "Padmavat — AI-native EHR/EMR platform frontend",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

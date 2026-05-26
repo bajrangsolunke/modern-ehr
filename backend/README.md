@@ -1,6 +1,6 @@
-# Symptra · Backend
+# Padmavat · Backend
 
-Production-grade FastAPI backend for the Symptra AI-native EHR platform.
+Production-grade FastAPI backend for the Padmavat AI-native EHR platform.
 
 **Stack:** Python 3.12 · FastAPI · SQLAlchemy 2.0 (async) · PostgreSQL · pgvector · Alembic · Redis · Celery · WebSockets · JWT · Pydantic v2 · OpenAI / LangChain.
 

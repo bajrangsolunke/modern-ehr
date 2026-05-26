@@ -42,22 +42,22 @@ async def seed() -> None:
         # Users
         users = [
             User(
-                email="robert.fox@symptra.health",
-                hashed_password=hash_password("symptra123"),
+                email="robert.fox@padmavat.health",
+                hashed_password=hash_password("padmavat123"),
                 full_name="Dr. Robert Fox",
                 role=UserRole.surgeon,
                 specialty="Orthopedics & Trauma Surgery",
             ),
             User(
-                email="leslie@symptra.health",
-                hashed_password=hash_password("symptra123"),
+                email="leslie@padmavat.health",
+                hashed_password=hash_password("padmavat123"),
                 full_name="Dr. Leslie Alexander",
                 role=UserRole.physician,
                 specialty="Orthopedic Surgeon",
             ),
             User(
-                email="jane@symptra.health",
-                hashed_password=hash_password("symptra123"),
+                email="jane@padmavat.health",
+                hashed_password=hash_password("padmavat123"),
                 full_name="Dr. Jane Cooper",
                 role=UserRole.physician,
                 specialty="Anesthesiologist",

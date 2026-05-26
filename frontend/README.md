@@ -1,4 +1,4 @@
-# Symptra · Frontend
+# Padmavat · Frontend
 
 AI-native EHR/EMR frontend.
 

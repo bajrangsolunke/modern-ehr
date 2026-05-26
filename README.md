@@ -1,10 +1,10 @@
-# Symptra · AI-native EHR Platform
+# Padmavat · AI-native EHR Platform
 
 A next-generation Electronic Health Record / EMR platform with the design language of Linear + Stripe + Apple Health, and an AI-first clinical workflow.
 
 > *Apple + Linear + Stripe built an AI-native EHR.*
 
-![Symptra](frontend/public/symptra.svg)
+![Padmavat](frontend/public/padmavat.svg)
 
 ## What's inside
 
@@ -106,9 +106,9 @@ Tokens live in [`frontend/tailwind.config.ts`](frontend/tailwind.config.ts) and 
 ## Demo credentials
 
 After running `python -m scripts.seed`:
-- `robert.fox@symptra.health` / `symptra123` — Surgeon
-- `leslie@symptra.health` / `symptra123` — Physician
-- `jane@symptra.health` / `symptra123` — Anesthesiologist
+- `robert.fox@padmavat.health` / `padmavat123` — Surgeon
+- `leslie@padmavat.health` / `padmavat123` — Physician
+- `jane@padmavat.health` / `padmavat123` — Anesthesiologist
 
 ## License
 

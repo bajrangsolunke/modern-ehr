@@ -26,7 +26,7 @@ function readBool(key: string, fallback: boolean): boolean {
 export const env: AppEnv = {
   API_BASE_URL: read("VITE_API_BASE_URL", "http://localhost:8000/api/v1"),
   WS_URL: read("VITE_WS_URL", "ws://localhost:8000/ws"),
-  APP_NAME: read("VITE_APP_NAME", "Symptra"),
+  APP_NAME: read("VITE_APP_NAME", "Padmavat"),
   MODE: (import.meta.env.MODE as AppEnv["MODE"]) ?? "development",
   DEMO_FALLBACK: readBool("VITE_DEMO_FALLBACK", import.meta.env.MODE !== "production"),
 };

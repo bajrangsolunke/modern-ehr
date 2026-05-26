@@ -1,10 +1,10 @@
-# Symptra Foundation Integration — Design
+# Padmavat Foundation Integration — Design
 
 **Date:** 2026-05-26
 **Scope:** Sub-project A (foundation only)
 **Author:** Claude + Bajrang
 
-This is the first of four sub-projects that turn the Symptra scaffold into a fully functional product. Phase A builds the plumbing that everything else depends on. Phases B (Patient feature wired + Dashboard polish), C (AI + WebSockets), and D (new screens) each get their own design doc later.
+This is the first of four sub-projects that turn the Padmavat scaffold into a fully functional product. Phase A builds the plumbing that everything else depends on. Phases B (Patient feature wired + Dashboard polish), C (AI + WebSockets), and D (new screens) each get their own design doc later.
 
 ## Goal
 
@@ -12,7 +12,7 @@ Make the React frontend talk to the FastAPI backend end-to-end with real auth, r
 
 After this phase ships, a developer should be able to:
 
-1. `docker compose up` → land on `/login` → sign in with `robert.fox@symptra.health / symptra123`
+1. `docker compose up` → land on `/login` → sign in with `robert.fox@padmavat.health / padmavat123`
 2. See the Dashboard render with a real `Welcome back, Dr. Robert Fox`
 3. Navigate to `/patients`, see the real seeded patients from the DB
 4. Click a patient → see their real profile

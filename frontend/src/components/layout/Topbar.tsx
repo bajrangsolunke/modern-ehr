@@ -38,7 +38,7 @@ export function Topbar() {
               />
             </svg>
           </div>
-          <div className="font-display text-[22px] font-bold tracking-tight">Symptra</div>
+          <div className="font-display text-[22px] font-bold tracking-tight">Padmavat</div>
         </div>
 
         <nav className="hidden lg:flex items-center gap-1 mx-auto bg-[#F1F4F9] rounded-full p-1">
