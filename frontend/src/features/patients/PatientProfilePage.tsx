@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Pencil, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -74,27 +72,9 @@ export function PatientProfilePage() {
         onBack={() => navigate(-1)}
         right={
           patient && (
-            <>
-              <span className="text-xs text-muted-foreground mr-2">
-                MRN {patient.mrn}
-              </span>
-              <Button
-                variant="secondary"
-                className="h-10"
-                onClick={() => setEditOpen(true)}
-              >
-                <Pencil className="size-4" />
-                Edit
-              </Button>
-              <Button
-                variant="secondary"
-                className="h-10 text-danger hover:text-danger"
-                onClick={() => setConfirmingDelete(true)}
-              >
-                <Trash2 className="size-4" />
-                Remove
-              </Button>
-            </>
+            <span className="text-xs text-muted-foreground">
+              MRN {patient.mrn}
+            </span>
           )
         }
       />
@@ -114,7 +94,11 @@ export function PatientProfilePage() {
         <div className="space-y-4">
           {/* Patient header + alerts strip — always visible above the tabs */}
           <div className="space-y-4">
-            <PatientHeader patient={patient} />
+            <PatientHeader
+              patient={patient}
+              onEdit={() => setEditOpen(true)}
+              onRemove={() => setConfirmingDelete(true)}
+            />
             <AlertsStrip patientId={patient.id} />
           </div>
 

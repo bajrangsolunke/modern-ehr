@@ -50,7 +50,8 @@ class Patient(Base, UUIDMixin, TimestampMixin):
     email: Mapped[str | None] = mapped_column(String(255))
     phone: Mapped[str | None] = mapped_column(String(64))
     city: Mapped[str | None] = mapped_column(String(255))
-    avatar_url: Mapped[str | None] = mapped_column(String(512))
+    # Holds either an http(s) URL or a data URL (small inline photo).
+    avatar_url: Mapped[str | None] = mapped_column(Text)
 
     procedure: Mapped[str | None] = mapped_column(String(255))
     procedure_date: Mapped[date | None] = mapped_column(Date)

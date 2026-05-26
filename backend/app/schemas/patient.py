@@ -47,6 +47,7 @@ class PatientUpdate(BaseModel):
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=64)
     city: str | None = Field(default=None, max_length=255)
+    avatar_url: str | None = Field(default=None, max_length=2_000_000)
     procedure: str | None = Field(default=None, max_length=255)
     procedure_date: date | None = None
     asa: AsaClass | None = None

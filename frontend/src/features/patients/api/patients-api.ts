@@ -178,6 +178,7 @@ export interface PatientInput {
   email?: string | null;
   phone?: string | null;
   city?: string | null;
+  avatar_url?: string | null;
   procedure?: string | null;
   procedure_date?: string | null;
   asa?: "I" | "II" | "III" | "IV" | null;
