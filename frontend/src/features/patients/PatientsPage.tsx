@@ -18,6 +18,7 @@ import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { PatientTable } from "@/features/patients/components/PatientTable";
 import { PatientCardGrid } from "@/features/patients/components/PatientCardGrid";
 import { usePatients } from "@/features/patients/hooks/use-patients";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useAppStore } from "@/stores/app-store";
 import { cn } from "@/lib/utils";
 
@@ -25,10 +26,11 @@ export function PatientsPage() {
   const viewMode = useAppStore((s) => s.viewMode);
   const setViewMode = useAppStore((s) => s.setViewMode);
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query, 300);
   const [page, setPage] = useState(1);
 
   const { data, isLoading, isError, error, refetch, isFetching } = usePatients({
-    q: query || undefined,
+    q: debouncedQuery || undefined,
     page,
     page_size: 20,
   });
