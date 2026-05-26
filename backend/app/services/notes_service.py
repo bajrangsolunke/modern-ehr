@@ -37,3 +37,12 @@ class NotesService:
             .order_by(SoapNote.created_at.desc())
         )
         return list(result.scalars().all())
+
+    async def delete(self, note_id: UUID) -> bool:
+        """Hard delete a SOAP note. Returns True if a row was removed."""
+        note = await self.db.get(SoapNote, note_id)
+        if not note:
+            return False
+        await self.db.delete(note)
+        await self.db.flush()
+        return True

@@ -102,6 +102,7 @@ export const soapNotes: SoapNote[] = [
     id: "n-1",
     date: "2025-05-12T09:14",
     author: "Dr. Müller",
+    version: 1,
     subjective:
       "Patient reports persistent right hip pain (7/10), worse with weight-bearing. Mild swelling. Denies fevers.",
     objective:

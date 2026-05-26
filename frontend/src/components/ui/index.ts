@@ -16,4 +16,5 @@ export * from "./stat-card";
 export * from "./status-pill";
 export * from "./table-skeleton";
 export * from "./tabs";
+export * from "./textarea";
 export * from "./tooltip";

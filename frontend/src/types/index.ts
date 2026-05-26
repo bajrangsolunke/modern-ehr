@@ -98,13 +98,19 @@ export interface LabResult {
 
 export interface SoapNote {
   id: string;
+  patientId?: string;
+  authorId?: string;
+  /** When this note was created. ISO timestamp. */
   date: string;
+  /** Display name of the author. Backend may not always have this; fallback to a dash. */
   author: string;
   subjective: string;
   objective: string;
   assessment: string;
   plan: string;
   aiSummary?: string;
+  version: number;
+  updatedAt?: string;
 }
 
 export interface TimelineEvent {
