@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   ArrowDownAZ,
   ChevronLeft,
@@ -18,18 +17,19 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { PatientTable } from "@/features/patients/components/PatientTable";
 import { PatientCardGrid } from "@/features/patients/components/PatientCardGrid";
+import { PatientNewDrawer } from "@/features/patients/components/PatientNewDrawer";
 import { usePatients } from "@/features/patients/hooks/use-patients";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useAppStore } from "@/stores/app-store";
 import { cn } from "@/lib/utils";
 
 export function PatientsPage() {
-  const navigate = useNavigate();
   const viewMode = useAppStore((s) => s.viewMode);
   const setViewMode = useAppStore((s) => s.setViewMode);
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, 300);
   const [page, setPage] = useState(1);
+  const [newDrawerOpen, setNewDrawerOpen] = useState(false);
 
   const { data, isLoading, isError, error, refetch, isFetching } = usePatients({
     q: debouncedQuery || undefined,
@@ -98,7 +98,7 @@ export function PatientsPage() {
             <Button variant="secondary" className="h-10">
               <Download className="size-4" /> Export data
             </Button>
-            <Button className="h-10" onClick={() => navigate("/patients/new")}>
+            <Button className="h-10" onClick={() => setNewDrawerOpen(true)}>
               <Plus className="size-4" /> New patient
             </Button>
           </>
@@ -153,6 +153,8 @@ export function PatientsPage() {
           </div>
         </>
       )}
+
+      <PatientNewDrawer open={newDrawerOpen} onOpenChange={setNewDrawerOpen} />
     </>
   );
 }

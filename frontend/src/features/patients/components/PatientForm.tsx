@@ -1,9 +1,10 @@
-import { Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { useForm, zodResolver, z } from "@/lib/form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormField } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { PatientInput } from "@/features/patients/api/patients-api";
 import type { Patient } from "@/types";
 
@@ -103,19 +104,23 @@ export function PatientForm({
   return (
     <form onSubmit={submit} className="space-y-4 lg:space-y-5" noValidate>
       <Section title="Identity">
-        <Grid>
+        <Field>
           <FormField label="MRN" required htmlFor="mrn" error={errors.mrn?.message}>
             <Input id="mrn" placeholder="e.g. 1042" {...register("mrn")} />
           </FormField>
+        </Field>
+        <Field>
           <FormField label="Sex" required htmlFor="sex" error={errors.sex?.message}>
             <Select id="sex" {...register("sex")}>
               {sexes.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {s === "F" ? "Female" : s === "M" ? "Male" : "Other"}
                 </option>
               ))}
             </Select>
           </FormField>
+        </Field>
+        <Field>
           <FormField
             label="Date of birth"
             required
@@ -124,41 +129,54 @@ export function PatientForm({
           >
             <Input id="dob" type="date" {...register("dob")} />
           </FormField>
+        </Field>
+        <Field>
           <FormField
             label="First name"
             required
             htmlFor="first_name"
             error={errors.first_name?.message}
           >
-            <Input id="first_name" {...register("first_name")} />
+            <Input id="first_name" {...register("first_name")} placeholder="Robert" />
           </FormField>
+        </Field>
+        <Field>
           <FormField
             label="Last name"
             required
             htmlFor="last_name"
             error={errors.last_name?.message}
           >
-            <Input id="last_name" {...register("last_name")} />
+            <Input id="last_name" {...register("last_name")} placeholder="Fox" />
           </FormField>
+        </Field>
+        <Field>
           <FormField label="City" htmlFor="city" error={errors.city?.message}>
             <Input id="city" {...register("city")} placeholder="Berlin, Germany" />
           </FormField>
-        </Grid>
+        </Field>
       </Section>
 
       <Section title="Contact">
-        <Grid>
+        <Field span={2}>
           <FormField label="Email" htmlFor="email" error={errors.email?.message}>
-            <Input id="email" type="email" placeholder="patient@example.org" {...register("email")} />
+            <Input
+              id="email"
+              type="email"
+              placeholder="patient@example.org"
+              {...register("email")}
+            />
           </FormField>
+        </Field>
+        <Field>
           <FormField label="Phone" htmlFor="phone" error={errors.phone?.message}>
             <Input id="phone" type="tel" placeholder="+49…" {...register("phone")} />
           </FormField>
-        </Grid>
+        </Field>
       </Section>
 
       <Section title="Clinical">
-        <Grid>
+        <Field span={2}>
           <FormField
             label="Planned procedure"
             htmlFor="procedure"
@@ -170,6 +188,8 @@ export function PatientForm({
               {...register("procedure")}
             />
           </FormField>
+        </Field>
+        <Field>
           <FormField
             label="Procedure date"
             htmlFor="procedure_date"
@@ -177,6 +197,8 @@ export function PatientForm({
           >
             <Input id="procedure_date" type="date" {...register("procedure_date")} />
           </FormField>
+        </Field>
+        <Field>
           <FormField label="ASA class" htmlFor="asa" error={errors.asa?.message}>
             <Select id="asa" {...register("asa")}>
               <option value="">—</option>
@@ -187,10 +209,12 @@ export function PatientForm({
               ))}
             </Select>
           </FormField>
-          <FormField label="ICU bed needed" htmlFor="icu_needed">
+        </Field>
+        <Field span={2}>
+          <FormField label="ICU bed" htmlFor="icu_needed">
             <label
               htmlFor="icu_needed"
-              className="flex items-center gap-2 h-10 px-4 rounded-full border border-border bg-white"
+              className="flex items-center gap-2 h-10 px-4 rounded-full border border-border bg-white shadow-soft cursor-pointer"
             >
               <input
                 id="icu_needed"
@@ -201,12 +225,17 @@ export function PatientForm({
               <span className="text-sm">Reserve ICU bed post-op</span>
             </label>
           </FormField>
-        </Grid>
+        </Field>
       </Section>
 
       <Section title="Care plan">
-        <Grid>
-          <FormField label="Status" required htmlFor="status" error={errors.status?.message}>
+        <Field>
+          <FormField
+            label="Status"
+            required
+            htmlFor="status"
+            error={errors.status?.message}
+          >
             <Select id="status" {...register("status")}>
               {statuses.map((s) => (
                 <option key={s} value={s}>
@@ -215,7 +244,14 @@ export function PatientForm({
               ))}
             </Select>
           </FormField>
-          <FormField label="Risk level" required htmlFor="risk" error={errors.risk?.message}>
+        </Field>
+        <Field>
+          <FormField
+            label="Risk level"
+            required
+            htmlFor="risk"
+            error={errors.risk?.message}
+          >
             <Select id="risk" {...register("risk")}>
               {risks.map((r) => (
                 <option key={r} value={r}>
@@ -224,25 +260,36 @@ export function PatientForm({
               ))}
             </Select>
           </FormField>
+        </Field>
+        <Field>
           <FormField
             label="Tags"
             htmlFor="tags"
-            hint="Comma separated. e.g. #ASA II, #ICU needed"
+            hint="Comma separated"
             error={errors.tags?.message}
-            className="col-span-full"
           >
-            <Input id="tags" {...register("tags")} placeholder="#ASA II, #ICU needed" />
+            <Input
+              id="tags"
+              {...register("tags")}
+              placeholder="#ASA II, #ICU needed"
+            />
           </FormField>
-        </Grid>
+        </Field>
       </Section>
 
       <div className="flex items-center justify-end gap-2 pt-2">
         {onCancel && (
-          <Button type="button" variant="secondary" onClick={onCancel} disabled={submitting}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onCancel}
+            disabled={submitting}
+            className="h-10"
+          >
             Cancel
           </Button>
         )}
-        <Button type="submit" disabled={submitting}>
+        <Button type="submit" disabled={submitting} className="h-10">
           {submitting && <Loader2 className="size-4 animate-spin" />}
           {submitting ? "Saving…" : submitLabel}
         </Button>
@@ -251,20 +298,37 @@ export function PatientForm({
   );
 }
 
+/* Sectioned card. Children render into a 3-col grid; each Field can
+   span 1, 2, or 3 columns. */
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card>
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-3">
         <CardTitle className="text-[15px]">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="pb-5">{children}</CardContent>
+      <CardContent className="pb-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 auto-rows-min">
+          {children}
+        </div>
+      </CardContent>
     </Card>
   );
 }
 
-function Grid({ children }: { children: React.ReactNode }) {
+function Field({
+  children,
+  span = 1,
+}: {
+  children: React.ReactNode;
+  span?: 1 | 2 | 3;
+}) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
+    <div
+      className={cn(
+        span === 2 && "lg:col-span-2",
+        span === 3 && "lg:col-span-3 sm:col-span-2"
+      )}
+    >
       {children}
     </div>
   );
@@ -272,10 +336,13 @@ function Grid({ children }: { children: React.ReactNode }) {
 
 function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select
-      {...props}
-      className="h-10 w-full rounded-full border border-border bg-white px-4 text-sm shadow-soft ring-focus appearance-none cursor-pointer"
-    />
+    <div className="relative">
+      <select
+        {...props}
+        className="h-10 w-full rounded-full border border-border bg-white px-4 pr-9 text-sm shadow-soft ring-focus appearance-none cursor-pointer"
+      />
+      <ChevronDown className="size-4 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+    </div>
   );
 }
 

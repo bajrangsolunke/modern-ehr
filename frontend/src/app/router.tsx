@@ -6,7 +6,6 @@ import { DashboardPage } from "@/features/dashboard";
 import {
   PatientsPage,
   PatientProfilePage,
-  PatientNewPage,
   PatientEditPage,
 } from "@/features/patients";
 import { InsightsPage } from "@/features/analytics";
@@ -25,7 +24,6 @@ export function AppRouter() {
         <Route element={<Shell />}>
           <Route path={ROUTES.dashboard} element={<DashboardPage />} />
           <Route path={ROUTES.patients} element={<PatientsPage />} />
-          <Route path="/patients/new" element={<PatientNewPage />} />
           <Route path="/patients/:patientId" element={<PatientProfilePage />} />
           <Route path="/patients/:patientId/edit" element={<PatientEditPage />} />
           <Route path={ROUTES.insights} element={<InsightsPage />} />
