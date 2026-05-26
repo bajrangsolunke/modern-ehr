@@ -16,13 +16,12 @@ from app.schemas.patient import (
 from app.services.audit_service import AuditService
 from app.services.patient_service import PatientService
 
-# Writes (create/update/delete) are restricted to clinicians + admins.
-# Reads stay open to any active authenticated user (nurses + coordinators
-# still need to see patient lists).
+# Writes (create/update/delete) are restricted to providers + admins.
+# Reads stay open to any active authenticated user — staff still need
+# to see patient lists for scheduling.
 write_role_dep = Depends(
     require_roles(
-        UserRole.physician,
-        UserRole.surgeon,
+        UserRole.provider,
         UserRole.admin,
     )
 )

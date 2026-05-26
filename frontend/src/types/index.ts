@@ -1,4 +1,4 @@
-export type Role = "surgeon" | "physician" | "nurse" | "admin" | "coordinator";
+export type Role = "provider" | "staff" | "admin";
 
 export type RiskLevel = "low" | "moderate" | "high" | "critical";
 

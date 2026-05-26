@@ -15,10 +15,12 @@ if TYPE_CHECKING:
 
 
 class UserRole(str, enum.Enum):
-    surgeon = "surgeon"
-    physician = "physician"
-    nurse = "nurse"
-    coordinator = "coordinator"
+    # Simplified three-role model.
+    # - provider: clinicians (write clinical records)
+    # - staff: schedulers / coordinators (manage appointments, read patients)
+    # - admin: full access, including user management
+    provider = "provider"
+    staff = "staff"
     admin = "admin"
 
 
@@ -29,7 +31,7 @@ class User(Base, UUIDMixin, TimestampMixin):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole, name="user_role"), default=UserRole.physician, nullable=False
+        Enum(UserRole, name="user_role"), default=UserRole.provider, nullable=False
     )
     specialty: Mapped[str | None] = mapped_column(String(255))
     avatar_url: Mapped[str | None] = mapped_column(String(512))

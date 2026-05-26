@@ -8,7 +8,7 @@ export const ROUTES = {
   insights: "/insights",
   appointments: "/appointments",
   docs: "/docs",
-  team: "/team",
+  users: "/users",
   mobile: "/mobile",
 } as const;
 
@@ -27,6 +27,11 @@ export const QUERY_KEYS = {
   },
   notes: {
     forPatient: (patientId: string) => ["notes", "patient", patientId] as const,
+  },
+  users: {
+    all: ["users"] as const,
+    list: (filters?: unknown) => ["users", "list", filters] as const,
+    byId: (id: string) => ["users", id] as const,
   },
   analytics: { snapshot: ["analytics", "snapshot"] as const },
   ai: {

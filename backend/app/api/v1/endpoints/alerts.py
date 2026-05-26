@@ -9,12 +9,10 @@ from app.models.user import UserRole
 from app.schemas.alert import AlertCreate, AlertOut, AlertUpdate
 from app.services.audit_service import AuditService
 
-# Nurses can flag/clear alerts in many real-world workflows.
+# Alerts can be flagged or cleared by any provider, plus admins.
 alert_writer = Depends(
     require_roles(
-        UserRole.physician,
-        UserRole.surgeon,
-        UserRole.nurse,
+        UserRole.provider,
         UserRole.admin,
     )
 )

@@ -10,19 +10,29 @@ import { DemoBadge } from "@/features/auth/components/DemoBadge";
 import { currentUser as mockUser } from "@/mocks";
 import { cn } from "@/lib/utils";
 
-const navItems = [
+interface NavItem {
+  to: string;
+  label: string;
+  /** When set, the item only renders for users whose role is in the list. */
+  roles?: ("provider" | "staff" | "admin")[];
+}
+
+const navItems: NavItem[] = [
   { to: "/", label: "Dashboard" },
   { to: "/patients", label: "Patients" },
   { to: "/insights", label: "Insights" },
   { to: "/appointments", label: "Appointments" },
   { to: "/docs", label: "Docs" },
-  { to: "/team", label: "Team" },
+  { to: "/users", label: "Users", roles: ["admin"] },
   { to: "/mobile", label: "Mobile" },
 ];
 
 export function Topbar() {
   const user = useAuthStore((s) => s.user) ?? mockUser;
   const logout = useLogout();
+  const visibleNav = navItems.filter(
+    (item) => !item.roles || item.roles.includes(user.role)
+  );
 
   return (
     <header className="rounded-[28px] bg-white border border-border/70 shadow-[0_8px_24px_rgba(17,24,39,0.06)]">
@@ -42,7 +52,7 @@ export function Topbar() {
         </div>
 
         <nav className="hidden lg:flex items-center gap-1 mx-auto bg-[#F1F4F9] rounded-full p-1">
-          {navItems.map((item) => (
+          {visibleNav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

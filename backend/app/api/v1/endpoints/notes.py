@@ -8,9 +8,9 @@ from app.schemas.soap_note import SoapNoteCreate, SoapNoteOut, SoapNoteUpdate
 from app.services.audit_service import AuditService
 from app.services.notes_service import NotesService
 
-# Writing clinical notes is a clinician-only action.
+# Writing clinical notes is a provider-only action.
 clinician_only = Depends(
-    require_roles(UserRole.physician, UserRole.surgeon, UserRole.admin)
+    require_roles(UserRole.provider, UserRole.admin)
 )
 
 router = APIRouter(prefix="/notes", tags=["notes"])

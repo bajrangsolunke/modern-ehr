@@ -9,9 +9,9 @@ from app.models.user import UserRole
 from app.schemas.medication import MedicationCreate, MedicationOut, MedicationUpdate
 from app.services.audit_service import AuditService
 
-# Only prescribers + admins can write to the medication list.
+# Only providers + admins can write to the medication list.
 prescriber_only = Depends(
-    require_roles(UserRole.physician, UserRole.surgeon, UserRole.admin)
+    require_roles(UserRole.provider, UserRole.admin)
 )
 
 router = APIRouter(prefix="/medications", tags=["medications"])

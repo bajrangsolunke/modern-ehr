@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useParams } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useParams } from "react-router-dom";
 import { Shell } from "@/components/layout/Shell";
 import { ProtectedRoute, PublicRoute } from "@/components/auth";
 import { LoginPage } from "@/features/auth";
@@ -7,7 +7,10 @@ import { PatientsPage, PatientProfilePage } from "@/features/patients";
 import { InsightsPage } from "@/features/analytics";
 import { AppointmentsPage } from "@/features/appointments";
 import { MobilePage } from "@/features/mobile";
+import { UsersPage } from "@/features/users";
+import { useAuthStore } from "@/stores/auth-store";
 import { ROUTES } from "@/config/constants";
+import { currentUser as mockUser } from "@/mocks";
 
 export function AppRouter() {
   return (
@@ -31,7 +34,11 @@ export function AppRouter() {
           <Route path={ROUTES.insights} element={<InsightsPage />} />
           <Route path={ROUTES.appointments} element={<AppointmentsPage />} />
           <Route path={ROUTES.docs} element={<Placeholder title="Docs" />} />
-          <Route path={ROUTES.team} element={<Placeholder title="Team" />} />
+          <Route element={<AdminRoute />}>
+            <Route path={ROUTES.users} element={<UsersPage />} />
+          </Route>
+          {/* Legacy /team redirects to /users for bookmarked links. */}
+          <Route path="/team" element={<Navigate to={ROUTES.users} replace />} />
           <Route path={ROUTES.mobile} element={<MobilePage />} />
         </Route>
       </Route>
@@ -44,6 +51,18 @@ export function AppRouter() {
 function EditRedirect() {
   const { patientId } = useParams();
   return <Navigate to={`/patients/${patientId}`} replace />;
+}
+
+/**
+ * Route gate: only admins pass through. Anyone else bounces to the
+ * dashboard. Used for the /users management page.
+ */
+function AdminRoute() {
+  const user = useAuthStore((s) => s.user) ?? mockUser;
+  if (user.role !== "admin") {
+    return <Navigate to={ROUTES.dashboard} replace />;
+  }
+  return <Outlet />;
 }
 
 function Placeholder({ title }: { title: string }) {

@@ -10,12 +10,10 @@ from app.models.vital import VitalSign
 from app.schemas.vital import VitalCreate, VitalOut, VitalUpdate
 from app.services.audit_service import AuditService
 
-# Nurses also record vitals — wider write role than other endpoints.
+# Any provider (or admin) can record vitals.
 clinical_writer = Depends(
     require_roles(
-        UserRole.physician,
-        UserRole.surgeon,
-        UserRole.nurse,
+        UserRole.provider,
         UserRole.admin,
     )
 )
