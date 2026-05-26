@@ -1,4 +1,5 @@
 import { LoginForm } from "@/features/auth/components/LoginForm";
+import { isDev } from "@/config/env";
 
 export function LoginPage() {
   return (
@@ -30,12 +31,14 @@ export function LoginPage() {
 
           <LoginForm />
 
-          <p className="text-xs text-muted-foreground">
-            Demo creds:{" "}
-            <span className="font-mono text-foreground/70">
-              robert.fox@padmavat.health / padmavat123
-            </span>
-          </p>
+          {isDev && (
+            <p className="text-xs text-muted-foreground">
+              Demo creds:{" "}
+              <span className="font-mono text-foreground/70">
+                robert.fox@padmavat.health / padmavat123
+              </span>
+            </p>
+          )}
         </div>
       </div>
 

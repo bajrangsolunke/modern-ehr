@@ -5,6 +5,12 @@ import { Input } from "@/components/ui/input";
 import { FormField } from "@/components/ui/form";
 import { useLogin } from "@/features/auth/hooks/use-login";
 import { ApiError } from "@/lib/api-client";
+import { isDev } from "@/config/env";
+
+// Only pre-fill credentials in local dev so the demo flow stays fast.
+// Production builds get an empty form — no autofill against real data.
+const DEV_DEFAULTS = { email: "robert.fox@padmavat.health", password: "padmavat123" };
+const EMPTY_DEFAULTS = { email: "", password: "" };
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -20,7 +26,7 @@ export function LoginForm() {
     formState: { errors },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "robert.fox@padmavat.health", password: "padmavat123" },
+    defaultValues: isDev ? DEV_DEFAULTS : EMPTY_DEFAULTS,
   });
   const login = useLogin();
 
