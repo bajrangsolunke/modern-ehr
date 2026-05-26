@@ -2,7 +2,7 @@ import { Bell, ChevronDown, Settings } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { UserAvatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { currentUser } from "@/data/mock";
+import { currentUser } from "@/mocks";
 import { cn } from "@/lib/utils";
 
 const navItems = [
