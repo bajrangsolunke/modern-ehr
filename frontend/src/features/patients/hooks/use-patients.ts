@@ -2,21 +2,24 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { patientsApi, type PatientFilters } from "@/features/patients/api/patients-api";
 import { QUERY_KEYS, PAGE_SIZE } from "@/config/constants";
 import { patients as mockPatients } from "@/mocks";
+import type { Patient } from "@/types";
 
 export function usePatients(filters: PatientFilters) {
   return useQuery({
     queryKey: QUERY_KEYS.patients.list(filters),
-    queryFn: () =>
-      patientsApi.list(filters, {
-        items: applyClientFilters(mockPatients, filters),
-        total: applyClientFilters(mockPatients, filters).length,
-      }),
+    queryFn: () => {
+      const filtered = applyFilters(mockPatients, filters);
+      const page = filters.page ?? 1;
+      const size = filters.page_size ?? PAGE_SIZE;
+      const items = filtered.slice((page - 1) * size, page * size);
+      return patientsApi.list(filters, { items, total: filtered.length });
+    },
     placeholderData: keepPreviousData,
     staleTime: 30_000,
   });
 }
 
-function applyClientFilters(items: typeof mockPatients, f: PatientFilters) {
+function applyFilters(items: Patient[], f: PatientFilters): Patient[] {
   const q = f.q?.toLowerCase().trim();
   let out = items;
   if (q) {
@@ -29,7 +32,5 @@ function applyClientFilters(items: typeof mockPatients, f: PatientFilters) {
   }
   if (f.status) out = out.filter((p) => p.status === f.status);
   if (f.risk) out = out.filter((p) => p.risk === f.risk);
-  const page = f.page ?? 1;
-  const size = f.page_size ?? PAGE_SIZE;
-  return out.slice((page - 1) * size, page * size);
+  return out;
 }
