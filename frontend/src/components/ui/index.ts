@@ -12,5 +12,6 @@ export * from "./separator";
 export * from "./skeleton";
 export * from "./stat-card";
 export * from "./status-pill";
+export * from "./table-skeleton";
 export * from "./tabs";
 export * from "./tooltip";
