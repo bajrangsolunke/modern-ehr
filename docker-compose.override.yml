@@ -1,0 +1,13 @@
+# Local override — picked up automatically by `docker compose`.
+# Reason: a system Postgres / Redis are bound to host ports 5432 / 6379 on
+# this machine, so the Symptra stack is exposed on 5433 / 6380. Container-
+# internal ports stay the same.
+#
+# `!override` REPLACES the parent's ports array (default is merge).
+services:
+  db:
+    ports: !override
+      - "5433:5432"
+  redis:
+    ports: !override
+      - "6380:6379"

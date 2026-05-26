@@ -7,6 +7,7 @@ pydantic>=2.10.0
 pydantic-settings>=2.7.0
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
+bcrypt<4.0  # passlib 1.7.x is incompatible with bcrypt >=4.x (raises ValueError on internal detect_wrap_bug check)
 python-multipart>=0.0.20
 redis>=5.2.0
 celery>=5.4.0
