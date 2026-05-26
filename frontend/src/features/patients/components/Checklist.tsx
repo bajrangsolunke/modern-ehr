@@ -1,6 +1,5 @@
-import { CheckCircle2, ChevronDown, Pencil, Search, SlidersHorizontal } from "lucide-react";
+import { CheckCircle2, ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { checklist } from "@/mocks";
@@ -10,18 +9,10 @@ export function ChecklistCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle>Checklist</CardTitle>
-        <div className="flex gap-1">
-          <Button variant="ghost" size="icon" className="size-7">
-            <Search className="size-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="size-7">
-            <SlidersHorizontal className="size-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="size-7">
-            <Pencil className="size-3.5" />
-          </Button>
-        </div>
+        <CardTitle>Care plan checklist</CardTitle>
+        <Badge variant="neutral" size="sm">
+          Read-only · backed by upcoming care-plan API
+        </Badge>
       </CardHeader>
       <CardContent className="pb-5">
         <div className="relative ml-2 pl-5 border-l-2 border-dashed border-border space-y-3">

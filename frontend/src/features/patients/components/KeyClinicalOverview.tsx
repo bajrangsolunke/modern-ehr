@@ -18,14 +18,28 @@ const rows = [
   { k: "Last lab date", v: "Hb/INR", extra: "Last updated: 12.01.2025" },
 ];
 
-export function KeyClinicalOverview() {
+interface Props {
+  /** Open the patient demographics edit drawer (lives in the parent page). */
+  onEdit?: () => void;
+}
+
+export function KeyClinicalOverview({ onEdit }: Props = {}) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle>Key clinical overview</CardTitle>
-        <Button variant="ghost" size="icon" className="size-7">
-          <Pencil className="size-3.5" />
-        </Button>
+        {onEdit && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            onClick={onEdit}
+            aria-label="Edit patient details"
+            title="Edit patient details"
+          >
+            <Pencil className="size-3.5" />
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-2 pb-5">
         {rows.map((r) => (

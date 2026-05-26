@@ -1,6 +1,7 @@
-import { ChevronDown, Download, Eye, FileText, Pencil, Plus } from "lucide-react";
+import { ChevronDown, Download, Eye, FileText, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/lib/toast";
 
 const sections = [
   {
@@ -28,14 +29,21 @@ export function KeyDocuments() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle>Key documents</CardTitle>
-        <div className="flex gap-1">
-          <Button variant="ghost" size="icon" className="size-7">
-            <Pencil className="size-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="size-7">
-            <Plus className="size-3.5" />
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          aria-label="Upload document"
+          title="Upload document"
+          onClick={() =>
+            toast.info("Document uploads coming soon", {
+              description:
+                "Drag-and-drop uploads land alongside the documents tab in the next release.",
+            })
+          }
+        >
+          <Plus className="size-3.5" />
+        </Button>
       </CardHeader>
       <CardContent className="pb-5 space-y-3">
         {sections.map((sec) => (
@@ -57,10 +65,24 @@ export function KeyDocuments() {
                     <span className="text-sm truncate">{it.name}</span>
                   </div>
                   <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100">
-                    <Button variant="ghost" size="icon" className="size-7">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      aria-label="Preview"
+                      title="Preview (coming soon)"
+                      onClick={() => toast.info("Document preview coming soon")}
+                    >
                       <Eye className="size-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="size-7">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      aria-label="Download"
+                      title="Download (coming soon)"
+                      onClick={() => toast.info("Document download coming soon")}
+                    >
                       <Download className="size-3.5" />
                     </Button>
                   </div>

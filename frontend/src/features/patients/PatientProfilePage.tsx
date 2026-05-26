@@ -138,10 +138,10 @@ export function PatientProfilePage() {
                       "AI summary unavailable — please regenerate."
                     }
                   />
-                  <KeyClinicalOverview />
+                  <KeyClinicalOverview onEdit={() => setEditOpen(true)} />
                 </div>
                 <div className="lg:col-span-4 space-y-4">
-                  <ClinicalActions />
+                  <ClinicalActions onGoToTab={setTab} />
                   <Timeline />
                 </div>
               </div>
@@ -153,7 +153,7 @@ export function PatientProfilePage() {
                   <SoapNotesCard patientId={patient.id} />
                 </div>
                 <div className="lg:col-span-4 space-y-4">
-                  <ClinicalActions />
+                  <ClinicalActions onGoToTab={setTab} />
                 </div>
               </div>
             </TabsContent>
@@ -171,7 +171,7 @@ export function PatientProfilePage() {
                   <MedicationsCard patientId={patient.id} />
                 </div>
                 <div className="lg:col-span-4 space-y-4">
-                  <ClinicalActions />
+                  <ClinicalActions onGoToTab={setTab} />
                 </div>
               </div>
             </TabsContent>
