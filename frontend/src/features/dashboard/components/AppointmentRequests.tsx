@@ -2,7 +2,7 @@ import { Calendar, Check, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserAvatar } from "@/components/ui/avatar";
+import { avatarColor, cn, initials } from "@/lib/utils";
 
 const requests = [
   {
@@ -31,6 +31,8 @@ const requests = [
   },
 ];
 
+const ROW_BG = "#F5F7FB";
+
 export function AppointmentRequests() {
   return (
     <Card className="h-full">
@@ -45,24 +47,25 @@ export function AppointmentRequests() {
           View more
         </button>
       </CardHeader>
-      <CardContent className="space-y-3 pb-5">
+      <CardContent className="space-y-2.5 pb-5">
         {requests.map((r, i) => (
           <motion.div
             key={r.id}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            className="flex items-center gap-3 rounded-2xl border border-border p-3 hover:border-primary/30 transition"
+            className="flex items-center gap-3 rounded-2xl p-3 hover:[background:#EEF2F8] transition"
+            style={{ background: ROW_BG }}
           >
-            <UserAvatar name={r.name} size="lg" />
+            <PortraitAvatar name={r.name} />
             <div className="flex-1 min-w-0">
               <div className="font-semibold text-[15px] leading-tight truncate">
                 {r.name}
               </div>
-              <div className="text-[12px] text-muted-foreground truncate">
+              <div className="text-[12px] text-muted-foreground truncate mt-0.5">
                 {r.role}
               </div>
-              <div className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground bg-surface-subtle rounded-full px-2 py-0.5">
+              <div className="mt-2 inline-flex items-center gap-1 text-[11px] text-foreground/70 bg-white rounded-full px-2 py-0.5 border border-border/60">
                 <Calendar className="size-3" />
                 {r.date}
               </div>
@@ -71,13 +74,15 @@ export function AppointmentRequests() {
               <Button
                 size="icon"
                 variant="ghost"
-                className="size-8 rounded-full bg-rose-50 text-rose-500 hover:bg-rose-100"
+                className="size-8 rounded-full bg-white text-rose-500 hover:bg-rose-50 shadow-soft"
+                aria-label="Decline"
               >
                 <X className="size-3.5" />
               </Button>
               <Button
                 size="icon"
-                className="size-8 rounded-full"
+                className="size-8 rounded-full shadow-soft"
+                aria-label="Accept"
               >
                 <Check className="size-3.5" />
               </Button>
@@ -86,5 +91,22 @@ export function AppointmentRequests() {
         ))}
       </CardContent>
     </Card>
+  );
+}
+
+/* Portrait (vertical rectangle) avatar: rounded rectangle, taller than wide.
+   Falls back to colored initials; works alongside UserAvatar elsewhere. */
+function PortraitAvatar({ name }: { name: string }) {
+  return (
+    <div
+      className={cn(
+        "shrink-0 grid place-items-center font-semibold text-[15px] select-none",
+        "w-[52px] h-[64px] rounded-2xl ring-2 ring-white shadow-soft",
+        avatarColor(name)
+      )}
+      aria-label={name}
+    >
+      {initials(name)}
+    </div>
   );
 }
