@@ -9,6 +9,8 @@ import { formatDate } from "@/lib/utils";
 import type { Patient } from "@/types";
 
 const ROW_BG = "#F5F7FB";
+const HEADER_BG = "#FFFFFF";
+const HEADER_SHADOW = "0 4px 12px rgba(17,24,39,0.06)";
 
 export function PatientTable({ data }: { data: Patient[] }) {
   return (
@@ -16,13 +18,13 @@ export function PatientTable({ data }: { data: Patient[] }) {
       <div className="overflow-x-auto">
         <table
           className="w-full text-sm border-separate"
-          style={{ borderSpacing: "0 8px" }}
+          style={{ borderSpacing: "0 6px" }}
         >
           <thead>
             <tr className="text-xs text-muted-foreground text-left">
               <th
-                className="font-medium px-4 py-3 w-10 first:rounded-l-full"
-                style={{ background: ROW_BG }}
+                className="font-medium px-4 py-2 w-10 first:rounded-l-full"
+                style={{ background: HEADER_BG, boxShadow: HEADER_SHADOW }}
               >
                 <input type="checkbox" className="rounded border-border" />
               </th>
@@ -34,8 +36,8 @@ export function PatientTable({ data }: { data: Patient[] }) {
               <Th>Assigned physician</Th>
               <Th>Tags</Th>
               <th
-                className="font-medium px-4 py-3 text-right last:rounded-r-full"
-                style={{ background: ROW_BG }}
+                className="font-medium px-4 py-2 text-right last:rounded-r-full"
+                style={{ background: HEADER_BG, boxShadow: HEADER_SHADOW }}
               >
                 Action
               </th>
@@ -48,22 +50,22 @@ export function PatientTable({ data }: { data: Patient[] }) {
                 className="hover:[&_td]:bg-[#EEF2F8] transition group"
               >
                 <td
-                  className="px-4 py-3.5 first:rounded-l-full"
+                  className="px-4 py-2 first:rounded-l-full"
                   style={{ background: ROW_BG }}
                 >
                   <input type="checkbox" className="rounded border-border" />
                 </td>
                 <td
-                  className="px-4 py-3.5 text-primary font-semibold"
+                  className="px-4 py-2 text-primary font-semibold"
                   style={{ background: ROW_BG }}
                 >
                   <Link to={`/patients/${p.id}`} className="hover:underline">
                     {p.mrn}
                   </Link>
                 </td>
-                <td className="px-4 py-3.5" style={{ background: ROW_BG }}>
-                  <div className="flex items-center gap-2.5">
-                    <UserAvatar name={p.name} src={p.avatarUrl} size="md" />
+                <td className="px-4 py-2" style={{ background: ROW_BG }}>
+                  <div className="flex items-center gap-2">
+                    <UserAvatar name={p.name} src={p.avatarUrl} size="sm" />
                     <Link
                       to={`/patients/${p.id}`}
                       className="font-semibold hover:text-primary transition"
@@ -73,32 +75,29 @@ export function PatientTable({ data }: { data: Patient[] }) {
                   </div>
                 </td>
                 <td
-                  className="px-4 py-3.5 text-foreground/80"
+                  className="px-4 py-2 text-foreground/80"
                   style={{ background: ROW_BG }}
                 >
                   {p.procedure}
                 </td>
-                <td className="px-4 py-3.5" style={{ background: ROW_BG }}>
+                <td className="px-4 py-2" style={{ background: ROW_BG }}>
                   <StatusPill status={p.status} />
                 </td>
                 <td
-                  className="px-4 py-3.5 text-foreground/80"
+                  className="px-4 py-2 text-foreground/80"
                   style={{ background: ROW_BG }}
                 >
                   {formatDate(p.procedureDate)}
                 </td>
-                <td className="px-4 py-3.5" style={{ background: ROW_BG }}>
+                <td className="px-4 py-2" style={{ background: ROW_BG }}>
                   <div className="flex items-center gap-2">
-                    <UserAvatar
-                      name={p.assignedPhysician.name}
-                      size="md"
-                    />
+                    <UserAvatar name={p.assignedPhysician.name} size="sm" />
                     <span className="text-foreground">
                       {p.assignedPhysician.name}
                     </span>
                   </div>
                 </td>
-                <td className="px-4 py-3.5" style={{ background: ROW_BG }}>
+                <td className="px-4 py-2" style={{ background: ROW_BG }}>
                   <div className="flex gap-1 flex-wrap">
                     {p.tags.map((t) => (
                       <Badge
@@ -113,23 +112,23 @@ export function PatientTable({ data }: { data: Patient[] }) {
                   </div>
                 </td>
                 <td
-                  className="px-4 py-3.5 last:rounded-r-full"
+                  className="px-4 py-2 last:rounded-r-full"
                   style={{ background: ROW_BG }}
                 >
                   <div className="flex items-center justify-end gap-1">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8 rounded-full bg-white hover:bg-white/80 text-foreground/70"
+                      className="size-7 rounded-full bg-white hover:bg-white/80 text-foreground/70"
                     >
-                      <Pencil className="size-3.5" />
+                      <Pencil className="size-3" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8 rounded-full bg-white hover:bg-rose-50 text-danger"
+                      className="size-7 rounded-full bg-white hover:bg-rose-50 text-danger"
                     >
-                      <Trash2 className="size-3.5" />
+                      <Trash2 className="size-3" />
                     </Button>
                   </div>
                 </td>
@@ -144,7 +143,10 @@ export function PatientTable({ data }: { data: Patient[] }) {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="font-medium px-4 py-3" style={{ background: ROW_BG }}>
+    <th
+      className="font-medium px-4 py-2"
+      style={{ background: HEADER_BG, boxShadow: HEADER_SHADOW }}
+    >
       <button className="inline-flex items-center gap-1 hover:text-foreground transition">
         {children}
         <ChevronsUpDown className="size-3 opacity-60" />

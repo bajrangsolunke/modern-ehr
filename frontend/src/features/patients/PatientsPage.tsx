@@ -52,11 +52,17 @@ export function PatientsPage() {
                 className="bg-white"
               />
             </div>
-            <Button variant="secondary" className="h-10">
-              <Filter className="size-4" /> Filter
+            <Button variant="secondary" className="h-10 pl-1.5 gap-2">
+              <span className="grid place-items-center size-7 rounded-full bg-[#F1F4F9] text-foreground/70">
+                <Filter className="size-3.5" />
+              </span>
+              Filter
             </Button>
-            <Button variant="secondary" className="h-10">
-              <ArrowDownAZ className="size-4" /> Sort by
+            <Button variant="secondary" className="h-10 pl-1.5 gap-2">
+              <span className="grid place-items-center size-7 rounded-full bg-[#F1F4F9] text-foreground/70">
+                <ArrowDownAZ className="size-3.5" />
+              </span>
+              Sort by
             </Button>
             <div className="flex items-center bg-white border border-border rounded-full p-1 h-10 shadow-soft">
               <button
