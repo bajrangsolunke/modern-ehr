@@ -16,11 +16,18 @@ export interface User {
 export interface Patient {
   id: string;
   mrn: string;
+  /** Convenience: `${firstName} ${lastName}`. Prefer the explicit fields for
+   *  form fields, splitting, etc. — multi-part last names get mangled by
+   *  naive whitespace splits on `name`. */
   name: string;
+  firstName: string;
+  lastName: string;
   avatarUrl?: string;
   age: number;
   sex: "F" | "M" | "O";
   dob: string;
+  email?: string;
+  phone?: string;
   city?: string;
   procedure: string;
   status: PatientStatus;

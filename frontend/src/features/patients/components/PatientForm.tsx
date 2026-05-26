@@ -50,12 +50,12 @@ export function PatientForm({
 }: Props) {
   const defaults: PatientFormValues = {
     mrn: defaultPatient?.mrn ?? "",
-    first_name: defaultPatient?.name.split(" ")[0] ?? "",
-    last_name: defaultPatient?.name.split(" ").slice(1).join(" ") ?? "",
+    first_name: defaultPatient?.firstName ?? "",
+    last_name: defaultPatient?.lastName ?? "",
     sex: defaultPatient?.sex ?? "F",
     dob: defaultPatient?.dob ?? "",
-    email: "",
-    phone: "",
+    email: defaultPatient?.email ?? "",
+    phone: defaultPatient?.phone ?? "",
     city: defaultPatient?.city ?? "",
     procedure: defaultPatient?.procedure ?? "",
     procedure_date: defaultPatient?.procedureDate ?? "",

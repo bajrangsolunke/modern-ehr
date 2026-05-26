@@ -8,6 +8,8 @@ interface BackendPatientDto {
   last_name: string;
   sex: "F" | "M" | "O";
   dob: string;
+  email?: string | null;
+  phone?: string | null;
   city?: string | null;
   avatar_url?: string | null;
   procedure?: string | null;
@@ -46,16 +48,21 @@ export interface PatientPage {
 }
 
 function mapPatient(dto: BackendPatientDto): Patient {
-  const age = computeAge(dto.dob);
+  const firstName = dto.first_name;
+  const lastName = dto.last_name;
   return {
     id: dto.id,
     mrn: dto.mrn,
-    name: `${dto.first_name} ${dto.last_name}`,
+    name: `${firstName} ${lastName}`,
+    firstName,
+    lastName,
     sex: dto.sex,
     dob: dto.dob,
+    email: dto.email ?? undefined,
+    phone: dto.phone ?? undefined,
     city: dto.city ?? undefined,
     avatarUrl: dto.avatar_url ?? undefined,
-    age,
+    age: computeAge(dto.dob),
     procedure: dto.procedure ?? "",
     status: dto.status,
     procedureDate: dto.procedure_date ?? "",
@@ -67,10 +74,21 @@ function mapPatient(dto: BackendPatientDto): Patient {
   };
 }
 
+/**
+ * Computes whole-year age from a YYYY-MM-DD date string. Subtract 1 if this
+ * year's birthday hasn't happened yet — the prior naive `diff / 365.25`
+ * formula was off by a day around birthdays.
+ */
 function computeAge(dob: string): number {
-  const birth = new Date(dob);
-  const diff = Date.now() - birth.getTime();
-  return Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
+  const [y, m, d] = dob.split("-").map(Number);
+  if (!y || !m || !d) return 0;
+  const today = new Date();
+  let age = today.getFullYear() - y;
+  const monthDelta = today.getMonth() + 1 - m;
+  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < d)) {
+    age -= 1;
+  }
+  return Math.max(0, age);
 }
 
 export const patientsApi = {
@@ -88,25 +106,7 @@ export const patientsApi = {
       },
       demoFallback: fallback
         ? () => ({
-            items: fallback.items.map((p) => ({
-              id: p.id,
-              mrn: p.mrn,
-              first_name: p.name.split(" ")[0] ?? "",
-              last_name: p.name.split(" ").slice(1).join(" "),
-              sex: p.sex,
-              dob: p.dob,
-              city: p.city ?? null,
-              avatar_url: p.avatarUrl ?? null,
-              procedure: p.procedure,
-              procedure_date: p.procedureDate,
-              asa: p.asa ?? null,
-              icu_needed: Boolean(p.icu),
-              status: p.status,
-              risk: p.risk,
-              risk_score: 0,
-              tags: p.tags ?? null,
-              assigned_physician_id: null,
-            })),
+            items: fallback.items.map(patientToBackendDto),
             total: fallback.total,
             page: filters.page ?? 1,
             page_size: filters.page_size ?? 20,
@@ -125,27 +125,7 @@ export const patientsApi = {
 
   get: async (id: string, fallback?: Patient): Promise<Patient> => {
     const dto = await api.get<BackendPatientDto>(`/patients/${id}`, {
-      demoFallback: fallback
-        ? () => ({
-            id: fallback.id,
-            mrn: fallback.mrn,
-            first_name: fallback.name.split(" ")[0] ?? "",
-            last_name: fallback.name.split(" ").slice(1).join(" "),
-            sex: fallback.sex,
-            dob: fallback.dob,
-            city: fallback.city ?? null,
-            avatar_url: fallback.avatarUrl ?? null,
-            procedure: fallback.procedure,
-            procedure_date: fallback.procedureDate,
-            asa: fallback.asa ?? null,
-            icu_needed: Boolean(fallback.icu),
-            status: fallback.status,
-            risk: fallback.risk,
-            risk_score: 0,
-            tags: fallback.tags ?? null,
-            assigned_physician_id: null,
-          })
-        : undefined,
+      demoFallback: fallback ? () => patientToBackendDto(fallback) : undefined,
     });
     return mapPatient(dto);
   },
@@ -195,4 +175,33 @@ function inputToBackend(input: Partial<PatientInput>): Record<string, unknown> {
     if (v !== undefined) out[k] = v;
   }
   return out;
+}
+
+/**
+ * Round-trip helper: convert a frontend Patient back into the backend DTO
+ * shape. Used by the demo-mode fallback to feed mockPatients through the
+ * same mapPatient pipeline as real responses (no parallel mapping logic).
+ */
+function patientToBackendDto(p: Patient): BackendPatientDto {
+  return {
+    id: p.id,
+    mrn: p.mrn,
+    first_name: p.firstName,
+    last_name: p.lastName,
+    sex: p.sex,
+    dob: p.dob,
+    email: p.email ?? null,
+    phone: p.phone ?? null,
+    city: p.city ?? null,
+    avatar_url: p.avatarUrl ?? null,
+    procedure: p.procedure || null,
+    procedure_date: p.procedureDate || null,
+    asa: p.asa ?? null,
+    icu_needed: Boolean(p.icu),
+    status: p.status,
+    risk: p.risk,
+    risk_score: 0,
+    tags: p.tags ?? null,
+    assigned_physician_id: null,
+  };
 }
