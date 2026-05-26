@@ -39,31 +39,35 @@ export function PatientsPage() {
     <>
       <PageHeader
         title="All patients view"
-        subtitle={`Showing ${filtered.length} of 598 patients`}
         right={
-          <div className="flex items-center gap-2 flex-wrap">
-            <Input
-              icon={<Search className="size-4" />}
-              placeholder="Search…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-56"
-            />
-            <Button variant="secondary">
+          <>
+            <div className="w-52">
+              <Input
+                icon={<Search className="size-3.5" />}
+                iconPosition="right"
+                iconBg
+                placeholder="Search…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="bg-white"
+              />
+            </div>
+            <Button variant="secondary" className="h-10">
               <Filter className="size-4" /> Filter
             </Button>
-            <Button variant="secondary">
+            <Button variant="secondary" className="h-10">
               <ArrowDownAZ className="size-4" /> Sort by
             </Button>
-            <div className="flex items-center bg-secondary rounded-full p-0.5">
+            <div className="flex items-center bg-white border border-border rounded-full p-1 h-10 shadow-soft">
               <button
                 onClick={() => setViewMode("table")}
                 className={cn(
                   "size-8 grid place-items-center rounded-full transition",
                   viewMode === "table"
-                    ? "bg-primary text-white shadow-glow"
+                    ? "bg-primary-gradient text-white shadow-glow"
                     : "text-muted-foreground hover:text-foreground"
                 )}
+                aria-label="Table view"
               >
                 <Rows3 className="size-3.5" />
               </button>
@@ -72,20 +76,21 @@ export function PatientsPage() {
                 className={cn(
                   "size-8 grid place-items-center rounded-full transition",
                   viewMode === "cards"
-                    ? "bg-primary text-white shadow-glow"
+                    ? "bg-primary-gradient text-white shadow-glow"
                     : "text-muted-foreground hover:text-foreground"
                 )}
+                aria-label="Card view"
               >
                 <LayoutGrid className="size-3.5" />
               </button>
             </div>
-            <Button variant="secondary">
+            <Button variant="secondary" className="h-10">
               <Download className="size-4" /> Export data
             </Button>
-            <Button>
+            <Button className="h-10">
               <Plus className="size-4" /> New patient
             </Button>
-          </div>
+          </>
         }
       />
 
@@ -96,15 +101,17 @@ export function PatientsPage() {
       )}
 
       <div className="flex items-center justify-between mt-6 text-sm text-muted-foreground">
-        <span>Showing {filtered.length} of 598</span>
+        <span>
+          Showing {filtered.length} of 598
+        </span>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="icon" className="size-8">
+          <Button variant="secondary" size="icon" className="size-9 rounded-full">
             <ChevronLeft className="size-3.5" />
           </Button>
-          <span className="px-3 py-1 rounded-full bg-secondary text-xs">
+          <span className="px-3 py-1 rounded-full bg-white border border-border text-xs">
             Page <strong className="text-foreground">1</strong> of 50
           </span>
-          <Button size="icon" className="size-8">
+          <Button size="icon" className="size-9 rounded-full">
             <ChevronRight className="size-3.5" />
           </Button>
         </div>
