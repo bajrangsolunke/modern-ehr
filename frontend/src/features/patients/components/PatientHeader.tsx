@@ -1,8 +1,5 @@
-import { useRef, useState } from "react";
 import {
-  Camera,
   CalendarClock,
-  Loader2,
   Mail,
   MapPin,
   MoreHorizontal,
@@ -15,9 +12,8 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "@/lib/toast";
-import { cn, initials, avatarColor, formatDate } from "@/lib/utils";
-import { fileToBoundedDataUrl } from "@/lib/image-resize";
+import { formatDate } from "@/lib/utils";
+import { PortraitUploader } from "@/features/patients/components/PortraitUploader";
 import { useUpdatePatient } from "@/features/patients/hooks/use-update-patient";
 import type { Patient } from "@/types";
 
@@ -28,37 +24,7 @@ interface Props {
 }
 
 export function PatientHeader({ patient, onEdit, onRemove }: Props) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
   const update = useUpdatePatient(patient.id);
-
-  const handlePickPhoto = () => fileRef.current?.click();
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-picking the same file
-    if (!file) return;
-    setUploading(true);
-    try {
-      const dataUrl = await fileToBoundedDataUrl(file, 360, 480, 0.85);
-      await update.mutateAsync({ avatar_url: dataUrl });
-    } catch (err) {
-      toast.error("Couldn't update photo", {
-        description: err instanceof Error ? err.message : undefined,
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleRemovePhoto = async () => {
-    setUploading(true);
-    try {
-      await update.mutateAsync({ avatar_url: null });
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const dobLabel = patient.dob ? formatDate(patient.dob) : "DOB unknown";
   const sexLabel =
@@ -68,19 +34,12 @@ export function PatientHeader({ patient, onEdit, onRemove }: Props) {
     <Card>
       <CardContent className="p-5">
         <div className="flex items-start gap-5">
-          <PortraitFrame
+          <PortraitUploader
             name={patient.name}
             src={patient.avatarUrl}
-            uploading={uploading}
-            onPick={handlePickPhoto}
-            onRemove={patient.avatarUrl ? handleRemovePhoto : undefined}
-          />
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            onChange={handleFileChange}
+            onChange={async (dataUrl) => {
+              await update.mutateAsync({ avatar_url: dataUrl });
+            }}
           />
 
           <div className="flex-1 min-w-0">
@@ -161,72 +120,6 @@ export function PatientHeader({ patient, onEdit, onRemove }: Props) {
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function PortraitFrame({
-  name,
-  src,
-  uploading,
-  onPick,
-  onRemove,
-}: {
-  name: string;
-  src?: string;
-  uploading: boolean;
-  onPick: () => void;
-  onRemove?: () => void;
-}) {
-  return (
-    <div className="relative w-[104px] sm:w-[120px] aspect-[3/4] shrink-0">
-      <div
-        className={cn(
-          "relative w-full h-full rounded-2xl overflow-hidden border border-border shadow-soft",
-          !src && "bg-surface-subtle"
-        )}
-      >
-        {src ? (
-          <img src={src} alt={name} className="w-full h-full object-cover" />
-        ) : (
-          <div
-            className={cn(
-              "w-full h-full grid place-items-center text-2xl font-bold",
-              avatarColor(name)
-            )}
-          >
-            {initials(name)}
-          </div>
-        )}
-
-        {uploading && (
-          <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] grid place-items-center">
-            <Loader2 className="size-5 animate-spin text-foreground" />
-          </div>
-        )}
-      </div>
-
-      <button
-        type="button"
-        onClick={onPick}
-        aria-label={src ? "Change photo" : "Add photo"}
-        title={src ? "Change photo" : "Add photo"}
-        className="absolute -bottom-2 -right-2 size-9 rounded-full bg-primary text-primary-foreground shadow-elev grid place-items-center hover:bg-primary/90 transition ring-2 ring-white ring-focus"
-      >
-        <Camera className="size-4" />
-      </button>
-
-      {onRemove && (
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label="Remove photo"
-          title="Remove photo"
-          className="absolute -top-2 -right-2 size-7 rounded-full bg-white shadow-soft border border-border text-muted-foreground hover:text-danger hover:border-danger/40 grid place-items-center transition ring-focus"
-        >
-          <Trash2 className="size-3.5" />
-        </button>
-      )}
-    </div>
   );
 }
 

@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { FormField } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { PortraitUploader } from "@/features/patients/components/PortraitUploader";
 import type { PatientInput } from "@/features/patients/api/patients-api";
 import type { Patient } from "@/types";
 
@@ -22,6 +23,7 @@ const schema = z.object({
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional().or(z.literal("")),
   city: z.string().optional().or(z.literal("")),
+  avatar_url: z.string().optional().or(z.literal("")),
   procedure: z.string().optional().or(z.literal("")),
   procedure_date: z.string().optional().or(z.literal("")),
   asa: z.enum(asas).optional().or(z.literal("")),
@@ -57,6 +59,7 @@ export function PatientForm({
     email: defaultPatient?.email ?? "",
     phone: defaultPatient?.phone ?? "",
     city: defaultPatient?.city ?? "",
+    avatar_url: defaultPatient?.avatarUrl ?? "",
     procedure: defaultPatient?.procedure ?? "",
     procedure_date: defaultPatient?.procedureDate ?? "",
     asa: (defaultPatient?.asa as (typeof asas)[number]) ?? "",
@@ -69,11 +72,18 @@ export function PatientForm({
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<PatientFormValues>({
     resolver: zodResolver(schema),
     defaultValues: defaults,
   });
+
+  const avatarUrl = watch("avatar_url");
+  const firstName = watch("first_name");
+  const lastName = watch("last_name");
+  const portraitName = `${firstName ?? ""} ${lastName ?? ""}`.trim() || "New patient";
 
   const submit = handleSubmit(async (values) => {
     const input: PatientInput = {
@@ -85,6 +95,7 @@ export function PatientForm({
       email: values.email || null,
       phone: values.phone || null,
       city: values.city || null,
+      avatar_url: values.avatar_url || null,
       procedure: values.procedure || null,
       procedure_date: values.procedure_date || null,
       asa: (values.asa || null) as PatientInput["asa"],
@@ -104,6 +115,25 @@ export function PatientForm({
   return (
     <form onSubmit={submit} className="space-y-4 lg:space-y-5" noValidate>
       <Section title="Identity">
+        <Field span={3}>
+          <div className="flex items-start gap-5">
+            <PortraitUploader
+              name={portraitName}
+              src={avatarUrl || undefined}
+              onChange={(dataUrl) =>
+                setValue("avatar_url", dataUrl, { shouldDirty: true })
+              }
+            />
+            <div className="flex-1 min-w-0 self-center">
+              <div className="text-sm font-semibold">Profile photo</div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Optional. Tap the camera to upload. We resize to a passport-
+                sized image so the chart stays light.
+              </p>
+            </div>
+          </div>
+          <input type="hidden" {...register("avatar_url")} />
+        </Field>
         <Field>
           <FormField label="MRN" required htmlFor="mrn" error={errors.mrn?.message}>
             <Input id="mrn" placeholder="e.g. 1042" {...register("mrn")} />
