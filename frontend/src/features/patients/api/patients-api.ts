@@ -149,4 +149,50 @@ export const patientsApi = {
     });
     return mapPatient(dto);
   },
+
+  create: async (input: PatientInput): Promise<Patient> => {
+    const dto = await api.post<BackendPatientDto>(
+      "/patients",
+      inputToBackend(input)
+    );
+    return mapPatient(dto);
+  },
+
+  update: async (id: string, input: Partial<PatientInput>): Promise<Patient> => {
+    const dto = await api.patch<BackendPatientDto>(
+      `/patients/${id}`,
+      inputToBackend(input)
+    );
+    return mapPatient(dto);
+  },
+
+  remove: (id: string): Promise<void> => api.delete(`/patients/${id}`),
 };
+
+export interface PatientInput {
+  mrn?: string;
+  first_name?: string;
+  last_name?: string;
+  sex?: "F" | "M" | "O";
+  dob?: string;
+  email?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  procedure?: string | null;
+  procedure_date?: string | null;
+  asa?: "I" | "II" | "III" | "IV" | null;
+  icu_needed?: boolean;
+  status?: Patient["status"];
+  risk?: Patient["risk"];
+  tags?: string[] | null;
+  assigned_physician_id?: string | null;
+}
+
+function inputToBackend(input: Partial<PatientInput>): Record<string, unknown> {
+  // Drop undefined keys so PATCH only sends the fields the caller set.
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(input)) {
+    if (v !== undefined) out[k] = v;
+  }
+  return out;
+}
