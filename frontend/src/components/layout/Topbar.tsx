@@ -20,7 +20,7 @@ const navItems = [
 export function Topbar() {
   return (
     <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-border">
-      <div className="flex items-center justify-between gap-4 px-6 lg:px-8 h-16">
+      <div className="mx-auto w-full max-w-[1720px] flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-8 3xl:px-10 h-16">
         <div className="flex items-center gap-3 min-w-fit">
           <div className="size-9 rounded-2xl bg-primary-gradient grid place-items-center text-white shadow-glow">
             <svg

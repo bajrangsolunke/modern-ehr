@@ -37,8 +37,9 @@ export function StatCard({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
+      className="h-full"
     >
-      <Card className={cn("card-hover", className)}>
+      <Card className={cn("card-hover h-full flex flex-col", className)}>
         <CardContent className="p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
