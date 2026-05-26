@@ -70,6 +70,7 @@ class PatientService:
             "email",
             "phone",
             "city",
+            "avatar_url",
             "procedure",
             "procedure_date",
             "asa",
