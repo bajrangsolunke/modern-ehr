@@ -35,14 +35,27 @@ function mapUser(dto: BackendUserDto): User {
   };
 }
 
+function toBackendDto(user: User): BackendUserDto {
+  return {
+    id: user.id,
+    email: user.email,
+    full_name: user.name,
+    role: user.role,
+    specialty: user.specialty ?? null,
+    avatar_url: user.avatarUrl ?? null,
+    is_active: true,
+    is_verified: true,
+  };
+}
+
 export const authApi = {
   login: (payload: LoginPayload) =>
     api.post<TokenResponse>("/auth/login/json", payload, { skipAuth: true }),
 
-  me: (demoFallback?: () => User) =>
-    api
-      .get<BackendUserDto>("/auth/me", {
-        demoFallback: demoFallback as (() => unknown) | undefined,
-      })
-      .then((data) => (typeof data === "object" && "id" in data ? mapUser(data) : (data as unknown as User))),
+  me: async (demoFallback?: () => User): Promise<User> => {
+    const dto = await api.get<BackendUserDto>("/auth/me", {
+      demoFallback: demoFallback ? () => toBackendDto(demoFallback()) : undefined,
+    });
+    return mapUser(dto);
+  },
 };
