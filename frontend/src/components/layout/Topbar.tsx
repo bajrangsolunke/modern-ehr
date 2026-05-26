@@ -35,7 +35,7 @@ export function Topbar() {
           </div>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-1 mx-auto">
+        <nav className="hidden lg:flex items-center gap-1 mx-auto bg-[#F1F4F9] rounded-full p-1">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -43,10 +43,10 @@ export function Topbar() {
               end={item.to === "/"}
               className={({ isActive }) =>
                 cn(
-                  "px-5 py-2 rounded-full text-[15px] font-medium transition-all",
+                  "px-4 xl:px-5 py-2 rounded-full text-[14px] font-medium transition-all",
                   isActive
                     ? "bg-slate-900 text-white shadow-soft"
-                    : "text-slate-600 hover:text-slate-900"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
                 )
               }
             >
@@ -55,25 +55,25 @@ export function Topbar() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3 min-w-fit">
+        <div className="flex items-center gap-2 min-w-fit">
           <Button
             variant="ghost"
             size="icon"
-            className="relative size-10 rounded-full bg-white border border-border hover:border-primary/40"
+            className="relative size-10 rounded-full bg-[#F1F4F9] hover:bg-[#E6EBF2] text-slate-700"
           >
-            <Bell className="size-4" />
-            <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 grid place-items-center rounded-full bg-danger text-[10px] font-bold text-white">
+            <Bell className="size-[18px]" />
+            <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 grid place-items-center rounded-full bg-danger text-[10px] font-bold text-white ring-2 ring-white">
               3
             </span>
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="size-10 rounded-full bg-white border border-border hover:border-primary/40"
+            className="size-10 rounded-full bg-[#F1F4F9] hover:bg-[#E6EBF2] text-slate-700"
           >
-            <Settings className="size-4" />
+            <Settings className="size-[18px]" />
           </Button>
-          <div className="flex items-center gap-2 pl-2 ml-1 border-l border-border h-10">
+          <div className="flex items-center gap-2.5 pl-2 ml-1 h-10">
             <UserAvatar
               name={currentUser.name}
               size="md"
