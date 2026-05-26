@@ -115,7 +115,7 @@ export function PatientProfilePage() {
           {/* Patient header + alerts strip — always visible above the tabs */}
           <div className="space-y-4">
             <PatientHeader patient={patient} />
-            <AlertsStrip />
+            <AlertsStrip patientId={patient.id} />
           </div>
 
           <Tabs value={activeTab} onValueChange={setTab} className="space-y-4">

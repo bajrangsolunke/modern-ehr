@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     ai,
+    alerts,
     analytics,
     appointments,
     auth,
@@ -24,6 +25,7 @@ api_router.include_router(appointments.router)
 api_router.include_router(notes.router)
 api_router.include_router(medications.router)
 api_router.include_router(vitals.router)
+api_router.include_router(alerts.router)
 api_router.include_router(labs.router)
 api_router.include_router(documents.router)
 api_router.include_router(notifications.router)

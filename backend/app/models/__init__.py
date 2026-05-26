@@ -13,6 +13,7 @@ from app.models.audit_log import AuditLog
 from app.models.notification import Notification
 from app.models.ai_insight import AiInsight
 from app.models.document_chunk import DocumentChunk
+from app.models.alert import AlertSeverity, PatientAlert
 
 __all__ = [
     "User",
@@ -36,4 +37,6 @@ __all__ = [
     "Notification",
     "AiInsight",
     "DocumentChunk",
+    "PatientAlert",
+    "AlertSeverity",
 ]
