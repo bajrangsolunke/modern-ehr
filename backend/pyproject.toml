@@ -1,0 +1,55 @@
+[project]
+name = "symptra-backend"
+version = "1.0.0"
+description = "Symptra · AI-native EHR/EMR FastAPI backend"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "python-multipart>=0.0.20",
+    "redis>=5.2.0",
+    "celery>=5.4.0",
+    "httpx>=0.28.0",
+    "tenacity>=9.0.0",
+    "structlog>=24.4.0",
+    "orjson>=3.10.12",
+    "email-validator>=2.2.0",
+    "python-dotenv>=1.0.1",
+    "openai>=1.59.0",
+    "langchain>=0.3.13",
+    "langchain-openai>=0.2.14",
+    "langchain-community>=0.3.13",
+    "pgvector>=0.3.6",
+    "tiktoken>=0.8.0",
+    "websockets>=14.1",
+    "slowapi>=0.1.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.25.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.4",
+    "mypy>=1.13.0",
+    "faker>=33.1.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "PL"]
+ignore = ["PLR0913", "B008"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
