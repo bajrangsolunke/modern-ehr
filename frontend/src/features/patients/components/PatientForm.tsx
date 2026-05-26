@@ -1,0 +1,287 @@
+import { Loader2 } from "lucide-react";
+import { useForm, zodResolver, z } from "@/lib/form";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { FormField } from "@/components/ui/form";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { PatientInput } from "@/features/patients/api/patients-api";
+import type { Patient } from "@/types";
+
+const sexes = ["F", "M", "O"] as const;
+const asas = ["I", "II", "III", "IV"] as const;
+const statuses = ["scheduled", "ready", "in-progress", "at-risk", "discharged"] as const;
+const risks = ["low", "moderate", "high", "critical"] as const;
+
+const schema = z.object({
+  mrn: z.string().min(1, "MRN is required"),
+  first_name: z.string().min(1, "First name is required"),
+  last_name: z.string().min(1, "Last name is required"),
+  sex: z.enum(sexes),
+  dob: z.string().min(1, "Date of birth is required"),
+  email: z.string().email("Invalid email").optional().or(z.literal("")),
+  phone: z.string().optional().or(z.literal("")),
+  city: z.string().optional().or(z.literal("")),
+  procedure: z.string().optional().or(z.literal("")),
+  procedure_date: z.string().optional().or(z.literal("")),
+  asa: z.enum(asas).optional().or(z.literal("")),
+  icu_needed: z.boolean(),
+  status: z.enum(statuses),
+  risk: z.enum(risks),
+  tags: z.string().optional().or(z.literal("")),
+});
+
+export type PatientFormValues = z.infer<typeof schema>;
+
+interface Props {
+  defaultPatient?: Patient;
+  submitting?: boolean;
+  submitLabel?: string;
+  onCancel?: () => void;
+  onSubmit: (input: PatientInput) => void | Promise<void>;
+}
+
+export function PatientForm({
+  defaultPatient,
+  submitting,
+  submitLabel = "Save",
+  onCancel,
+  onSubmit,
+}: Props) {
+  const defaults: PatientFormValues = {
+    mrn: defaultPatient?.mrn ?? "",
+    first_name: defaultPatient?.name.split(" ")[0] ?? "",
+    last_name: defaultPatient?.name.split(" ").slice(1).join(" ") ?? "",
+    sex: defaultPatient?.sex ?? "F",
+    dob: defaultPatient?.dob ?? "",
+    email: "",
+    phone: "",
+    city: defaultPatient?.city ?? "",
+    procedure: defaultPatient?.procedure ?? "",
+    procedure_date: defaultPatient?.procedureDate ?? "",
+    asa: (defaultPatient?.asa as (typeof asas)[number]) ?? "",
+    icu_needed: defaultPatient?.icu ?? false,
+    status: defaultPatient?.status ?? "scheduled",
+    risk: defaultPatient?.risk ?? "low",
+    tags: defaultPatient?.tags?.join(", ") ?? "",
+  };
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<PatientFormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: defaults,
+  });
+
+  const submit = handleSubmit(async (values) => {
+    const input: PatientInput = {
+      mrn: values.mrn,
+      first_name: values.first_name,
+      last_name: values.last_name,
+      sex: values.sex,
+      dob: values.dob,
+      email: values.email || null,
+      phone: values.phone || null,
+      city: values.city || null,
+      procedure: values.procedure || null,
+      procedure_date: values.procedure_date || null,
+      asa: (values.asa || null) as PatientInput["asa"],
+      icu_needed: values.icu_needed,
+      status: values.status,
+      risk: values.risk,
+      tags: values.tags
+        ? values.tags
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : null,
+    };
+    await onSubmit(input);
+  });
+
+  return (
+    <form onSubmit={submit} className="space-y-4 lg:space-y-5" noValidate>
+      <Section title="Identity">
+        <Grid>
+          <FormField label="MRN" required htmlFor="mrn" error={errors.mrn?.message}>
+            <Input id="mrn" placeholder="e.g. 1042" {...register("mrn")} />
+          </FormField>
+          <FormField label="Sex" required htmlFor="sex" error={errors.sex?.message}>
+            <Select id="sex" {...register("sex")}>
+              {sexes.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField
+            label="Date of birth"
+            required
+            htmlFor="dob"
+            error={errors.dob?.message}
+          >
+            <Input id="dob" type="date" {...register("dob")} />
+          </FormField>
+          <FormField
+            label="First name"
+            required
+            htmlFor="first_name"
+            error={errors.first_name?.message}
+          >
+            <Input id="first_name" {...register("first_name")} />
+          </FormField>
+          <FormField
+            label="Last name"
+            required
+            htmlFor="last_name"
+            error={errors.last_name?.message}
+          >
+            <Input id="last_name" {...register("last_name")} />
+          </FormField>
+          <FormField label="City" htmlFor="city" error={errors.city?.message}>
+            <Input id="city" {...register("city")} placeholder="Berlin, Germany" />
+          </FormField>
+        </Grid>
+      </Section>
+
+      <Section title="Contact">
+        <Grid>
+          <FormField label="Email" htmlFor="email" error={errors.email?.message}>
+            <Input id="email" type="email" placeholder="patient@example.org" {...register("email")} />
+          </FormField>
+          <FormField label="Phone" htmlFor="phone" error={errors.phone?.message}>
+            <Input id="phone" type="tel" placeholder="+49…" {...register("phone")} />
+          </FormField>
+        </Grid>
+      </Section>
+
+      <Section title="Clinical">
+        <Grid>
+          <FormField
+            label="Planned procedure"
+            htmlFor="procedure"
+            error={errors.procedure?.message}
+          >
+            <Input
+              id="procedure"
+              placeholder="Hip Replacement"
+              {...register("procedure")}
+            />
+          </FormField>
+          <FormField
+            label="Procedure date"
+            htmlFor="procedure_date"
+            error={errors.procedure_date?.message}
+          >
+            <Input id="procedure_date" type="date" {...register("procedure_date")} />
+          </FormField>
+          <FormField label="ASA class" htmlFor="asa" error={errors.asa?.message}>
+            <Select id="asa" {...register("asa")}>
+              <option value="">—</option>
+              {asas.map((a) => (
+                <option key={a} value={a}>
+                  ASA {a}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label="ICU bed needed" htmlFor="icu_needed">
+            <label
+              htmlFor="icu_needed"
+              className="flex items-center gap-2 h-10 px-4 rounded-full border border-border bg-white"
+            >
+              <input
+                id="icu_needed"
+                type="checkbox"
+                className="size-4 rounded border-border accent-primary"
+                {...register("icu_needed")}
+              />
+              <span className="text-sm">Reserve ICU bed post-op</span>
+            </label>
+          </FormField>
+        </Grid>
+      </Section>
+
+      <Section title="Care plan">
+        <Grid>
+          <FormField label="Status" required htmlFor="status" error={errors.status?.message}>
+            <Select id="status" {...register("status")}>
+              {statuses.map((s) => (
+                <option key={s} value={s}>
+                  {labelFor(s)}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label="Risk level" required htmlFor="risk" error={errors.risk?.message}>
+            <Select id="risk" {...register("risk")}>
+              {risks.map((r) => (
+                <option key={r} value={r}>
+                  {labelFor(r)}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField
+            label="Tags"
+            htmlFor="tags"
+            hint="Comma separated. e.g. #ASA II, #ICU needed"
+            error={errors.tags?.message}
+            className="col-span-full"
+          >
+            <Input id="tags" {...register("tags")} placeholder="#ASA II, #ICU needed" />
+          </FormField>
+        </Grid>
+      </Section>
+
+      <div className="flex items-center justify-end gap-2 pt-2">
+        {onCancel && (
+          <Button type="button" variant="secondary" onClick={onCancel} disabled={submitting}>
+            Cancel
+          </Button>
+        )}
+        <Button type="submit" disabled={submitting}>
+          {submitting && <Loader2 className="size-4 animate-spin" />}
+          {submitting ? "Saving…" : submitLabel}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-[15px]">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="pb-5">{children}</CardContent>
+    </Card>
+  );
+}
+
+function Grid({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
+      {children}
+    </div>
+  );
+}
+
+function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select
+      {...props}
+      className="h-10 w-full rounded-full border border-border bg-white px-4 text-sm shadow-soft ring-focus appearance-none cursor-pointer"
+    />
+  );
+}
+
+function labelFor(v: string) {
+  return v
+    .split(/[-_]/)
+    .map((s) => s[0].toUpperCase() + s.slice(1))
+    .join(" ");
+}
