@@ -1,7 +1,12 @@
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Pencil, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/ui/error-banner";
-import { PageSpinner } from "@/components/feedback/Spinner";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ProfileSkeleton } from "@/features/patients/components/ProfileSkeleton";
+import { useDeletePatient } from "@/features/patients/hooks/use-delete-patient";
 import { PatientHeader } from "@/features/patients/components/PatientHeader";
 import { KeyClinicalOverview } from "@/features/patients/components/KeyClinicalOverview";
 import { KeyDocuments } from "@/features/patients/components/KeyDocuments";
@@ -20,6 +25,8 @@ import { soapNotes } from "@/mocks";
 export function PatientProfilePage() {
   const { patientId } = useParams<{ patientId: string }>();
   const navigate = useNavigate();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const remove = useDeletePatient();
   const { data: patient, isLoading, isError, error, refetch, isFetching } = usePatient(
     patientId
   );
@@ -32,12 +39,32 @@ export function PatientProfilePage() {
         onBack={() => navigate(-1)}
         right={
           patient && (
-            <span className="text-xs text-muted-foreground">MRN {patient.mrn}</span>
+            <>
+              <span className="text-xs text-muted-foreground mr-2">
+                MRN {patient.mrn}
+              </span>
+              <Button
+                variant="secondary"
+                className="h-10"
+                onClick={() => navigate(`/patients/${patient.id}/edit`)}
+              >
+                <Pencil className="size-4" />
+                Edit
+              </Button>
+              <Button
+                variant="secondary"
+                className="h-10 text-danger hover:text-danger"
+                onClick={() => setConfirmingDelete(true)}
+              >
+                <Trash2 className="size-4" />
+                Remove
+              </Button>
+            </>
           )
         }
       />
 
-      {isLoading && <PageSpinner label="Loading patient…" />}
+      {isLoading && <ProfileSkeleton />}
 
       {isError && !isLoading && (
         <ErrorBanner
@@ -78,6 +105,22 @@ export function PatientProfilePage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title={patient ? `Remove ${patient.name}?` : "Remove patient?"}
+        description="This will remove the patient record. This action can't be undone."
+        confirmLabel="Remove patient"
+        destructive
+        busy={remove.isPending}
+        onConfirm={async () => {
+          if (!patient) return;
+          await remove.mutateAsync(patient.id);
+          setConfirmingDelete(false);
+          navigate("/patients", { replace: true });
+        }}
+      />
     </>
   );
 }

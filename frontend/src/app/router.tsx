@@ -3,7 +3,12 @@ import { Shell } from "@/components/layout/Shell";
 import { ProtectedRoute, PublicRoute } from "@/components/auth";
 import { LoginPage } from "@/features/auth";
 import { DashboardPage } from "@/features/dashboard";
-import { PatientsPage, PatientProfilePage } from "@/features/patients";
+import {
+  PatientsPage,
+  PatientProfilePage,
+  PatientNewPage,
+  PatientEditPage,
+} from "@/features/patients";
 import { InsightsPage } from "@/features/analytics";
 import { AppointmentsPage } from "@/features/appointments";
 import { MobilePage } from "@/features/mobile";
@@ -20,7 +25,9 @@ export function AppRouter() {
         <Route element={<Shell />}>
           <Route path={ROUTES.dashboard} element={<DashboardPage />} />
           <Route path={ROUTES.patients} element={<PatientsPage />} />
+          <Route path="/patients/new" element={<PatientNewPage />} />
           <Route path="/patients/:patientId" element={<PatientProfilePage />} />
+          <Route path="/patients/:patientId/edit" element={<PatientEditPage />} />
           <Route path={ROUTES.insights} element={<InsightsPage />} />
           <Route path={ROUTES.appointments} element={<AppointmentsPage />} />
           <Route path={ROUTES.docs} element={<Placeholder title="Docs" />} />

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ArrowDownAZ,
   ChevronLeft,
@@ -23,6 +24,7 @@ import { useAppStore } from "@/stores/app-store";
 import { cn } from "@/lib/utils";
 
 export function PatientsPage() {
+  const navigate = useNavigate();
   const viewMode = useAppStore((s) => s.viewMode);
   const setViewMode = useAppStore((s) => s.setViewMode);
   const [query, setQuery] = useState("");
@@ -96,7 +98,7 @@ export function PatientsPage() {
             <Button variant="secondary" className="h-10">
               <Download className="size-4" /> Export data
             </Button>
-            <Button className="h-10">
+            <Button className="h-10" onClick={() => navigate("/patients/new")}>
               <Plus className="size-4" /> New patient
             </Button>
           </>
