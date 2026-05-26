@@ -40,49 +40,54 @@ export function StatCard({
       className="h-full"
     >
       <Card className={cn("card-hover h-full flex flex-col", className)}>
-        <CardContent className="p-5">
+        <CardContent className="p-5 lg:p-6 flex flex-col h-full">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               {icon && (
                 <div
                   className={cn(
-                    "size-9 rounded-xl flex items-center justify-center [&_svg]:size-4",
+                    "size-10 rounded-2xl flex items-center justify-center [&_svg]:size-5",
                     accentMap[accent]
                   )}
                 >
                   {icon}
                 </div>
               )}
-              <span className="text-sm font-medium text-muted-foreground">
+              <span className="text-[15px] font-semibold text-foreground">
                 {label}
               </span>
             </div>
             {hint && (
-              <span className="text-xs text-primary hover:underline cursor-pointer">
+              <button className="text-[13px] font-medium text-primary hover:underline">
                 {hint}
-              </span>
+              </button>
             )}
           </div>
-          <div className="mt-4 flex items-end gap-2">
-            <div className="text-3xl font-bold tracking-tight">{value}</div>
+
+          <div className="mt-4 flex items-center gap-2.5">
+            <div className="text-[40px] leading-none font-bold tracking-tight">
+              {value}
+            </div>
             {delta && (
               <div
                 className={cn(
-                  "flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-medium mb-1",
+                  "flex items-center gap-0.5 rounded-full px-2 py-1 text-[12px] font-semibold",
                   positive ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
                 )}
               >
                 {positive ? (
-                  <ArrowUpRight className="size-3" />
+                  <ArrowUpRight className="size-3.5" />
                 ) : (
-                  <ArrowDownRight className="size-3" />
+                  <ArrowDownRight className="size-3.5" />
                 )}
+                {positive ? "+" : "-"}
                 {Math.abs(delta.value)}
                 {typeof delta.value === "number" && "%"}
               </div>
             )}
           </div>
-          {children && <div className="mt-4">{children}</div>}
+
+          {children && <div className="mt-5 flex-1">{children}</div>}
         </CardContent>
       </Card>
     </motion.div>
