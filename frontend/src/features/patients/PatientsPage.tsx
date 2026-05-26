@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   ArrowDownAZ,
   ChevronLeft,
@@ -13,9 +13,11 @@ import {
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ErrorBanner } from "@/components/ui/error-banner";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { PatientTable } from "@/features/patients/components/PatientTable";
 import { PatientCardGrid } from "@/features/patients/components/PatientCardGrid";
-import { patients } from "@/mocks";
+import { usePatients } from "@/features/patients/hooks/use-patients";
 import { useAppStore } from "@/stores/app-store";
 import { cn } from "@/lib/utils";
 
@@ -23,17 +25,13 @@ export function PatientsPage() {
   const viewMode = useAppStore((s) => s.viewMode);
   const setViewMode = useAppStore((s) => s.setViewMode);
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
 
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase();
-    if (!q) return patients;
-    return patients.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.mrn.includes(q) ||
-        p.procedure.toLowerCase().includes(q)
-    );
-  }, [query]);
+  const { data, isLoading, isError, error, refetch, isFetching } = usePatients({
+    q: query || undefined,
+    page,
+    page_size: 20,
+  });
 
   return (
     <>
@@ -48,7 +46,10 @@ export function PatientsPage() {
                 iconBg
                 placeholder="Search…"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setPage(1);
+                }}
                 className="bg-white"
               />
             </div>
@@ -100,28 +101,54 @@ export function PatientsPage() {
         }
       />
 
-      {viewMode === "table" ? (
-        <PatientTable data={filtered} />
-      ) : (
-        <PatientCardGrid data={filtered} />
+      {isLoading && <TableSkeleton rows={8} cols={9} />}
+
+      {isError && !isLoading && (
+        <ErrorBanner
+          title="Couldn't load patients"
+          message={error instanceof Error ? error.message : "Please try again."}
+          onRetry={() => refetch()}
+          retrying={isFetching}
+        />
       )}
 
-      <div className="flex items-center justify-between mt-6 text-sm text-muted-foreground">
-        <span>
-          Showing {filtered.length} of 598
-        </span>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="icon" className="size-9 rounded-full">
-            <ChevronLeft className="size-3.5" />
-          </Button>
-          <span className="px-3 py-1 rounded-full bg-white border border-border text-xs">
-            Page <strong className="text-foreground">1</strong> of 50
-          </span>
-          <Button size="icon" className="size-9 rounded-full">
-            <ChevronRight className="size-3.5" />
-          </Button>
-        </div>
-      </div>
+      {!isLoading && !isError && data && (
+        <>
+          {viewMode === "table" ? (
+            <PatientTable data={data.items} />
+          ) : (
+            <PatientCardGrid data={data.items} />
+          )}
+
+          <div className="flex items-center justify-between mt-6 text-sm text-muted-foreground">
+            <span>
+              Showing {data.items.length} of {data.total}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="icon"
+                className="size-9 rounded-full"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={data.page <= 1}
+              >
+                <ChevronLeft className="size-3.5" />
+              </Button>
+              <span className="px-3 py-1 rounded-full bg-white border border-border text-xs">
+                Page <strong className="text-foreground">{data.page}</strong> of {data.pages}
+              </span>
+              <Button
+                size="icon"
+                className="size-9 rounded-full"
+                onClick={() => setPage((p) => Math.min(data.pages, p + 1))}
+                disabled={data.page >= data.pages}
+              >
+                <ChevronRight className="size-3.5" />
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
