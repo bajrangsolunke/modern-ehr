@@ -20,6 +20,30 @@ class PatientService:
         self.db = db
         self.repo = PatientRepository(db)
 
+    # Fields the client may set on create. Anything outside this set
+    # (e.g. risk_score, computed columns) is server-controlled.
+    _CREATE_ALLOWED = frozenset(
+        {
+            "mrn",
+            "first_name",
+            "last_name",
+            "sex",
+            "dob",
+            "email",
+            "phone",
+            "city",
+            "avatar_url",
+            "procedure",
+            "procedure_date",
+            "asa",
+            "icu_needed",
+            "tags",
+            "assigned_physician_id",
+            "risk",
+            "status",
+        }
+    )
+
     async def create(self, payload: PatientCreate) -> Patient:
         existing = await self.repo.get_by_mrn(payload.mrn)
         if existing:
@@ -27,7 +51,8 @@ class PatientService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Patient with MRN {payload.mrn} already exists",
             )
-        patient = Patient(**payload.model_dump())
+        data = payload.model_dump(include=self._CREATE_ALLOWED)
+        patient = Patient(**data)
         return await self.repo.add(patient)
 
     async def get(self, patient_id: UUID) -> Patient:
@@ -36,9 +61,30 @@ class PatientService:
             raise HTTPException(status_code=404, detail="Patient not found")
         return patient
 
+    # Fields the client may modify after create. mrn/sex/dob are intentionally
+    # omitted (MRN is immutable, demographic changes need a separate flow).
+    _UPDATE_ALLOWED = frozenset(
+        {
+            "first_name",
+            "last_name",
+            "email",
+            "phone",
+            "city",
+            "procedure",
+            "procedure_date",
+            "asa",
+            "icu_needed",
+            "status",
+            "risk",
+            "tags",
+            "assigned_physician_id",
+        }
+    )
+
     async def update(self, patient_id: UUID, payload: PatientUpdate) -> Patient:
         patient = await self.get(patient_id)
-        for k, v in payload.model_dump(exclude_unset=True).items():
+        data = payload.model_dump(exclude_unset=True, include=self._UPDATE_ALLOWED)
+        for k, v in data.items():
             setattr(patient, k, v)
         await self.db.flush()
         await self.db.refresh(patient)
