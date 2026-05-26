@@ -13,11 +13,26 @@ export const ROUTES = {
 } as const;
 
 export const QUERY_KEYS = {
-  currentUser: ["currentUser"] as const,
-  patients: (filters?: unknown) => ["patients", filters] as const,
-  patient: (id: string) => ["patients", id] as const,
-  appointments: ["appointments"] as const,
-  analytics: ["analytics"] as const,
+  auth: { me: ["auth", "me"] as const },
+  patients: {
+    all: ["patients"] as const,
+    list: (filters?: unknown) => ["patients", "list", filters] as const,
+    byId: (id: string) => ["patients", id] as const,
+  },
+  appointments: {
+    all: ["appointments"] as const,
+    upcoming: ["appointments", "upcoming"] as const,
+    forPatient: (patientId: string) =>
+      ["appointments", "patient", patientId] as const,
+  },
+  notes: {
+    forPatient: (patientId: string) => ["notes", "patient", patientId] as const,
+  },
+  analytics: { snapshot: ["analytics", "snapshot"] as const },
+  ai: {
+    summary: (patientId: string) => ["ai", "summary", patientId] as const,
+    risk: (patientId: string) => ["ai", "risk", patientId] as const,
+  },
 };
 
 export const STORAGE_KEYS = {
