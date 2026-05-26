@@ -10,12 +10,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { appointments } from "@/mocks";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useUpcomingAppointments } from "@/features/appointments/hooks/use-upcoming-appointments";
 import { cn } from "@/lib/utils";
 
 const days = Array.from({ length: 18 }).map((_, i) => 14 + i);
 
 export function UpcomingAppointments() {
+  const { data, isLoading } = useUpcomingAppointments(8);
+
   return (
     <Card className="h-full">
       <CardHeader className="flex flex-row items-center justify-between pb-3 gap-2 flex-wrap">
@@ -70,47 +73,56 @@ export function UpcomingAppointments() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
-              {appointments.map((a) => (
-                <tr key={a.id} className="hover:bg-surface-subtle transition">
-                  <td className="py-3.5">
-                    <div className="flex items-center gap-2.5">
-                      <UserAvatar name={a.patientName} size="md" />
-                      <span className="font-semibold text-[14px]">
-                        {a.patientName}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="py-3.5 capitalize text-foreground/80">{a.type}</td>
-                  <td className="py-3.5">
-                    <Badge
-                      variant={
-                        a.status === "confirmed"
-                          ? "success"
-                          : a.status === "cancelled"
-                          ? "danger"
-                          : "warning"
-                      }
-                      dot
-                      size="sm"
-                      className="capitalize"
-                    >
-                      {a.status}
-                    </Badge>
-                  </td>
-                  <td className="py-3.5 text-foreground/80">{a.date}</td>
-                  <td className="py-3.5 text-foreground/80">{a.time}</td>
-                  <td className="py-3.5">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button size="icon" className="size-9 rounded-full">
-                        <Phone className="size-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="size-9">
-                        <MoreVertical className="size-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {isLoading &&
+                Array.from({ length: 4 }).map((_, i) => (
+                  <tr key={i}>
+                    <td colSpan={6} className="py-2">
+                      <Skeleton className="h-10 rounded-xl" />
+                    </td>
+                  </tr>
+                ))}
+              {!isLoading &&
+                data?.map((a) => (
+                  <tr key={a.id} className="hover:bg-surface-subtle transition">
+                    <td className="py-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <UserAvatar name={a.patientName} size="md" />
+                        <span className="font-semibold text-[14px]">
+                          {a.patientName}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3.5 capitalize text-foreground/80">{a.type}</td>
+                    <td className="py-3.5">
+                      <Badge
+                        variant={
+                          a.status === "confirmed"
+                            ? "success"
+                            : a.status === "cancelled"
+                            ? "danger"
+                            : "warning"
+                        }
+                        dot
+                        size="sm"
+                        className="capitalize"
+                      >
+                        {a.status}
+                      </Badge>
+                    </td>
+                    <td className="py-3.5 text-foreground/80">{a.date}</td>
+                    <td className="py-3.5 text-foreground/80">{a.time}</td>
+                    <td className="py-3.5">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button size="icon" className="size-9 rounded-full">
+                          <Phone className="size-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="size-9">
+                          <MoreVertical className="size-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
