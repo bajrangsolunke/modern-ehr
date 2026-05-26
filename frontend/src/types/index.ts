@@ -70,14 +70,19 @@ export interface VitalSign {
   status?: "normal" | "elevated" | "low" | "critical";
 }
 
+export type MedicationStatus = "active" | "paused" | "discontinued";
+
 export interface Medication {
   id: string;
+  patientId?: string;
   name: string;
   dose: string;
   frequency: string;
   route: string;
+  rxnorm?: string;
   startDate: string;
-  status: "active" | "paused" | "discontinued";
+  endDate?: string;
+  status: MedicationStatus;
   prescriber: string;
 }
 

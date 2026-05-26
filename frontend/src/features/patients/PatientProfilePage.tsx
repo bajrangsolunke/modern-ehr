@@ -168,7 +168,7 @@ export function PatientProfilePage() {
             <TabsContent value="medications" className="mt-0">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
                 <div className="lg:col-span-8">
-                  <MedicationsCard />
+                  <MedicationsCard patientId={patient.id} />
                 </div>
                 <div className="lg:col-span-4 space-y-4">
                   <ClinicalActions />
