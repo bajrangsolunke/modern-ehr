@@ -24,6 +24,11 @@ export function AppRouter() {
         <Route element={<Shell />}>
           <Route path={ROUTES.dashboard} element={<DashboardPage />} />
           <Route path={ROUTES.patients} element={<PatientsPage />} />
+          {/* /patients/new is now a drawer on /patients; redirect any old links/bookmarks */}
+          <Route
+            path="/patients/new"
+            element={<Navigate to={ROUTES.patients} replace />}
+          />
           <Route path="/patients/:patientId" element={<PatientProfilePage />} />
           <Route path="/patients/:patientId/edit" element={<PatientEditPage />} />
           <Route path={ROUTES.insights} element={<InsightsPage />} />
