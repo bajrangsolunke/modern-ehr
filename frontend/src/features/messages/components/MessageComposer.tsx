@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Paperclip, Send, Sparkles } from "lucide-react";
+import { FileText, Image as ImageIcon, Loader2, Paperclip, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
+import { AttachmentPicker } from "./AttachmentPicker";
+import type { Document } from "@/features/docs/api/docs-api";
 import { cn } from "@/lib/utils";
 
 interface Props {
-  onSend: (body: string) => void | Promise<void>;
+  onSend: (body: string, attachments: Document[]) => void | Promise<void>;
   busy?: boolean;
   /** Called at most once per ~2s while the user is typing — drives
    *  the "X is typing…" indicator on the other side. */
@@ -14,6 +16,9 @@ interface Props {
    *  to fetch an LLM-drafted reply, then inserts it into the composer
    *  for the user to edit before sending. */
   onSuggest?: () => Promise<string>;
+  /** When provided, the paperclip opens a picker over the patient's
+   *  chart documents. Without a patientId, attachments are disabled. */
+  patientId?: string;
 }
 
 const TYPING_THROTTLE_MS = 2_000;
@@ -33,14 +38,61 @@ const QUICK_REPLIES = [
   "Lab results look normal — no follow-up needed.",
 ];
 
-export function MessageComposer({ onSend, busy, onTyping, onSuggest }: Props) {
+export function MessageComposer({
+  onSend,
+  busy,
+  onTyping,
+  onSuggest,
+  patientId,
+}: Props) {
   const [value, setValue] = useState("");
+  const [attachments, setAttachments] = useState<Document[]>([]);
   const [suggesting, setSuggesting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const lastTypingAtRef = useRef<number>(0);
 
+  // Reset throttle + clear staged attachments when the conversation
+  // changes so a left-over draft doesn't follow you to a new thread.
+  useEffect(() => {
+    lastTypingAtRef.current = 0;
+    setAttachments([]);
+  }, [onTyping]);
+
   const trimmed = value.trim();
-  const canSend = trimmed.length > 0 && !busy;
+  const canSend = (trimmed.length > 0 || attachments.length > 0) && !busy;
+
+  const send = async () => {
+    if (!canSend) return;
+    const body = trimmed;
+    const atts = attachments;
+    setValue("");
+    setAttachments([]);
+    await onSend(body, atts);
+    textareaRef.current?.focus();
+  };
+
+  const handleChange = (next: string) => {
+    setValue(next);
+    if (!onTyping) return;
+    const now = Date.now();
+    if (now - lastTypingAtRef.current > TYPING_THROTTLE_MS) {
+      lastTypingAtRef.current = now;
+      onTyping();
+    }
+  };
+
+  const insertQuickReply = (text: string) => {
+    setValue((cur) => (cur.trim() ? `${cur} ${text}` : text));
+    textareaRef.current?.focus();
+  };
+
+  const toggleAttachment = (doc: Document) => {
+    setAttachments((cur) =>
+      cur.some((a) => a.id === doc.id)
+        ? cur.filter((a) => a.id !== doc.id)
+        : [...cur, doc]
+    );
+  };
 
   const handleSuggest = async () => {
     if (!onSuggest || suggesting) return;
@@ -49,7 +101,6 @@ export function MessageComposer({ onSend, busy, onTyping, onSuggest }: Props) {
       const suggestion = await onSuggest();
       if (suggestion) {
         setValue(suggestion);
-        // Defer focus so it lands after React commits the new value.
         requestAnimationFrame(() => {
           const el = textareaRef.current;
           if (el) {
@@ -67,34 +118,7 @@ export function MessageComposer({ onSend, busy, onTyping, onSuggest }: Props) {
     }
   };
 
-  // Reset throttle when the conversation changes so the next keystroke
-  // pings immediately.
-  useEffect(() => {
-    lastTypingAtRef.current = 0;
-  }, [onTyping]);
-
-  const handleChange = (next: string) => {
-    setValue(next);
-    if (!onTyping) return;
-    const now = Date.now();
-    if (now - lastTypingAtRef.current > TYPING_THROTTLE_MS) {
-      lastTypingAtRef.current = now;
-      onTyping();
-    }
-  };
-
-  const send = async () => {
-    if (!canSend) return;
-    const body = trimmed;
-    setValue("");
-    await onSend(body);
-    textareaRef.current?.focus();
-  };
-
-  const insertQuickReply = (text: string) => {
-    setValue((cur) => (cur.trim() ? `${cur} ${text}` : text));
-    textareaRef.current?.focus();
-  };
+  const selectedIds = new Set(attachments.map((a) => a.id));
 
   return (
     <div className="border-t border-border bg-white">
@@ -130,19 +154,53 @@ export function MessageComposer({ onSend, busy, onTyping, onSuggest }: Props) {
         ))}
       </div>
 
+      {attachments.length > 0 && (
+        <div className="px-3 sm:px-4 pb-1.5 flex flex-wrap gap-1.5">
+          {attachments.map((a) => (
+            <span
+              key={a.id}
+              className="inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-full bg-primary/10 text-primary text-[11px] font-medium"
+            >
+              <MiniGlyph mime={a.mimeType} />
+              <span className="max-w-[180px] truncate">{a.name}</span>
+              <button
+                type="button"
+                onClick={() => toggleAttachment(a)}
+                className="size-4 grid place-items-center rounded-full hover:bg-primary/20 transition"
+                aria-label={`Remove ${a.name}`}
+              >
+                <X className="size-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="px-3 sm:px-4 pb-3 flex items-end gap-2">
-        <button
-          type="button"
-          onClick={() =>
-            toast.info("Attachments coming soon", {
-              description: "Attach a document from the patient's chart.",
-            })
-          }
-          aria-label="Attach"
-          className="size-10 shrink-0 rounded-full bg-surface-subtle text-muted-foreground hover:bg-secondary hover:text-foreground grid place-items-center transition ring-focus"
-        >
-          <Paperclip className="size-4" />
-        </button>
+        {patientId ? (
+          <div className="relative">
+            <AttachmentPicker
+              patientId={patientId}
+              selectedIds={selectedIds}
+              onToggle={toggleAttachment}
+              disabled={busy}
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() =>
+              toast.info("Attachments coming soon", {
+                description:
+                  "Clinician-to-clinician attachments land in a later phase.",
+              })
+            }
+            aria-label="Attach (patient threads only)"
+            className="size-10 shrink-0 rounded-full bg-surface-subtle text-muted-foreground hover:bg-secondary hover:text-foreground grid place-items-center transition ring-focus"
+          >
+            <Paperclip className="size-4" />
+          </button>
+        )}
         <textarea
           ref={textareaRef}
           value={value}
@@ -177,4 +235,9 @@ export function MessageComposer({ onSend, busy, onTyping, onSuggest }: Props) {
       </div>
     </div>
   );
+}
+
+function MiniGlyph({ mime }: { mime: string }) {
+  if (mime.startsWith("image/")) return <ImageIcon className="size-3" />;
+  return <FileText className="size-3" />;
 }

@@ -51,10 +51,8 @@ async def get_conversation(
     svc = MessagesService(db)
     conv = await svc.get_conversation(conversation_id, viewer_id=current.id)
     projected = await svc._project(conv, viewer_id=current.id)
-    return ConversationDetail(
-        **projected.model_dump(),
-        messages=[MessageOut.model_validate(m) for m in conv.messages],
-    )
+    messages = [await svc._project_message(m) for m in conv.messages]
+    return ConversationDetail(**projected.model_dump(), messages=messages)
 
 
 @router.post(
@@ -84,10 +82,8 @@ async def create_patient_conversation(
         payload={"patient_id": str(payload.patient_id), "urgent": payload.urgent},
     )
     projected = await svc._project(conv, viewer_id=current.id)
-    return ConversationDetail(
-        **projected.model_dump(),
-        messages=[MessageOut.model_validate(msg)],
-    )
+    msg_out = await svc._project_message(msg)
+    return ConversationDetail(**projected.model_dump(), messages=[msg_out])
 
 
 @router.post(
@@ -120,10 +116,8 @@ async def create_clinician_conversation(
         },
     )
     projected = await svc._project(conv, viewer_id=current.id)
-    return ConversationDetail(
-        **projected.model_dump(),
-        messages=[MessageOut.model_validate(msg)],
-    )
+    msg_out = await svc._project_message(msg)
+    return ConversationDetail(**projected.model_dump(), messages=[msg_out])
 
 
 @router.post(
@@ -144,6 +138,7 @@ async def send_message(
         viewer_id=current.id,
         body=payload.body,
         urgent=payload.urgent,
+        document_ids=payload.document_ids,
     )
     await AuditService(db).record_request(
         request,
@@ -154,9 +149,10 @@ async def send_message(
         payload={
             "conversation_id": str(conversation_id),
             "urgent": payload.urgent,
+            "document_ids": [str(d) for d in payload.document_ids],
         },
     )
-    return MessageOut.model_validate(msg)
+    return await svc._project_message(msg)
 
 
 @router.post(

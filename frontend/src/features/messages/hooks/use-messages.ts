@@ -35,11 +35,13 @@ export function useSendMessage() {
       conversationId,
       body,
       urgent,
+      documentIds,
     }: {
       conversationId: string;
       body: string;
       urgent?: boolean;
-    }) => messagesApi.send(conversationId, { body, urgent }),
+      documentIds?: string[];
+    }) => messagesApi.send(conversationId, { body, urgent, documentIds }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: MESSAGES_KEY });
     },

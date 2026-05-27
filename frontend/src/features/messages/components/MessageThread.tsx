@@ -3,11 +3,16 @@ import {
   AlertCircle,
   Check,
   CheckCheck,
+  FileText,
+  Image as ImageIcon,
   MessageSquarePlus,
 } from "lucide-react";
 import { UserAvatar } from "@/components/ui/avatar";
-import type { Message, Participant } from "../types";
-import { cn, formatTime } from "@/lib/utils";
+import { env } from "@/config/env";
+import { STORAGE_KEYS } from "@/config/constants";
+import { toast } from "@/lib/toast";
+import type { Attachment, Message, Participant } from "../types";
+import { cn, formatBytes, formatTime } from "@/lib/utils";
 
 interface Props {
   messages: Message[];
@@ -223,7 +228,16 @@ function Bubble({
               <AlertCircle className="size-3" /> Urgent
             </div>
           )}
-          <p className="whitespace-pre-wrap break-words">{message.body}</p>
+          {message.body && (
+            <p className="whitespace-pre-wrap break-words">{message.body}</p>
+          )}
+          {message.attachments && message.attachments.length > 0 && (
+            <AttachmentList
+              attachments={message.attachments}
+              outgoing={outgoing}
+              hasBody={Boolean(message.body)}
+            />
+          )}
         </div>
         {groupEnd && (
           <div
@@ -250,6 +264,86 @@ function Bubble({
       </div>
 
       {outgoing && <div className="size-7 shrink-0" />}
+    </div>
+  );
+}
+
+async function downloadAttachment(a: Attachment): Promise<void> {
+  const token = localStorage.getItem(STORAGE_KEYS.accessToken);
+  try {
+    const res = await fetch(`${env.API_BASE_URL}/documents/${a.id}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (!res.ok) throw new Error(res.statusText || "Download failed");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = window.document.createElement("a");
+    link.href = url;
+    link.download = a.name;
+    window.document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    toast.error("Couldn't download attachment", {
+      description: err instanceof Error ? err.message : undefined,
+    });
+  }
+}
+
+function AttachmentList({
+  attachments,
+  outgoing,
+  hasBody,
+}: {
+  attachments: Attachment[];
+  outgoing: boolean;
+  hasBody: boolean;
+}) {
+  return (
+    <div className={cn("flex flex-col gap-1.5", hasBody && "mt-2")}>
+      {attachments.map((a) => {
+        const isImage = a.mimeType.startsWith("image/");
+        return (
+          <button
+            key={a.id}
+            type="button"
+            onClick={() => downloadAttachment(a)}
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 rounded-xl text-left transition",
+              outgoing
+                ? "bg-white/15 hover:bg-white/25 text-white"
+                : "bg-white border border-border hover:border-foreground/30"
+            )}
+          >
+            <div
+              className={cn(
+                "size-7 rounded-lg grid place-items-center shrink-0 [&_svg]:size-3.5",
+                outgoing
+                  ? "bg-white/15 text-white"
+                  : isImage
+                    ? "bg-info/10 text-info"
+                    : a.mimeType === "application/pdf"
+                      ? "bg-danger/10 text-danger"
+                      : "bg-primary/10 text-primary"
+              )}
+            >
+              {isImage ? <ImageIcon aria-label="" /> : <FileText />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] font-semibold truncate">{a.name}</div>
+              <div
+                className={cn(
+                  "text-[10px]",
+                  outgoing ? "text-white/70" : "text-muted-foreground"
+                )}
+              >
+                {formatBytes(a.sizeBytes)}
+              </div>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }

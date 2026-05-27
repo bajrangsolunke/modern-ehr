@@ -1,6 +1,12 @@
 import { api } from "@/lib/api-client";
 import { stripUndefined } from "@/lib/api-utils";
-import type { Audience, Conversation, Message, Participant } from "../types";
+import type {
+  Attachment,
+  Audience,
+  Conversation,
+  Message,
+  Participant,
+} from "../types";
 
 /* -------------------------------- DTOs ----------------------------------- */
 
@@ -27,6 +33,15 @@ interface BackendPatientSummaryDto {
   condition_tag: string | null;
 }
 
+interface BackendAttachmentDto {
+  id: string;
+  name: string;
+  mime_type: string;
+  size_bytes: number;
+  category: string;
+  has_preview: boolean;
+}
+
 interface BackendMessageDto {
   id: string;
   conversation_id: string;
@@ -35,6 +50,7 @@ interface BackendMessageDto {
   body: string;
   urgent: boolean;
   sent_at: string;
+  attachments?: BackendAttachmentDto[];
 }
 
 interface BackendConversationDto {
@@ -105,6 +121,17 @@ function mapConversation(dto: BackendConversationDto): Conversation {
   };
 }
 
+function mapAttachment(dto: BackendAttachmentDto): Attachment {
+  return {
+    id: dto.id,
+    name: dto.name,
+    mimeType: dto.mime_type,
+    sizeBytes: dto.size_bytes,
+    category: dto.category,
+    hasPreview: dto.has_preview,
+  };
+}
+
 function mapMessage(dto: BackendMessageDto): Message {
   return {
     id: dto.id,
@@ -114,6 +141,9 @@ function mapMessage(dto: BackendMessageDto): Message {
     body: dto.body,
     sentAt: dto.sent_at,
     urgent: dto.urgent || undefined,
+    attachments: dto.attachments?.length
+      ? dto.attachments.map(mapAttachment)
+      : undefined,
   };
 }
 
@@ -158,13 +188,14 @@ export const messagesApi = {
 
   send: async (
     conversationId: string,
-    input: { body: string; urgent?: boolean }
+    input: { body: string; urgent?: boolean; documentIds?: string[] }
   ): Promise<Message> => {
     const data = await api.post<BackendMessageDto>(
       `/messages/conversations/${conversationId}/messages`,
       {
         body: input.body,
         urgent: input.urgent ?? false,
+        document_ids: input.documentIds ?? [],
       }
     );
     return mapMessage(data);

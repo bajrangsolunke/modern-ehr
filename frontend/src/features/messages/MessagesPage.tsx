@@ -186,15 +186,21 @@ export function MessagesPage() {
     }
   };
 
-  const handleSendActive = async (body: string) => {
+  const handleSendActive = async (
+    body: string,
+    attachments: import("@/features/docs/api/docs-api").Document[]
+  ) => {
     if (activeConversationId) {
       await sendMessage.mutateAsync({
         conversationId: activeConversationId,
         body,
+        documentIds: attachments.map((a) => a.id),
       });
       return;
     }
     if (activeDraftUserId) {
+      // Clinician drafts don't support attachments yet (backend rejects
+      // them) — silently drop any staged attachments here.
       const results = await compose.mutateAsync({
         audience: "clinician",
         recipientIds: [activeDraftUserId],
@@ -311,6 +317,11 @@ export function MessagesPage() {
                   onSuggest={
                     activeConversationId
                       ? () => messagesApi.suggestReply(activeConversationId)
+                      : undefined
+                  }
+                  patientId={
+                    activeParticipant.audience === "patient"
+                      ? activeParticipant.id
                       : undefined
                   }
                 />

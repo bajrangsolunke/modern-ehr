@@ -19,6 +19,7 @@ from app.models.conversation import (
     Conversation,
     ConversationParticipant,
     Message,
+    MessageAttachment,
 )
 
 __all__ = [
@@ -49,4 +50,5 @@ __all__ = [
     "Conversation",
     "ConversationParticipant",
     "Message",
+    "MessageAttachment",
 ]

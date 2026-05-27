@@ -36,6 +36,15 @@ export interface Participant {
   lastReadAt?: string;
 }
 
+export interface Attachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  category: string;
+  hasPreview: boolean;
+}
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -46,6 +55,7 @@ export interface Message {
   /** ISO timestamp. */
   sentAt: string;
   urgent?: boolean;
+  attachments?: Attachment[];
 }
 
 export interface Conversation {

@@ -25,10 +25,13 @@ from app.models.conversation import (
     Conversation,
     ConversationParticipant,
     Message,
+    MessageAttachment,
 )
+from app.models.document import Document
 from app.models.patient import Patient
 from app.models.user import User
 from app.schemas.conversation import (
+    AttachmentOut,
     ConversationOut,
     MessageOut,
     ParticipantOut,
@@ -100,7 +103,9 @@ class MessagesService:
                 select(Conversation)
                 .options(
                     selectinload(Conversation.participants),
-                    selectinload(Conversation.messages),
+                    selectinload(Conversation.messages).selectinload(
+                        Message.attachments
+                    ),
                 )
                 .where(Conversation.id == conversation_id)
             )
@@ -221,6 +226,7 @@ class MessagesService:
         viewer_id: UUID,
         body: str,
         urgent: bool,
+        document_ids: list[UUID] | None = None,
     ) -> Message:
         conv = await self.get_conversation(conversation_id, viewer_id=viewer_id)
 
@@ -231,13 +237,79 @@ class MessagesService:
             urgent=urgent,
         )
         self.db.add(msg)
-        conv.last_message_preview = body[:280]
+        await self.db.flush()  # populate msg.id for FK
+
+        if document_ids:
+            await self._attach_documents(msg, document_ids, conv=conv)
+
+        # Surface a richer preview when there's an attachment but no body.
+        preview = body or (
+            "📎 Document" if document_ids else ""
+        )
+        conv.last_message_preview = preview[:280]
         conv.last_message_at = datetime.now(timezone.utc)
         await self.db.flush()
-        await self.db.refresh(msg)
 
-        await self._broadcast_message(conv, msg)
-        return msg
+        # Re-load with attachments + their documents so the broadcast
+        # frame carries everything the FE needs.
+        loaded = (
+            await self.db.execute(
+                select(Message)
+                .options(
+                    selectinload(Message.attachments).selectinload(
+                        MessageAttachment.message
+                    ),
+                )
+                .where(Message.id == msg.id)
+            )
+        ).scalar_one()
+
+        await self._broadcast_message(conv, loaded)
+        return loaded
+
+    async def _attach_documents(
+        self,
+        msg: Message,
+        document_ids: list[UUID],
+        *,
+        conv: Conversation,
+    ) -> None:
+        """Validate document references + create the join rows.
+
+        For patient threads, every attached document must already
+        belong to that patient — prevents cross-patient leaks.
+        """
+        if not document_ids:
+            return
+        docs = (
+            await self.db.execute(
+                select(Document).where(Document.id.in_(document_ids))
+            )
+        ).scalars().all()
+        if len(docs) != len(set(document_ids)):
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        if conv.audience == "patient" and conv.patient_id is not None:
+            for d in docs:
+                if d.patient_id != conv.patient_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Document does not belong to this patient.",
+                    )
+        else:
+            # Clinician threads don't carry a patient_id; attaching cross-
+            # patient docs there can leak PHI to staff who aren't on the
+            # patient's care team. Block until we model that explicitly.
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Attachments are only supported on patient threads today.",
+            )
+
+        for d in docs:
+            self.db.add(
+                MessageAttachment(message_id=msg.id, document_id=d.id)
+            )
+        await self.db.flush()
 
     async def ping_typing(
         self, conversation_id: UUID, *, viewer_id: UUID
@@ -300,13 +372,52 @@ class MessagesService:
     # ------------------------------------------------------------ broadcast
 
     async def _broadcast_message(self, conv: Conversation, msg: Message) -> None:
+        projected = await self._project_message(msg)
         payload = {
             "type": "message.created",
             "conversation_id": str(conv.id),
-            "message": MessageOut.model_validate(msg).model_dump(),
+            "message": projected.model_dump(),
         }
         for user_id in await self._subscriber_ids(conv):
             await ws_manager.send_to_user(str(user_id), payload)
+
+    async def _project_message(self, msg: Message) -> MessageOut:
+        """Build the MessageOut payload — including the attached
+        document metadata for each MessageAttachment row."""
+        attachments_out: list[AttachmentOut] = []
+        if msg.attachments:
+            doc_ids = [a.document_id for a in msg.attachments]
+            docs = (
+                await self.db.execute(
+                    select(Document).where(Document.id.in_(doc_ids))
+                )
+            ).scalars().all()
+            docs_by_id = {d.id: d for d in docs}
+            for a in msg.attachments:
+                d = docs_by_id.get(a.document_id)
+                if not d:
+                    continue
+                attachments_out.append(
+                    AttachmentOut(
+                        id=d.id,
+                        name=d.name,
+                        mime_type=d.mime_type,
+                        size_bytes=d.size_bytes,
+                        category=d.category,
+                        has_preview=bool(d.extracted_text),
+                    )
+                )
+
+        return MessageOut(
+            id=msg.id,
+            conversation_id=msg.conversation_id,
+            sender_user_id=msg.sender_user_id,
+            sender_patient_id=msg.sender_patient_id,
+            body=msg.body,
+            urgent=msg.urgent,
+            sent_at=msg.sent_at,
+            attachments=attachments_out,
+        )
 
     async def _subscriber_ids(self, conv: Conversation) -> set[UUID]:
         if conv.audience == "clinician":

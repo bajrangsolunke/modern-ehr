@@ -110,3 +110,35 @@ class Message(Base, UUIDMixin):
     )
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
+    attachments: Mapped[list["MessageAttachment"]] = relationship(
+        back_populates="message",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class MessageAttachment(Base, UUIDMixin):
+    """Links a message to an existing document in the docs module."""
+
+    __tablename__ = "message_attachments"
+
+    message_id: Mapped[UUID] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    document_id: Mapped[UUID] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    message: Mapped[Message] = relationship(back_populates="attachments")
+
+    __table_args__ = (
+        Index(
+            "uq_message_attachment",
+            "message_id",
+            "document_id",
+            unique=True,
+        ),
+    )

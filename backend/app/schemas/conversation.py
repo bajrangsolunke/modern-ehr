@@ -40,6 +40,20 @@ class PatientSummary(BaseModel):
     condition_tag: str | None = None
 
 
+class AttachmentOut(BaseModel):
+    """Slim document projection — drives the attachment chip + click-
+    through to the docs preview modal."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    mime_type: str
+    size_bytes: int
+    category: str
+    has_preview: bool = False
+
+
 class MessageOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -50,6 +64,7 @@ class MessageOut(BaseModel):
     body: str
     urgent: bool
     sent_at: datetime
+    attachments: list[AttachmentOut] = Field(default_factory=list)
 
 
 class ConversationOut(BaseModel):
@@ -76,6 +91,7 @@ class ConversationDetail(ConversationOut):
 class SendMessageIn(BaseModel):
     body: str = Field(min_length=1, max_length=4000)
     urgent: bool = False
+    document_ids: list[UUID] = Field(default_factory=list)
 
 
 class CreatePatientConversationIn(BaseModel):
