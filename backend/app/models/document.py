@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDMixin
@@ -27,6 +27,10 @@ class Document(Base, UUIDMixin, TimestampMixin):
     extracted_text: Mapped[str | None] = mapped_column(Text)
     summary: Mapped[str | None] = mapped_column(Text)
     uploaded_by: Mapped[str | None] = mapped_column(String(255))
+    # Raw bytes — fine for a single-server demo. A real deploy
+    # streams to object storage (S3 / GCS) and keeps only the
+    # storage_key + size here.
+    content: Mapped[bytes | None] = mapped_column(LargeBinary)
 
     patient: Mapped[Patient] = relationship(back_populates="documents")
     chunks: Mapped[list[DocumentChunk]] = relationship(

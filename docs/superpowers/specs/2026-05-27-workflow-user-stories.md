@@ -277,6 +277,59 @@ Acceptance:
 
 ---
 
+## 6.5. Documents library
+
+### US-DOCS-1 — Browse the library
+**Actor**: any signed-in user.
+Acceptance:
+1. `/docs` lists every document with attached patient, category,
+   uploaded-by, size, created-at.
+2. Card grid; same header layout as Patients/Appointments/Users
+   (search · Filters popover · Upload).
+3. Summary tiles: total, consent, imaging, lab.
+
+### US-DOCS-2 — Filter and search
+Acceptance:
+1. Free-text search hits filename and summary.
+2. Filter popover groups: category (consent / lab / imaging /
+   discharge / referral / insurance / operative / pathology /
+   education / advance directive / other), uploaded-by Me/Anyone.
+3. `?patient_id=` scopes results to one chart (used by the
+   Documents tab on the patient profile).
+
+### US-DOCS-3 — Upload
+**Actor**: provider or admin.
+Acceptance:
+1. Modal: patient picker (live search) → category buttons →
+   drag-drop / click file dropzone. Cap 25 MB.
+2. Server stores file content inline (BYTEA) for download, extracts
+   text for `text/*` previews.
+3. Audit row written. Patient FK validated → 404 on typo.
+
+### US-DOCS-4 — Preview & download
+Acceptance:
+1. Click any card → details modal with metadata, category badge,
+   attached patient link.
+2. For `text/*`, the modal calls `/documents/:id/preview` and shows
+   the body inline (scroll-capped).
+3. Other types show a "Download to view" affordance.
+4. Download fetches the bytes with `Authorization`, drops them
+   through a blob URL so the browser saves with the original
+   filename.
+
+### US-DOCS-5 — Delete
+**Actor**: provider or admin.
+Acceptance: trash action in the details modal, behind a confirm,
+audited. Optimistically removed from cached lists; rolled back on
+error.
+
+### US-DOCS-6 — Patient profile integration
+Acceptance: the patient profile's Documents tab consumes
+`useDocuments({ patient_id })` so the same component renders
+patient-scoped — single source of truth.
+
+---
+
 ## 7. Cross-cutting concerns
 
 ### US-XC-1 — Demo mode fallback

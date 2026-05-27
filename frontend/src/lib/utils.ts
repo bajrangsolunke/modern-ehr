@@ -53,6 +53,19 @@ const colorPool = [
   "bg-sky-100 text-sky-700",
 ];
 
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let i = 0;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
+    i++;
+  }
+  const rounded = value >= 10 || i === 0 ? Math.round(value) : value.toFixed(1);
+  return `${rounded} ${units[i]}`;
+}
+
 export function avatarColor(seed: string) {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
