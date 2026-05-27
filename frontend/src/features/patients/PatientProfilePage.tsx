@@ -9,7 +9,7 @@ import { ProfileSkeleton } from "@/features/patients/components/ProfileSkeleton"
 import { AlertsStrip } from "@/features/patients/components/AlertsStrip";
 import { PatientHeader } from "@/features/patients/components/PatientHeader";
 import { KeyClinicalOverview } from "@/features/patients/components/KeyClinicalOverview";
-import { KeyDocuments } from "@/features/patients/components/KeyDocuments";
+import { PatientDocuments } from "@/features/patients/components/PatientDocuments";
 import { ChecklistCard } from "@/features/patients/components/Checklist";
 import { Timeline } from "@/features/patients/components/Timeline";
 import { Vitals } from "@/features/patients/components/Vitals";
@@ -161,7 +161,7 @@ export function PatientProfilePage() {
             </TabsContent>
 
             <TabsContent value="documents" className="mt-0">
-              <KeyDocuments />
+              <PatientDocuments patientId={patient.id} />
             </TabsContent>
 
             <TabsContent value="care-plan" className="mt-0">
