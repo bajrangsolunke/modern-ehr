@@ -5,9 +5,11 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  CalendarDays,
   CalendarPlus,
   Check,
   CheckCheck,
+  List,
   MoreVertical,
   Pencil,
   Search,
@@ -29,6 +31,10 @@ import { FilterChip } from "@/components/ui/filter-chip";
 import { SortableTh, TABLE_ROW_BG } from "@/components/ui/sortable-th";
 import { SummaryTile } from "@/components/ui/summary-tile";
 import { AppointmentModal } from "@/features/appointments/components/AppointmentModal";
+import {
+  AppointmentsCalendar,
+  startOfWeek,
+} from "@/features/appointments/components/AppointmentsCalendar";
 import {
   useAppointments,
   useAppointmentStats,
@@ -87,8 +93,11 @@ function rangeFor(preset: DatePreset): { start?: string; end?: string } {
   return {};
 }
 
+type ViewMode = "list" | "calendar";
+
 export function AppointmentsPage() {
   const user = useAuthStore((s) => s.user);
+  const [view, setView] = useState<ViewMode>("list");
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, 300);
   const [status, setStatus] = useState<AppointmentStatus | undefined>();
@@ -96,6 +105,7 @@ export function AppointmentsPage() {
   const [scope, setScope] = useState<"all" | "mine">(
     user?.role === "provider" ? "mine" : "all"
   );
+  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
@@ -108,17 +118,26 @@ export function AppointmentsPage() {
   const physicianFilter =
     scope === "mine" && user?.role === "provider" ? user.id : undefined;
 
+  // Calendar mode pulls the visible week explicitly so the user can
+  // navigate prev/next/today regardless of the filter chip choice.
+  // List mode uses the date preset like before.
+  const calendarRange = useMemo(() => {
+    const end = new Date(weekStart);
+    end.setDate(end.getDate() + 7);
+    return { start: weekStart.toISOString(), end: end.toISOString() };
+  }, [weekStart]);
+
   const filters = useMemo(
     () => ({
       q: debouncedQuery || undefined,
       status,
-      start_date: range.start,
-      end_date: range.end,
+      start_date: view === "calendar" ? calendarRange.start : range.start,
+      end_date: view === "calendar" ? calendarRange.end : range.end,
       physician_id: physicianFilter,
       sort_dir: preset === "all" ? ("desc" as const) : ("asc" as const),
       limit: 200,
     }),
-    [debouncedQuery, status, range, physicianFilter, preset]
+    [view, debouncedQuery, status, range, calendarRange, physicianFilter, preset]
   );
 
   const { data, isLoading, isError, error, refetch, isFetching } =
@@ -148,9 +167,12 @@ export function AppointmentsPage() {
           day: "numeric",
         })}`}
         right={
-          <Button className="h-10" onClick={openCreate}>
-            <CalendarPlus className="size-4" /> New appointment
-          </Button>
+          <>
+            <ViewToggle mode={view} onChange={setView} />
+            <Button className="h-10" onClick={openCreate}>
+              <CalendarPlus className="size-4" /> New appointment
+            </Button>
+          </>
         }
       />
 
@@ -179,6 +201,7 @@ export function AppointmentsPage() {
         userRole={user?.role}
         scope={scope}
         setScope={setScope}
+        hideDateChips={view === "calendar"}
       />
 
       {isLoading && <TableSkeleton rows={8} cols={7} />}
@@ -193,13 +216,23 @@ export function AppointmentsPage() {
       )}
 
       {!isLoading && !isError && data && (
-        <AppointmentsTable
-          items={data}
-          onEdit={openEdit}
-          onSetStatus={(id, s) => setStatusMutation.mutate(id, s)}
-          onDelete={canDelete ? setPendingDelete : undefined}
-          busy={setStatusMutation.isPending}
-        />
+        view === "list" ? (
+          <AppointmentsTable
+            items={data}
+            onEdit={openEdit}
+            onSetStatus={(id, s) => setStatusMutation.mutate(id, s)}
+            onDelete={canDelete ? setPendingDelete : undefined}
+            busy={setStatusMutation.isPending}
+          />
+        ) : (
+          <AppointmentsCalendar
+            weekStart={weekStart}
+            onWeekStartChange={setWeekStart}
+            appointments={data}
+            onEdit={openEdit}
+            onNew={() => openCreate()}
+          />
+        )
       )}
 
       <AppointmentModal
@@ -231,6 +264,60 @@ export function AppointmentsPage() {
 
 /* -------------------------------------------------------------------------- */
 
+function ViewToggle({
+  mode,
+  onChange,
+}: {
+  mode: ViewMode;
+  onChange: (m: ViewMode) => void;
+}) {
+  return (
+    <div className="bg-[#F1F4F9] rounded-full p-1 flex items-center gap-1">
+      <ViewToggleButton
+        active={mode === "list"}
+        onClick={() => onChange("list")}
+        label="List view"
+        icon={<List className="size-3.5" />}
+      />
+      <ViewToggleButton
+        active={mode === "calendar"}
+        onClick={() => onChange("calendar")}
+        label="Calendar view"
+        icon={<CalendarDays className="size-3.5" />}
+      />
+    </div>
+  );
+}
+
+function ViewToggleButton({
+  active,
+  onClick,
+  label,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={active}
+      className={cn(
+        "size-8 grid place-items-center rounded-full transition",
+        active
+          ? "bg-primary-gradient text-white shadow-glow"
+          : "text-muted-foreground hover:text-foreground"
+      )}
+    >
+      {icon}
+    </button>
+  );
+}
+
 function FilterBar({
   query,
   setQuery,
@@ -241,6 +328,7 @@ function FilterBar({
   userRole,
   scope,
   setScope,
+  hideDateChips,
 }: {
   query: string;
   setQuery: (v: string) => void;
@@ -251,6 +339,7 @@ function FilterBar({
   userRole?: string;
   scope: "all" | "mine";
   setScope: (s: "all" | "mine") => void;
+  hideDateChips?: boolean;
 }) {
   return (
     <Card className="mb-4">
@@ -263,16 +352,19 @@ function FilterBar({
           onChange={(e) => setQuery(e.target.value)}
         />
 
-        <Divider />
-
-        {DATE_PRESETS.map((p) => (
-          <FilterChip
-            key={p.value}
-            label={p.label}
-            active={preset === p.value}
-            onClick={() => setPreset(p.value)}
-          />
-        ))}
+        {!hideDateChips && (
+          <>
+            <Divider />
+            {DATE_PRESETS.map((p) => (
+              <FilterChip
+                key={p.value}
+                label={p.label}
+                active={preset === p.value}
+                onClick={() => setPreset(p.value)}
+              />
+            ))}
+          </>
+        )}
 
         <Divider />
 
