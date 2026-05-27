@@ -22,14 +22,25 @@ const sizes = {
 };
 
 /**
- * Centered modal dialog. Same Radix Dialog foundation as Drawer but
- * positioned in the middle of the viewport. Use for guided multi-step
- * forms (e.g. appointment booking) where a side drawer would feel too
- * peripheral.
+ * Modal dialog anchored near the top of the viewport.
  *
- * Centering uses a flex wrapper, not a transform — that way the
- * tailwindcss-animate `animate-in` keyframe (which rewrites
- * `transform`) can't fight the centering and produce a glitch frame.
+ * Why top-anchored, not centered:
+ *   `grid place-items-center` re-computes vertical centering every
+ *   time the modal's body height changes — slot grid loading vs
+ *   results vs empty state, native <select> opening, focus shifting,
+ *   etc. all rendered as a visible "shake" on screen. Anchoring to a
+ *   fixed top offset (top: max(4vh, 32px)) keeps the chrome stable
+ *   no matter what the body does.
+ *
+ * Why a scrollbar gutter:
+ *   The body uses overflow-y-auto. When content crosses the height
+ *   threshold the scrollbar appears, which would otherwise nudge
+ *   the form contents leftward by ~15px. `scrollbar-gutter: stable`
+ *   reserves the space up front so the layout never shifts.
+ *
+ * The fade + zoom keyframes only animate opacity/scale so they don't
+ * clobber the fixed positioning the way a translate-based animation
+ * would.
  */
 export function Modal({
   open,
@@ -52,10 +63,13 @@ export function Modal({
             "duration-200"
           )}
         />
-        <div className="fixed inset-0 z-50 grid place-items-center p-4 pointer-events-none">
+        <div
+          className="fixed inset-0 z-50 flex justify-center p-4 pointer-events-none overflow-y-auto"
+          style={{ paddingTop: "max(4vh, 32px)" }}
+        >
           <Dialog.Content
             className={cn(
-              "pointer-events-auto w-full rounded-2xl bg-[#F5F9FF] shadow-elev border border-border max-h-[92vh] flex flex-col focus:outline-none",
+              "pointer-events-auto w-full self-start mx-auto rounded-2xl bg-[#F5F9FF] shadow-elev border border-border max-h-[92vh] flex flex-col focus:outline-none",
               "data-[state=open]:animate-in data-[state=closed]:animate-out",
               "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
               "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -83,7 +97,12 @@ export function Modal({
               </Dialog.Close>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+            <div
+              className="flex-1 overflow-y-auto px-6 py-5"
+              style={{ scrollbarGutter: "stable" }}
+            >
+              {children}
+            </div>
 
             {footer && (
               <div className="border-t border-border bg-white px-6 py-3 shrink-0 rounded-b-2xl">
