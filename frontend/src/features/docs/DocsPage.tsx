@@ -11,6 +11,8 @@ import {
   Filter,
   HeartPulse,
   Image,
+  LayoutGrid,
+  List as ListIcon,
   Plus,
   Search,
   Shield,
@@ -49,6 +51,8 @@ import type {
 } from "@/features/docs/api/docs-api";
 import { cn, formatBytes, formatDate } from "@/lib/utils";
 
+type ViewMode = "list" | "cards";
+
 export function DocsPage() {
   const user = useAuthStore((s) => s.user);
   const [searchParams] = useSearchParams();
@@ -58,6 +62,7 @@ export function DocsPage() {
   const [scope, setScope] = useState<"all" | "mine">("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [view, setView] = useState<ViewMode>("list");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [viewing, setViewing] = useState<Document | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Document | null>(null);
@@ -131,6 +136,7 @@ export function DocsPage() {
                 />
               )}
             />
+            <ViewToggle mode={view} onChange={setView} />
             {canWrite && (
               <Button className="h-10" onClick={() => setUploadOpen(true)}>
                 <Plus className="size-4" /> Upload
@@ -167,7 +173,7 @@ export function DocsPage() {
         />
       </div>
 
-      {isLoading && <GridSkeleton />}
+      {isLoading && (view === "list" ? <ListSkeleton /> : <GridSkeleton />)}
 
       {isError && !isLoading && (
         <ErrorBanner
@@ -182,6 +188,8 @@ export function DocsPage() {
         <>
           {data.items.length === 0 ? (
             <EmptyState canUpload={canWrite} onUpload={() => setUploadOpen(true)} />
+          ) : view === "list" ? (
+            <DocumentList items={data.items} onOpen={setViewing} />
           ) : (
             <DocumentGrid items={data.items} onOpen={setViewing} />
           )}
@@ -230,6 +238,71 @@ export function DocsPage() {
         }}
       />
     </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* List view                                                                  */
+/* -------------------------------------------------------------------------- */
+
+function DocumentList({
+  items,
+  onOpen,
+}: {
+  items: Document[];
+  onOpen: (d: Document) => void;
+}) {
+  return (
+    <Card className="overflow-hidden">
+      <div className="hidden md:grid grid-cols-[1fr_220px_140px_120px] gap-3 px-4 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold border-b border-border bg-surface-subtle">
+        <span>Document</span>
+        <span>Patient</span>
+        <span>Category</span>
+        <span className="text-right">Uploaded</span>
+      </div>
+      <ul className="divide-y divide-border">
+        {items.map((d) => (
+          <li key={d.id}>
+            <button
+              type="button"
+              onClick={() => onOpen(d)}
+              className="grid grid-cols-1 md:grid-cols-[1fr_220px_140px_120px] items-center gap-3 w-full text-left px-4 py-3 hover:bg-surface-subtle transition ring-focus"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <Glyph mime={d.mimeType} />
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold truncate">{d.name}</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    {humanMime(d.mimeType)} · {formatBytes(d.sizeBytes)}
+                    {d.uploadedBy && ` · ${d.uploadedBy}`}
+                  </div>
+                </div>
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-medium truncate">
+                  {d.patientName || "—"}
+                </div>
+                {d.patientMrn && (
+                  <div className="text-[11px] text-muted-foreground">
+                    MRN {d.patientMrn}
+                  </div>
+                )}
+              </div>
+              <Badge
+                variant={CATEGORY_TONE[d.category as never] ?? "neutral"}
+                size="sm"
+                className="w-fit"
+              >
+                {categoryLabel(d.category)}
+              </Badge>
+              <span className="text-[11px] text-muted-foreground tabular-nums md:text-right">
+                {formatDate(d.createdAt)}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 
@@ -345,6 +418,18 @@ function GridSkeleton() {
         <Skeleton key={i} className="h-[140px] rounded-2xl" />
       ))}
     </div>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <Card className="overflow-hidden">
+      <div className="divide-y divide-border">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-[64px] rounded-none" />
+        ))}
+      </div>
+    </Card>
   );
 }
 
@@ -512,6 +597,60 @@ function FilterGroup({
       </div>
       <div className="flex flex-wrap gap-1.5">{children}</div>
     </div>
+  );
+}
+
+function ViewToggle({
+  mode,
+  onChange,
+}: {
+  mode: ViewMode;
+  onChange: (m: ViewMode) => void;
+}) {
+  return (
+    <div className="bg-[#F1F4F9] rounded-full p-1 flex items-center gap-1 h-10">
+      <ViewToggleButton
+        active={mode === "list"}
+        onClick={() => onChange("list")}
+        label="List view"
+        icon={<ListIcon className="size-3.5" />}
+      />
+      <ViewToggleButton
+        active={mode === "cards"}
+        onClick={() => onChange("cards")}
+        label="Card view"
+        icon={<LayoutGrid className="size-3.5" />}
+      />
+    </div>
+  );
+}
+
+function ViewToggleButton({
+  active,
+  onClick,
+  label,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={active}
+      className={cn(
+        "size-8 grid place-items-center rounded-full transition",
+        active
+          ? "bg-primary-gradient text-white shadow-glow"
+          : "text-muted-foreground hover:text-foreground"
+      )}
+    >
+      {icon}
+    </button>
   );
 }
 
