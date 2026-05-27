@@ -6,6 +6,7 @@ export * from "./card";
 export * from "./confirm-dialog";
 export * from "./drawer";
 export * from "./empty";
+export * from "./modal";
 export * from "./error-banner";
 export * from "./form";
 export * from "./input";

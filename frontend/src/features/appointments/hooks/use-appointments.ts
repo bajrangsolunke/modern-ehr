@@ -4,6 +4,7 @@ import {
   type AppointmentFilters,
   type AppointmentInput,
   type AppointmentPatch,
+  type SlotQuery,
 } from "@/features/appointments/api/appointments-api";
 import { QUERY_KEYS } from "@/config/constants";
 import { toast } from "@/lib/toast";
@@ -24,6 +25,15 @@ export function useAppointment(id: string | undefined) {
     queryKey: [...APPT_KEY, "byId", id],
     queryFn: () => appointmentsApi.get(id as string),
     enabled: Boolean(id),
+  });
+}
+
+export function useAvailableSlots(query: SlotQuery, enabled = true) {
+  return useQuery({
+    queryKey: [...APPT_KEY, "slots", query],
+    queryFn: () => appointmentsApi.slots(query),
+    enabled: enabled && Boolean(query.date),
+    staleTime: 15_000,
   });
 }
 

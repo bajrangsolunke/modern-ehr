@@ -104,6 +104,39 @@ function stripUndefined<T extends object>(obj: T): Partial<T> {
   return out as Partial<T>;
 }
 
+export interface BookingSlot {
+  physicianId: string;
+  physicianName: string;
+  startsAt: string;
+  durationMinutes: number;
+  load: number;
+}
+
+interface BackendSlotDto {
+  physician_id: string;
+  physician_name: string;
+  starts_at: string;
+  duration_minutes: number;
+  load: number;
+}
+
+function mapSlot(dto: BackendSlotDto): BookingSlot {
+  return {
+    physicianId: dto.physician_id,
+    physicianName: dto.physician_name,
+    startsAt: dto.starts_at,
+    durationMinutes: dto.duration_minutes,
+    load: dto.load,
+  };
+}
+
+export interface SlotQuery {
+  /** YYYY-MM-DD */
+  date: string;
+  duration: number;
+  physician_id?: string;
+}
+
 export const appointmentsApi = {
   list: async (filters: AppointmentFilters = {}): Promise<Appointment[]> => {
     const data = await api.get<BackendAppointmentDto[]>("/appointments", {
@@ -162,4 +195,11 @@ export const appointmentsApi = {
   },
 
   remove: (id: string): Promise<void> => api.delete(`/appointments/${id}`),
+
+  slots: async (q: SlotQuery): Promise<BookingSlot[]> => {
+    const data = await api.get<BackendSlotDto[]>("/appointments/slots", {
+      searchParams: stripUndefined(q) as Record<string, string | number>,
+    });
+    return data.map(mapSlot);
+  },
 };

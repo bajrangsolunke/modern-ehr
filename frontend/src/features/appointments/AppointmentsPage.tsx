@@ -2,8 +2,8 @@
  * Appointments management (US-AP1..US-AP9).
  *
  * Layout: stat tiles → filter bar (search + status chips + date range +
- * "Mine vs. all") → table with row actions → AppointmentDrawer for
- * create/edit.
+ * "Mine vs. all") → table with row actions → AppointmentModal for
+ * create/edit (slot-based booking, drawer-free).
  */
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -29,7 +29,7 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { UserAvatar } from "@/components/ui/avatar";
-import { AppointmentDrawer } from "@/features/appointments/components/AppointmentDrawer";
+import { AppointmentModal } from "@/features/appointments/components/AppointmentModal";
 import {
   useAppointments,
   useAppointmentStats,
@@ -393,7 +393,7 @@ export function AppointmentsPage() {
         </Card>
       )}
 
-      <AppointmentDrawer
+      <AppointmentModal
         open={drawerOpen}
         onOpenChange={(open) => {
           setDrawerOpen(open);

@@ -1,12 +1,15 @@
-from datetime import datetime, time, timedelta, timezone
+from collections import defaultdict
+from datetime import date as date_t, datetime, time, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession, require_roles
 from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
+from app.models.availability import UserAvailability
 from app.models.patient import Patient
 from app.models.user import User, UserRole
 from app.schemas.appointment import (
@@ -150,6 +153,109 @@ async def appointment_stats(
         cancellations_this_week=cancelled,
         no_shows_this_week=no_shows,
     )
+
+
+class SlotOut(BaseModel):
+    """A bookable window on a provider's day."""
+
+    physician_id: UUID
+    physician_name: str
+    starts_at: datetime
+    duration_minutes: int
+    # Existing appts on this provider for the same day — the FE
+    # surfaces it as "Light/Busy/Heavy" so the user can spread load.
+    load: int = 0
+
+
+@router.get("/slots", response_model=list[SlotOut])
+async def list_slots(
+    db: DbSession,
+    current: CurrentUser,  # noqa: ARG001 — auth check
+    date: date_t = Query(..., description="Day to find available slots for"),
+    duration: int = Query(30, ge=5, le=480, description="Slot length in minutes"),
+    physician_id: UUID | None = Query(
+        None, description="Scope to one provider; omit for round-robin across all"
+    ),
+) -> list[SlotOut]:
+    """
+    Derive bookable slots from provider weekly availability minus already-
+    booked (non-cancelled) appointments. When no physician_id is set we
+    return slots across every active provider, sorted by time then by
+    each provider's day-load — so the FE shows the least-busy provider
+    first (round-robin distribution).
+    """
+    weekday = date.weekday()  # 0=Mon..6=Sun
+
+    avail_stmt = (
+        select(UserAvailability)
+        .options(selectinload(UserAvailability.user))
+        .join(User, UserAvailability.user_id == User.id)
+        .where(
+            UserAvailability.day_of_week == weekday,
+            UserAvailability.is_active.is_(True),
+            User.is_active.is_(True),
+        )
+    )
+    if physician_id:
+        avail_stmt = avail_stmt.where(UserAvailability.user_id == physician_id)
+    else:
+        avail_stmt = avail_stmt.where(User.role == UserRole.provider)
+    avails = (await db.execute(avail_stmt)).scalars().unique().all()
+
+    if not avails:
+        return []
+
+    day_start = datetime.combine(date, time.min, tzinfo=timezone.utc)
+    day_end = day_start + timedelta(days=1)
+    existing_stmt = select(Appointment).where(
+        Appointment.starts_at >= day_start,
+        Appointment.starts_at < day_end,
+        Appointment.status != AppointmentStatus.cancelled,
+    )
+    if physician_id:
+        existing_stmt = existing_stmt.where(Appointment.physician_id == physician_id)
+    existing = (await db.execute(existing_stmt)).scalars().all()
+
+    # Pre-bucket existing appts per provider for quick conflict checks.
+    by_provider: dict[UUID, list[Appointment]] = defaultdict(list)
+    for a in existing:
+        if a.physician_id is not None:
+            by_provider[a.physician_id].append(a)
+
+    slots: list[dict] = []
+    delta = timedelta(minutes=duration)
+    for avail in avails:
+        provider = avail.user
+        if provider is None:
+            continue
+        window_start = datetime.combine(date, avail.start_time, tzinfo=timezone.utc)
+        window_end = datetime.combine(date, avail.end_time, tzinfo=timezone.utc)
+        load = len(by_provider.get(provider.id, []))
+
+        cursor = window_start
+        while cursor + delta <= window_end:
+            slot_end = cursor + delta
+            conflict = any(
+                appt.starts_at < slot_end
+                and appt.starts_at + timedelta(minutes=appt.duration_minutes) > cursor
+                for appt in by_provider.get(provider.id, [])
+            )
+            if not conflict:
+                slots.append(
+                    {
+                        "physician_id": provider.id,
+                        "physician_name": provider.full_name,
+                        "starts_at": cursor,
+                        "duration_minutes": duration,
+                        "load": load,
+                    }
+                )
+            cursor = slot_end
+
+    # Round-robin: by time first (so the UI groups naturally), then put
+    # the least-loaded provider's slot first within the same time.
+    slots.sort(key=lambda s: (s["starts_at"], s["load"], s["physician_name"]))
+    return [SlotOut(**s) for s in slots]
 
 
 @router.get("/patient/{patient_id}", response_model=list[AppointmentOut])
