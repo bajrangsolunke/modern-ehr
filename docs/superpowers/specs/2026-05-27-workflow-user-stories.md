@@ -330,6 +330,87 @@ patient-scoped — single source of truth.
 
 ---
 
+## 6.6. Communication (Messages)
+
+The Communication module replaces the top-nav "Insights" slot.
+Insights moves into the new Reports section (see 6.7). Messaging
+is currently a UI-only scaffold backed by an in-memory store; the
+backend contract (`conversations`, `messages` tables, WebSocket
+or polled `/messages` endpoints) lands in the next phase.
+
+### US-COMM-1 — Browse conversations
+**Actor**: provider, staff, or admin.
+Acceptance: `/messages` shows a two-pane layout — a left list of
+conversations and a right thread. The list has:
+- A "Patients · Clinicians" segmented toggle (audience scope).
+- A search field that filters by participant name and last-message
+  text.
+- A chip filter row with condition tags (Diabetic, Asthma, Cancer,
+  BP, Mental, All) that filters the patient list. Chips only
+  render in the Patients tab.
+- One row per conversation with name, condition badge (if any),
+  last-message snippet (truncated to one line), and timestamp
+  ("Today, 09:15 AM" / "08/24/2025, 09:45 AM" depending on
+  recency). Active conversation has a primary-border highlight.
+
+### US-COMM-2 — Read a thread
+Acceptance: opening a conversation renders a header strip with the
+participant's clinical context (name + MRN, DOB, age, gender,
+phone, email) and a "View patient profile" deep-link
+(`/patients/:id`). For clinician threads the header collapses to
+name + role + email. Messages render as bubbles — incoming on the
+left in `bg-surface-subtle`, outgoing on the right in
+`bg-primary-gradient text-white`. Each bubble shows time as a
+muted sub-line. The thread scrolls independently of the
+left list.
+
+### US-COMM-3 — Send a reply
+Acceptance: a bottom composer with `Type a message…` input and a
+Send button appends a new outgoing message to the current thread
+and clears the input. Empty input disables Send. Enter sends;
+Shift+Enter inserts a newline. The list's last-message snippet
+and timestamp update immediately. (UI-only optimistic add today;
+will hit a real `POST /messages` once the backend lands.)
+
+### US-COMM-4 — Compose a new message
+Acceptance: the "+ Compose" button in the page header opens a
+modal with two columns:
+- **Recipients**: search field, "Select all" toggle, scrollable
+  checkbox list of contacts. The header shows "NN Selected".
+  Audience defaults to the active tab (Patients or Clinicians).
+- **Message Content**: textarea with a `0 / 160 characters`
+  counter (matches SMS length budget), and an "Urgent" checkbox
+  that decorates the resulting messages with a priority badge.
+
+"Send Message" is disabled until at least one recipient is
+selected AND content is non-empty. On send, the modal closes and
+a toast confirms delivery; one conversation per recipient is
+created or updated in the local store.
+
+### US-COMM-5 — Empty + zero states
+Acceptance: when no conversations exist for the active tab, the
+list shows an empty card prompting the user to compose. When the
+list has rows but none selected (or before the user has clicked),
+the right pane shows a centered "Pick a conversation" hint with a
+"Compose new" button.
+
+---
+
+## 6.7. Reports
+
+### US-RPT-1 — Reports section with sidebar
+**Actor**: provider, staff, or admin.
+Acceptance: `/reports` is a parent route with a left sidebar
+listing the available reports (today: Insights · clinical +
+operational AI analytics). Hitting `/reports` redirects to
+`/reports/insights`. The sidebar item highlights when active.
+The existing Insights page renders inside `/reports/insights`
+with no changes to its content — only its route moves. Adding
+future reports means adding one sidebar entry and one nested
+route.
+
+---
+
 ## 7. Cross-cutting concerns
 
 ### US-XC-1 — Demo mode fallback

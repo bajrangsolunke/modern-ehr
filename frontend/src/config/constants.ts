@@ -5,12 +5,14 @@ export const ROUTES = {
   dashboard: "/",
   patients: "/patients",
   patientProfile: (id: string) => `/patients/${id}`,
-  insights: "/insights",
   appointments: "/appointments",
   docs: "/docs",
   users: "/users",
   settings: "/settings",
   mobile: "/mobile",
+  messages: "/messages",
+  reports: "/reports",
+  reportsInsights: "/reports/insights",
 } as const;
 
 export const QUERY_KEYS = {

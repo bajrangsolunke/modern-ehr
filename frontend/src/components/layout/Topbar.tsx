@@ -20,9 +20,10 @@ interface NavItem {
 const navItems: NavItem[] = [
   { to: "/", label: "Dashboard" },
   { to: "/patients", label: "Patients" },
-  { to: "/insights", label: "Insights" },
+  { to: "/messages", label: "Communication" },
   { to: "/appointments", label: "Appointments" },
   { to: "/docs", label: "Docs" },
+  { to: "/reports", label: "Reports" },
   { to: "/users", label: "Users", roles: ["admin"] },
   { to: "/mobile", label: "Mobile" },
 ];
