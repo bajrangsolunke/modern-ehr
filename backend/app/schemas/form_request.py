@@ -10,6 +10,20 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 
+def _scrub_empty_strings(value: Any) -> Any:
+    """Walk a JSON-ish structure and replace "" with None — Pydantic's
+    date / int / etc. coercion can't handle "" but the FE sends it
+    liberally for unfilled optional fields. Applied before validation
+    so every per-type schema benefits."""
+    if isinstance(value, str):
+        return None if value == "" else value
+    if isinstance(value, list):
+        return [_scrub_empty_strings(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _scrub_empty_strings(v) for k, v in value.items()}
+    return value
+
+
 FormTypeLiteral = Literal[
     "consent", "intake", "roi", "insurance", "discharge", "referral"
 ]
@@ -227,8 +241,13 @@ FormPayload = Annotated[
 
 def validate_payload(form_type: str, data: dict[str, Any]) -> dict[str, Any]:
     """Validate (and round-trip) a payload against the right schema for
-    its form_type. Returns the JSON-safe dict to persist."""
-    incoming = {**data, "form_type": form_type}
+    its form_type. Returns the JSON-safe dict to persist.
+
+    Empty strings are scrubbed to None before validation so the FE can
+    submit a fully-populated object with blanks for unfilled optional
+    fields without Pydantic choking on "" → date / int coercions."""
+    scrubbed = _scrub_empty_strings(data)
+    incoming = {**scrubbed, "form_type": form_type}
     cls_by_type: dict[str, type[BaseModel]] = {
         "consent": ConsentFormPayload,
         "intake": IntakeFormPayload,
