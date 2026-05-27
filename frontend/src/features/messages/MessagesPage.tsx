@@ -312,6 +312,8 @@ export function MessagesPage() {
                 <MessageThread
                   messages={detail?.messages ?? []}
                   participant={activeParticipant}
+                  participants={detail?.participants}
+                  viewerId={currentUser?.id}
                   isDraft={!detail}
                   readWatermark={readWatermark}
                   typingNames={typingNames}

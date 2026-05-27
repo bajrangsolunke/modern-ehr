@@ -48,9 +48,13 @@ export interface Attachment {
 export interface Message {
   id: string;
   conversationId: string;
-  authorId: string;
-  /** "incoming" = from the other side, "outgoing" = from the current user. */
-  direction: "incoming" | "outgoing";
+  /** Author identity. Exactly one is set:
+   *   - senderUserId for staff-sent messages
+   *   - senderPatientId for patient-sent (Twilio SMS-in, future)
+   *  Whether the message renders "outgoing" or "incoming" is decided
+   *  at render time by comparing senderUserId to the current viewer. */
+  senderUserId: string | null;
+  senderPatientId: string | null;
   body: string;
   /** ISO timestamp. */
   sentAt: string;

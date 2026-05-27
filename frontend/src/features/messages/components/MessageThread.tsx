@@ -16,7 +16,17 @@ import { cn, formatBytes, formatTime } from "@/lib/utils";
 
 interface Props {
   messages: Message[];
+  /** The conversation's primary "other side". Used for the patient
+   *  thread (single counterpart) and as the fallback when a staff
+   *  sender can't be resolved in `participants`. */
   participant: Participant;
+  /** Full participant list for clinician threads — drives per-message
+   *  avatar + name attribution. Empty for patient threads. */
+  participants?: Participant[];
+  /** Current viewer's user id — drives which bubbles render as
+   *  "outgoing" (mine) vs "incoming" (theirs). Without this, every
+   *  staff-sent message would look like it came from the viewer. */
+  viewerId: string | undefined;
   /** True when the user hasn't sent the first message yet (draft chat). */
   isDraft?: boolean;
   /** Highest last_read_at across other staff participants — outgoing
@@ -26,6 +36,13 @@ interface Props {
   /** When non-empty, render a "{name} is typing…" indicator below the
    *  last message. */
   typingNames?: string[];
+}
+
+function isOutgoing(message: Message, viewerId: string | undefined): boolean {
+  // The current viewer's messages render right-aligned. Staff-sent
+  // messages from OTHER users are incoming, even though both sides
+  // are "from staff" — that's the bug this comment exists to flag.
+  return Boolean(viewerId && message.senderUserId === viewerId);
 }
 
 interface RenderedItem {
@@ -47,7 +64,10 @@ interface RenderedItem {
  * (incoming vs outgoing) within ~5 minutes share the same group —
  * avatars only on the first, time only on the last.
  */
-function decorate(messages: Message[]): RenderedItem[] {
+function decorate(
+  messages: Message[],
+  viewerId: string | undefined
+): RenderedItem[] {
   const items: RenderedItem[] = [];
   let lastDay = "";
   for (let i = 0; i < messages.length; i++) {
@@ -64,16 +84,23 @@ function decorate(messages: Message[]): RenderedItem[] {
 
     const prev = messages[i - 1];
     const next = messages[i + 1];
+    const mOut = isOutgoing(m, viewerId);
+    const prevOut = prev ? isOutgoing(prev, viewerId) : null;
+    const nextOut = next ? isOutgoing(next, viewerId) : null;
+
     const groupStart =
       !prev ||
-      prev.direction !== m.direction ||
+      prevOut !== mOut ||
       new Date(m.sentAt).toDateString() !== new Date(prev.sentAt).toDateString() ||
-      diffMinutes(prev.sentAt, m.sentAt) > 5;
+      diffMinutes(prev.sentAt, m.sentAt) > 5 ||
+      // Different sender on the same side (group threads) — break.
+      (mOut === false && prev.senderUserId !== m.senderUserId);
     const groupEnd =
       !next ||
-      next.direction !== m.direction ||
+      nextOut !== mOut ||
       new Date(m.sentAt).toDateString() !== new Date(next.sentAt).toDateString() ||
-      diffMinutes(m.sentAt, next.sentAt) > 5;
+      diffMinutes(m.sentAt, next.sentAt) > 5 ||
+      (mOut === false && next.senderUserId !== m.senderUserId);
 
     items.push({
       type: "message",
@@ -89,6 +116,8 @@ function decorate(messages: Message[]): RenderedItem[] {
 export function MessageThread({
   messages,
   participant,
+  participants = [],
+  viewerId,
   isDraft = false,
   readWatermark = null,
   typingNames = [],
@@ -99,31 +128,39 @@ export function MessageThread({
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length]);
 
-  const items = decorate(messages);
+  const items = decorate(messages, viewerId);
 
   return (
     <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-1 bg-white">
       {messages.length === 0 ? (
         <DraftIntro participant={participant} isDraft={isDraft} />
       ) : (
-        items.map((item) =>
-          item.type === "divider" ? (
-            <DateDivider key={item.key} label={item.label!} />
-          ) : (
+        items.map((item) => {
+          if (item.type === "divider") {
+            return <DateDivider key={item.key} label={item.label!} />;
+          }
+          const m = item.message!;
+          const outgoing = isOutgoing(m, viewerId);
+          // For group threads, the bubble's avatar/name reflects the
+          // actual sender (not the conversation's primary participant).
+          const sender =
+            participants.find((p) => p.id === m.senderUserId) ?? participant;
+          return (
             <Bubble
               key={item.key}
-              message={item.message!}
-              participant={participant}
+              message={m}
+              participant={sender}
+              outgoing={outgoing}
               groupStart={item.groupStart!}
               groupEnd={item.groupEnd!}
               read={
-                item.message!.direction === "outgoing" &&
+                outgoing &&
                 readWatermark !== null &&
-                item.message!.sentAt <= readWatermark
+                m.sentAt <= readWatermark
               }
             />
-          )
-        )
+          );
+        })
       )}
       {typingNames.length > 0 && <TypingIndicator names={typingNames} />}
       <div ref={endRef} />
@@ -166,17 +203,18 @@ function Dot({ delay }: { delay: string }) {
 function Bubble({
   message,
   participant,
+  outgoing,
   groupStart,
   groupEnd,
   read,
 }: {
   message: Message;
   participant: Participant;
+  outgoing: boolean;
   groupStart: boolean;
   groupEnd: boolean;
   read: boolean;
 }) {
-  const outgoing = message.direction === "outgoing";
 
   return (
     <div

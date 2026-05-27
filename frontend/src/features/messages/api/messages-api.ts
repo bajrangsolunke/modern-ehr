@@ -136,8 +136,8 @@ function mapMessage(dto: BackendMessageDto): Message {
   return {
     id: dto.id,
     conversationId: dto.conversation_id,
-    authorId: dto.sender_user_id ?? dto.sender_patient_id ?? "unknown",
-    direction: dto.sender_user_id ? "outgoing" : "incoming",
+    senderUserId: dto.sender_user_id ?? null,
+    senderPatientId: dto.sender_patient_id ?? null,
     body: dto.body,
     sentAt: dto.sent_at,
     urgent: dto.urgent || undefined,
