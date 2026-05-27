@@ -11,6 +11,7 @@ from math import ceil
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from pydantic import ValidationError
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -158,7 +159,24 @@ class FormRequestService:
                 detail=f"Form is already {row.status.value}.",
             )
 
-        validated = validate_payload(row.form_type.value, payload.data)
+        # Surface payload validation errors as 422 (not a 500). The
+        # error path still hits the CORS middleware so the browser
+        # gets a clean response instead of a fake CORS error.
+        try:
+            validated = validate_payload(row.form_type.value, payload.data)
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "message": "Form data didn't pass validation.",
+                    "errors": exc.errors(include_url=False),
+                },
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
         row.data = validated
         row.submitted_at = datetime.now(timezone.utc)
         row.submitted_by_user_id = viewer_id

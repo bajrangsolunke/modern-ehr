@@ -48,6 +48,45 @@ function getToken(): string | null {
   return localStorage.getItem(STORAGE_KEYS.accessToken);
 }
 
+/**
+ * Pull a human-readable message out of an error payload. Handles:
+ *   - { detail: "string" }                              → that string
+ *   - { detail: { message, errors: [...] } }            → message + first field
+ *   - { detail: [{ loc, msg, type }, ...] } (Pydantic)  → joined field msgs
+ *   - everything else                                   → status text
+ */
+function extractErrorMessage(payload: unknown, statusText: string): string {
+  const fallback = statusText || "Request failed";
+  if (!payload || typeof payload !== "object") return fallback;
+  const detail = (payload as { detail?: unknown }).detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const msgs = detail
+      .map((d) =>
+        d && typeof d === "object" && "msg" in d ? String(d.msg) : null
+      )
+      .filter(Boolean);
+    if (msgs.length) return msgs.slice(0, 3).join(" · ");
+  }
+  if (detail && typeof detail === "object") {
+    const d = detail as { message?: string; errors?: Array<unknown> };
+    if (typeof d.message === "string") {
+      const fieldMsgs = (d.errors ?? [])
+        .map((e) =>
+          e && typeof e === "object" && "msg" in e
+            ? String((e as { msg: unknown }).msg)
+            : null
+        )
+        .filter(Boolean)
+        .slice(0, 3);
+      return fieldMsgs.length
+        ? `${d.message} — ${fieldMsgs.join("; ")}`
+        : d.message;
+    }
+  }
+  return fallback;
+}
+
 function buildUrl(path: string, params?: RequestOptions["searchParams"]) {
   const url = new URL(path.startsWith("http") ? path : `${env.API_BASE_URL}${path}`);
   if (params) {
@@ -139,10 +178,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     : await response.text();
 
   if (!response.ok) {
-    const message =
-      payload && typeof payload === "object" && "detail" in payload
-        ? String((payload as { detail: unknown }).detail)
-        : response.statusText || "Request failed";
+    const message = extractErrorMessage(payload, response.statusText);
     throw new ApiError(response.status, message, payload);
   }
 
