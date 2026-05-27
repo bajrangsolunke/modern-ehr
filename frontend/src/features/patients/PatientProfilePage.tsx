@@ -17,6 +17,7 @@ import { AiSummary } from "@/features/patients/components/AiSummary";
 import { SoapNotesCard } from "@/features/patients/components/SoapNotesCard";
 import { MedicationsCard } from "@/features/patients/components/Medications";
 import { Labs } from "@/features/patients/components/Labs";
+import { LabReports } from "@/features/patients/components/LabReports";
 import { ClinicalActions } from "@/features/patients/components/ClinicalActions";
 import { useDeletePatient } from "@/features/patients/hooks/use-delete-patient";
 import { usePatient } from "@/features/patients/hooks/use-patient";
@@ -146,6 +147,7 @@ export function PatientProfilePage() {
               <div className="grid grid-cols-1 gap-4">
                 <Vitals patientId={patient.id} />
                 <Labs />
+                <LabReports patientId={patient.id} />
               </div>
             </TabsContent>
 

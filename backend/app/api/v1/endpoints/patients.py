@@ -14,6 +14,8 @@ from app.schemas.patient import (
     PatientUpdate,
 )
 from app.services.audit_service import AuditService
+from app.schemas.form_request import FormRequestCreate
+from app.services.form_request_service import FormRequestService
 from app.services.patient_service import PatientService
 
 # Writes (create/update/delete) are restricted to providers + admins.
@@ -80,6 +82,35 @@ async def create_patient(
         resource_type="patient",
         resource_id=str(patient.id),
     )
+
+    # Auto-create the intake form so onboarding always has a starting
+    # point on the workqueue. The form is in "pending" state — staff
+    # (or the patient via a future portal) fills it during the first
+    # visit. A linked task is created server-side by the form service.
+    try:
+        intake = await FormRequestService(db).request_form(
+            viewer_id=current.id,
+            payload=FormRequestCreate(
+                patient_id=patient.id,
+                form_type="intake",
+                notes="Auto-generated on patient creation. "
+                "Capture chief complaint, current meds, allergies, history.",
+            ),
+        )
+        await AuditService(db).record_request(
+            request,
+            user_id=current.id,
+            action="form.request",
+            resource_type="form_request",
+            resource_id=str(intake.id),
+            payload={"auto": True, "patient_id": str(patient.id)},
+        )
+    except Exception:  # noqa: BLE001 - never block patient create on this
+        # The intake auto-create is a convenience; if it fails (e.g.,
+        # because the forms tables aren't migrated yet in a partial
+        # deploy), the patient create still succeeds.
+        pass
+
     return PatientOut.model_validate(patient)
 
 

@@ -24,16 +24,28 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultPatientId?: string;
+  /** When set, the category picker is hidden and uploads use this
+   *  value. Used by the LabReports panel to lock uploads to "lab". */
+  lockedCategory?: DocCategory;
+  /** Override the modal title (e.g. "Upload lab report"). */
+  title?: string;
+  /** Override the modal subtitle. */
+  description?: string;
 }
 
 export function DocumentUploadModal({
   open,
   onOpenChange,
   defaultPatientId,
+  lockedCategory,
+  title,
+  description,
 }: Props) {
   const upload = useUploadDocument();
   const [patientId, setPatientId] = useState<string>(defaultPatientId ?? "");
-  const [category, setCategory] = useState<DocCategory>("other");
+  const [category, setCategory] = useState<DocCategory>(
+    lockedCategory ?? "other"
+  );
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -56,8 +68,11 @@ export function DocumentUploadModal({
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title="Upload document"
-      description="Attach a file to a patient's chart. PDFs, images, text — up to 25 MB."
+      title={title ?? "Upload document"}
+      description={
+        description ??
+        "Attach a file to a patient's chart. PDFs, images, text — up to 25 MB."
+      }
       size="lg"
       footer={
         <div className="flex justify-end gap-2">
@@ -85,11 +100,16 @@ export function DocumentUploadModal({
           <PatientPicker value={patientId} onChange={setPatientId} />
         </Section>
 
-        <Section title="2 · Category">
-          <CategoryPicker value={category} onChange={setCategory} />
-        </Section>
+        {!lockedCategory && (
+          <Section title="2 · Category">
+            <CategoryPicker value={category} onChange={setCategory} />
+          </Section>
+        )}
 
-        <Section title="3 · File" required>
+        <Section
+          title={lockedCategory ? "2 · File" : "3 · File"}
+          required
+        >
           <div
             onDragOver={(e) => {
               e.preventDefault();
