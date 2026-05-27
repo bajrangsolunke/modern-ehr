@@ -23,7 +23,7 @@ class VitalSign(Base, UUIDMixin):
     value: Mapped[float] = mapped_column(Numeric(8, 2), nullable=False)
     unit: Mapped[str | None] = mapped_column(String(32))
     recorded_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True), server_default=func.now(), index=True
     )
     source: Mapped[str] = mapped_column(String(32), default="manual")
 

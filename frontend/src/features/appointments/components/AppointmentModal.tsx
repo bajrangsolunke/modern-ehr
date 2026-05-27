@@ -122,12 +122,19 @@ function BookAppointmentModal({
     physicianId: string;
   } | null>(null);
 
-  const { data: slots, isLoading: slotsLoading } = useAvailableSlots(
-    {
+  // Memoize the slots query so its identity only changes when an
+  // actual input does — otherwise every keystroke in reason/room would
+  // re-hash the React Query key.
+  const slotsQuery = useMemo(
+    () => ({
       date,
       duration,
       physician_id: physicianId || undefined,
-    },
+    }),
+    [date, duration, physicianId]
+  );
+  const { data: slots, isLoading: slotsLoading } = useAvailableSlots(
+    slotsQuery,
     open && Boolean(date)
   );
 

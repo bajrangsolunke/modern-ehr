@@ -54,22 +54,24 @@ class Patient(Base, UUIDMixin, TimestampMixin):
     avatar_url: Mapped[str | None] = mapped_column(Text)
 
     procedure: Mapped[str | None] = mapped_column(String(255))
-    procedure_date: Mapped[date | None] = mapped_column(Date)
+    procedure_date: Mapped[date | None] = mapped_column(Date, index=True)
     asa: Mapped[str | None] = mapped_column(String(8))
     icu_needed: Mapped[bool] = mapped_column(default=False)
 
     status: Mapped[PatientStatus] = mapped_column(
-        Enum(PatientStatus, name="patient_status"), default=PatientStatus.scheduled
+        Enum(PatientStatus, name="patient_status"),
+        default=PatientStatus.scheduled,
+        index=True,
     )
     risk: Mapped[RiskLevel] = mapped_column(
-        Enum(RiskLevel, name="risk_level"), default=RiskLevel.low
+        Enum(RiskLevel, name="risk_level"), default=RiskLevel.low, index=True
     )
     risk_score: Mapped[int] = mapped_column(Integer, default=0)
     tags: Mapped[list[str] | None] = mapped_column(ARRAY(String))
     notes_internal: Mapped[str | None] = mapped_column(Text)
 
     assigned_physician_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL")
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
 
     assigned_physician: Mapped[User | None] = relationship(foreign_keys=[assigned_physician_id])

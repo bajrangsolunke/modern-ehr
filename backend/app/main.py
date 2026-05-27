@@ -32,14 +32,17 @@ limiter = Limiter(
 
 
 def create_app() -> FastAPI:
+    # Auto-generated docs are convenient in dev but expose surface area
+    # in production. Disable them when ENVIRONMENT != development.
+    is_dev = settings.ENVIRONMENT == "development"
     app = FastAPI(
         title=f"{settings.PROJECT_NAME} API",
         version="1.0.0",
         description="AI-native EHR/EMR backend",
         default_response_class=ORJSONResponse,
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
+        docs_url="/docs" if is_dev else None,
+        redoc_url="/redoc" if is_dev else None,
+        openapi_url=f"{settings.API_V1_PREFIX}/openapi.json" if is_dev else None,
         lifespan=lifespan,
     )
 

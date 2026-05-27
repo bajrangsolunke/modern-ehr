@@ -45,9 +45,13 @@ class Appointment(Base, UUIDMixin, TimestampMixin):
         Enum(AppointmentType, name="appointment_type"), default=AppointmentType.consultation
     )
     status: Mapped[AppointmentStatus] = mapped_column(
-        Enum(AppointmentStatus, name="appointment_status"), default=AppointmentStatus.scheduled
+        Enum(AppointmentStatus, name="appointment_status"),
+        default=AppointmentStatus.scheduled,
+        index=True,
     )
-    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    starts_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
     duration_minutes: Mapped[int] = mapped_column(Integer, default=30)
     room: Mapped[str | None] = mapped_column(String(64))
     reason: Mapped[str | None] = mapped_column(String(512))

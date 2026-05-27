@@ -41,7 +41,9 @@ class PatientAlert(Base, UUIDMixin, TimestampMixin):
     detail: Mapped[str | None] = mapped_column(Text)
 
     # Soft-resolve flag — keep the row for audit but hide from the strip.
-    resolved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    resolved: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, index=True
+    )
 
     created_by_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")

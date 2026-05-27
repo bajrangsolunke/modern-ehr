@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, require_roles
 from app.core.security import hash_password, verify_password
+from app.models.user import UserRole
 from app.schemas.common import Token
 from app.schemas.user import (
     LoginRequest,
@@ -17,14 +18,39 @@ from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+admin_only = Depends(require_roles(UserRole.admin))
+
 
 class RefreshRequest(BaseModel):
     refresh_token: str
 
 
-@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def register(payload: UserCreate, db: DbSession) -> UserOut:
+@router.post(
+    "/register",
+    response_model=UserOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[admin_only],
+)
+async def register(
+    payload: UserCreate,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
+) -> UserOut:
+    """
+    Admin-only account create. This shadow of /users exists for
+    service-to-service onboarding scripts; production user
+    management runs through /users with the same RBAC.
+    """
     user = await AuthService(db).register(payload)
+    await AuditService(db).record_request(
+        request,
+        user_id=current.id,
+        action="user.create_via_register",
+        resource_type="user",
+        resource_id=str(user.id),
+        payload={"email": user.email, "role": user.role.value},
+    )
     return UserOut.model_validate(user)
 
 
