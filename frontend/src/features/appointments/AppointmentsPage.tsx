@@ -94,20 +94,31 @@ export function AppointmentsPage() {
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Appointment | null>(null);
 
-  const range = rangeFor(preset);
+  /*
+   * Lock the date range to a stable reference per preset selection.
+   * rangeFor() calls `new Date()` for the "upcoming" preset, which
+   * shifts by milliseconds on every render. Without useMemo, the
+   * filters object's identity (and the React Query key it feeds)
+   * mutates on every render — we end up in a refetch loop that
+   * hammers the API rate limit and returns 429s.
+   */
+  const range = useMemo(() => rangeFor(preset), [preset]);
   const physicianFilter =
     scope === "mine" && user?.role === "provider" ? user.id : undefined;
 
-  const filters = {
-    q: debouncedQuery || undefined,
-    status,
-    start_date: range.start,
-    end_date: range.end,
-    physician_id: physicianFilter,
-    sort_dir:
-      preset === "all" ? ("desc" as const) : ("asc" as const),
-    limit: 200,
-  };
+  const filters = useMemo(
+    () => ({
+      q: debouncedQuery || undefined,
+      status,
+      start_date: range.start,
+      end_date: range.end,
+      physician_id: physicianFilter,
+      sort_dir:
+        preset === "all" ? ("desc" as const) : ("asc" as const),
+      limit: 200,
+    }),
+    [debouncedQuery, status, range, physicianFilter, preset]
+  );
 
   const { data, isLoading, isError, error, refetch, isFetching } =
     useAppointments(filters);
