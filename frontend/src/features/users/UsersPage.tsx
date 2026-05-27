@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Briefcase,
+  Filter,
   LayoutGrid,
   Pencil,
   Plus,
@@ -17,6 +18,7 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
+import * as Popover from "@radix-ui/react-popover";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,6 +81,9 @@ export function UsersPage() {
     };
   }, [data]);
 
+  const activeFilterCount =
+    (filters.role ? 1 : 0) + (filters.is_active !== undefined ? 1 : 0);
+
   const openCreate = () => {
     setEditing(null);
     setDrawerOpen(true);
@@ -94,12 +99,23 @@ export function UsersPage() {
         title="Users"
         right={
           <>
-            <Input
-              placeholder="Search name or email…"
-              icon={<Search className="size-4" />}
-              className="w-56 lg:w-72 h-10"
+            <HeaderSearch
               value={filters.q ?? ""}
-              onChange={(e) => setFilter({ q: e.target.value || undefined })}
+              onChange={(v) => setFilter({ q: v || undefined })}
+              placeholder="Search name or email…"
+            />
+            <FilterPopover
+              activeCount={activeFilterCount}
+              renderBody={(close) => (
+                <FilterPopoverBody
+                  filters={filters}
+                  setFilter={setFilter}
+                  onClear={() => {
+                    setFilter({ role: undefined, is_active: undefined });
+                    close();
+                  }}
+                />
+              )}
             />
             <ViewToggle mode={viewMode} onChange={setViewMode} />
             <Button className="h-10" onClick={openCreate}>
@@ -135,8 +151,6 @@ export function UsersPage() {
           tone="neutral"
         />
       </div>
-
-      <FilterBar filters={filters} setFilter={setFilter} />
 
       {isLoading && <TableSkeleton rows={8} cols={6} />}
 
@@ -265,17 +279,87 @@ function ViewToggleButton({
   );
 }
 
-function FilterBar({
+function HeaderSearch({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="w-52">
+      <Input
+        icon={<Search className="size-3.5" />}
+        iconPosition="right"
+        iconBg
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="bg-white"
+      />
+    </div>
+  );
+}
+
+function FilterPopover({
+  activeCount,
+  renderBody,
+}: {
+  activeCount: number;
+  renderBody: (closePopover: () => void) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <Button variant="secondary" className="h-10 rounded-full px-4 relative">
+          <Filter className="size-4" />
+          Filters
+          {activeCount > 0 && (
+            <span className="ml-1 inline-grid place-items-center min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+              {activeCount}
+            </span>
+          )}
+        </Button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="end"
+          sideOffset={6}
+          className="z-50 w-[min(92vw,420px)] rounded-2xl bg-white shadow-elev border border-border p-4 animate-fade-in"
+        >
+          {renderBody(() => setOpen(false))}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+function FilterPopoverBody({
   filters,
   setFilter,
+  onClear,
 }: {
   filters: UserFilters;
   setFilter: (patch: Partial<UserFilters>) => void;
+  onClear: () => void;
 }) {
   return (
-    <Card className="mb-4">
-      <CardContent className="p-3 flex flex-wrap items-center gap-2">
-        <FilterGroupLabel>Role</FilterGroupLabel>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-bold">Filters</h3>
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          Reset
+        </button>
+      </div>
+
+      <FilterGroup label="Role">
         <FilterChip
           label="All"
           active={filters.role === undefined}
@@ -289,10 +373,9 @@ function FilterBar({
             onClick={() => setFilter({ role: r })}
           />
         ))}
+      </FilterGroup>
 
-        <Divider />
-
-        <FilterGroupLabel>Status</FilterGroupLabel>
+      <FilterGroup label="Status">
         <FilterChip
           label="Active"
           tone="success"
@@ -315,21 +398,26 @@ function FilterBar({
             })
           }
         />
-      </CardContent>
-    </Card>
+      </FilterGroup>
+    </div>
   );
 }
 
-function FilterGroupLabel({ children }: { children: React.ReactNode }) {
+function FilterGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
-    <span className="text-xs uppercase tracking-wide text-muted-foreground font-semibold px-2">
-      {children}
-    </span>
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">
+        {label}
+      </div>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
+    </div>
   );
-}
-
-function Divider() {
-  return <div className="w-px h-6 bg-border mx-2" />;
 }
 
 /* -------------------------------------------------------------------------- */

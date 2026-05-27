@@ -176,6 +176,33 @@ export function AppointmentsPage() {
         title="Appointments"
         right={
           <>
+            <HeaderSearch
+              value={query}
+              onChange={setQuery}
+              placeholder="Search patient or MRN…"
+            />
+            <FilterPopover
+              activeCount={activeFilterCount}
+              renderBody={(close) => (
+                <FilterPopoverBody
+                  status={status}
+                  setStatus={setStatus}
+                  preset={preset}
+                  setPreset={setPreset}
+                  userRole={user?.role}
+                  scope={scope}
+                  setScope={setScope}
+                  hideDateChips={view === "calendar"}
+                  today={today}
+                  onClear={() => {
+                    setStatus(undefined);
+                    if (view === "list") setPreset("upcoming");
+                    if (user?.role === "provider") setScope("mine");
+                    close();
+                  }}
+                />
+              )}
+            />
             <ViewToggle mode={view} onChange={setView} />
             <Button className="h-10" onClick={openCreate}>
               <CalendarPlus className="size-4" /> New appointment
@@ -210,31 +237,6 @@ export function AppointmentsPage() {
           tone="muted"
         />
       </div>
-
-      <Toolbar
-        query={query}
-        setQuery={setQuery}
-        activeFilterCount={activeFilterCount}
-        renderFilterBody={(close) => (
-          <FilterPopoverBody
-            status={status}
-            setStatus={setStatus}
-            preset={preset}
-            setPreset={setPreset}
-            userRole={user?.role}
-            scope={scope}
-            setScope={setScope}
-            hideDateChips={view === "calendar"}
-            today={today}
-            onClear={() => {
-              setStatus(undefined);
-              if (view === "list") setPreset("upcoming");
-              if (user?.role === "provider") setScope("mine");
-              close();
-            }}
-          />
-        )}
-      />
 
       {isLoading && <TableSkeleton rows={8} cols={7} />}
 
@@ -364,55 +366,61 @@ function ViewToggleButton({
   );
 }
 
-function Toolbar({
-  query,
-  setQuery,
-  activeFilterCount,
-  renderFilterBody,
+function HeaderSearch({
+  value,
+  onChange,
+  placeholder,
 }: {
-  query: string;
-  setQuery: (v: string) => void;
-  activeFilterCount: number;
-  renderFilterBody: (closePopover: () => void) => React.ReactNode;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="w-52">
+      <Input
+        icon={<Search className="size-3.5" />}
+        iconPosition="right"
+        iconBg
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="bg-white"
+      />
+    </div>
+  );
+}
+
+function FilterPopover({
+  activeCount,
+  renderBody,
+}: {
+  activeCount: number;
+  renderBody: (closePopover: () => void) => React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <Card className="mb-3">
-      <CardContent className="p-2 sm:p-3 flex items-center gap-2">
-        <Input
-          placeholder="Search patient name or MRN…"
-          icon={<Search className="size-4" />}
-          className="w-64 h-10"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <Popover.Root open={open} onOpenChange={setOpen}>
-          <Popover.Trigger asChild>
-            <Button
-              variant="secondary"
-              className="h-10 rounded-full px-4 relative ml-auto shrink-0"
-            >
-              <Filter className="size-4" />
-              Filters
-              {activeFilterCount > 0 && (
-                <span className="ml-1 inline-grid place-items-center min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
-                  {activeFilterCount}
-                </span>
-              )}
-            </Button>
-          </Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Content
-              align="end"
-              sideOffset={6}
-              className="z-50 w-[min(92vw,420px)] rounded-2xl bg-white shadow-elev border border-border p-4 animate-fade-in"
-            >
-              {renderFilterBody(() => setOpen(false))}
-            </Popover.Content>
-          </Popover.Portal>
-        </Popover.Root>
-      </CardContent>
-    </Card>
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <Button variant="secondary" className="h-10 rounded-full px-4 relative">
+          <Filter className="size-4" />
+          Filters
+          {activeCount > 0 && (
+            <span className="ml-1 inline-grid place-items-center min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+              {activeCount}
+            </span>
+          )}
+        </Button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="end"
+          sideOffset={6}
+          className="z-50 w-[min(92vw,420px)] rounded-2xl bg-white shadow-elev border border-border p-4 animate-fade-in"
+        >
+          {renderBody(() => setOpen(false))}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
