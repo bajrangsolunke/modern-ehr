@@ -32,6 +32,7 @@ import { UserAvatar } from "@/components/ui/avatar";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { SortableTh, TABLE_ROW_BG } from "@/components/ui/sortable-th";
 import { AppointmentModal } from "@/features/appointments/components/AppointmentModal";
+import { AppointmentDetailsModal } from "@/features/appointments/components/AppointmentDetailsModal";
 import {
   AppointmentsCalendar,
   rangeForMode,
@@ -112,6 +113,7 @@ export function AppointmentsPage() {
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
+  const [viewing, setViewing] = useState<Appointment | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Appointment | null>(null);
 
   // rangeFor() calls `new Date()` for the "upcoming" preset, which
@@ -161,6 +163,7 @@ export function AppointmentsPage() {
     setEditing(a);
     setDrawerOpen(true);
   };
+  const openDetails = (a: Appointment) => setViewing(a);
 
   return (
     <>
@@ -231,6 +234,7 @@ export function AppointmentsPage() {
         view === "list" ? (
           <AppointmentsTable
             items={data}
+            onView={openDetails}
             onEdit={openEdit}
             onSetStatus={(id, s) => setStatusMutation.mutate(id, s)}
             onDelete={canDelete ? setPendingDelete : undefined}
@@ -243,11 +247,22 @@ export function AppointmentsPage() {
             cursor={calendarCursor}
             onCursorChange={setCalendarCursor}
             appointments={data}
-            onEdit={openEdit}
+            onEdit={openDetails}
             onNew={() => openCreate()}
           />
         )
       )}
+
+      <AppointmentDetailsModal
+        open={Boolean(viewing)}
+        onOpenChange={(open) => !open && setViewing(null)}
+        appointment={viewing}
+        onEdit={(a) => {
+          setViewing(null);
+          openEdit(a);
+        }}
+        onDelete={canDelete ? setPendingDelete : undefined}
+      />
 
       <AppointmentModal
         open={drawerOpen}
@@ -526,12 +541,14 @@ function CompactStat({
 
 function AppointmentsTable({
   items,
+  onView,
   onEdit,
   onSetStatus,
   onDelete,
   busy,
 }: {
   items: Appointment[];
+  onView: (a: Appointment) => void;
   onEdit: (a: Appointment) => void;
   onSetStatus: (id: string, status: AppointmentStatus) => void;
   onDelete?: (a: Appointment) => void;
@@ -571,6 +588,7 @@ function AppointmentsTable({
               <AppointmentRow
                 key={a.id}
                 appointment={a}
+                onView={() => onView(a)}
                 onEdit={() => onEdit(a)}
                 onSetStatus={(s) => onSetStatus(a.id, s)}
                 onDelete={onDelete ? () => onDelete(a) : undefined}
@@ -589,22 +607,32 @@ function AppointmentsTable({
 
 function AppointmentRow({
   appointment,
+  onView,
   onEdit,
   onSetStatus,
   onDelete,
   busy,
 }: {
   appointment: Appointment;
+  onView: () => void;
   onEdit: () => void;
   onSetStatus: (s: AppointmentStatus) => void;
   onDelete?: () => void;
   busy?: boolean;
 }) {
   const a = appointment;
+  // Clicking the row body opens details; nested interactives
+  // (patient link, action buttons, dropdown) call stopPropagation so
+  // they take precedence.
+  const handleRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
+    if ((e.target as HTMLElement).closest("a,button,[data-no-row-click]")) return;
+    onView();
+  };
   return (
     <tr
+      onClick={handleRowClick}
       className={cn(
-        "hover:[&_td]:bg-[#EEF2F8] transition group",
+        "hover:[&_td]:bg-[#EEF2F8] transition group cursor-pointer",
         a.status === "cancelled" && "opacity-60"
       )}
     >
