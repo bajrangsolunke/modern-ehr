@@ -3,7 +3,7 @@
  * (docs/superpowers/specs/2026-05-27-workflow-user-stories.md).
  */
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   CheckCircle2,
   ChevronDown,
@@ -49,9 +49,16 @@ import {
 import type { FormRequest, FormStatus, FormType } from "./api/forms-api";
 import { cn, formatDate } from "@/lib/utils";
 
+/** Intake + consent open the full-page editor; the simpler form types
+ *  use the modal filler. */
+function usesPageEditor(formType: FormType): boolean {
+  return formType === "intake" || formType === "consent";
+}
+
 export function FormsPage() {
   const user = useAuthStore((s) => s.user);
   const canRequest = user?.role === "provider" || user?.role === "admin";
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const scopedPatientId = searchParams.get("patient_id") ?? undefined;
 
@@ -112,9 +119,17 @@ export function FormsPage() {
 
   const activeFilterCount = (formType ? 1 : 0) + (status ? 1 : 0);
 
+  const fillForm = (f: FormRequest) => {
+    if (usesPageEditor(f.formType)) {
+      navigate(`/forms/${f.id}/edit`);
+    } else {
+      setFillingId(f.id);
+    }
+  };
+
   const onRowClick = (f: FormRequest) => {
     if (f.status === "pending") {
-      setFillingId(f.id);
+      fillForm(f);
     } else {
       setViewingId(f.id);
     }
@@ -202,7 +217,7 @@ export function FormsPage() {
             <FormsTable
               items={data.items}
               onRowClick={onRowClick}
-              onFill={(f) => setFillingId(f.id)}
+              onFill={fillForm}
               onView={(f) => setViewingId(f.id)}
               onDelete={(f) => setPendingDelete(f)}
               canModify={canRequest}
@@ -239,7 +254,7 @@ export function FormsPage() {
         onOpenChange={(open) => !open && setViewingId(null)}
         onFill={(f) => {
           setViewingId(null);
-          setFillingId(f.id);
+          fillForm(f);
         }}
         canModify={canRequest}
       />

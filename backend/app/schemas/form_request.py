@@ -19,24 +19,143 @@ FormStatusLiteral = Literal["pending", "submitted", "completed", "denied"]
 # ---------------------------------------------------------------- payloads
 
 
+# ---------------------------------------------------------------- consent
+
+
+class ConsentSignature(BaseModel):
+    """A single signature block — typed name + date. Used in both the
+    patient-consent section and the privacy-acknowledgement section."""
+
+    signature: str = Field(min_length=1, max_length=255)
+    name: str = Field(min_length=1, max_length=255)
+    date: date
+
+
+class ConsentContactPreferences(BaseModel):
+    """Privacy-rules contact preferences — phone numbers + flags for
+    how (or whether) the practice may reach the patient on each."""
+
+    home_phone: str | None = Field(default=None, max_length=64)
+    home_phone_ok_detailed: bool = False
+    work_phone: str | None = Field(default=None, max_length=64)
+    work_phone_callback_only: bool = False
+    mobile_phone: str | None = Field(default=None, max_length=64)
+    mobile_do_not_contact: bool = False
+    email: str | None = Field(default=None, max_length=255)
+    email_ok: bool = False
+
+
+class ConsentPrivacyAcknowledgement(BaseModel):
+    contact_preferences: ConsentContactPreferences = Field(
+        default_factory=ConsentContactPreferences
+    )
+    only_disclose_to_me: bool = False
+    signature_block: ConsentSignature
+
+
 class ConsentFormPayload(BaseModel):
     form_type: Literal["consent"] = "consent"
-    procedure_name: str = Field(min_length=1, max_length=255)
-    procedure_date: date | None = None
-    patient_signature: str = Field(min_length=1, max_length=255)
-    guardian_name: str | None = Field(default=None, max_length=255)
-    consent_acknowledged: bool
-    signed_date: date
+    patient_consent: ConsentSignature
+    """Acknowledges patient consent + financial responsibility blocks."""
+    financial_acknowledged: bool = True
+    privacy_acknowledgement: ConsentPrivacyAcknowledgement
+
+
+# ---------------------------------------------------------------- intake
+
+
+class IntakeDemographics(BaseModel):
+    first_name: str = Field(min_length=1, max_length=128)
+    middle_name: str | None = Field(default=None, max_length=128)
+    last_name: str = Field(min_length=1, max_length=128)
+    suffix: str | None = Field(default=None, max_length=16)
+    nickname: str | None = Field(default=None, max_length=128)
+    gender_at_birth: str | None = Field(default=None, max_length=32)
+    current_gender: str | None = Field(default=None, max_length=32)
+    pronouns: str | None = Field(default=None, max_length=32)
+    dob: date | None = None
+    marital_status: str | None = Field(default=None, max_length=32)
+    time_zone: str | None = Field(default=None, max_length=64)
+    preferred_language: str | None = Field(default=None, max_length=64)
+    occupation: str | None = Field(default=None, max_length=128)
+    ssn: str | None = Field(default=None, max_length=32)
+    race: str | None = Field(default=None, max_length=64)
+    ethnicity: str | None = Field(default=None, max_length=64)
+
+
+class IntakeContact(BaseModel):
+    mobile_number: str | None = Field(default=None, max_length=64)
+    home_number: str | None = Field(default=None, max_length=64)
+    email: str | None = Field(default=None, max_length=255)
+    fax_number: str | None = Field(default=None, max_length=64)
+    address_line_1: str | None = Field(default=None, max_length=255)
+    address_line_2: str | None = Field(default=None, max_length=255)
+    city: str | None = Field(default=None, max_length=128)
+    state: str | None = Field(default=None, max_length=64)
+    country: str | None = Field(default=None, max_length=64)
+    zip_code: str | None = Field(default=None, max_length=16)
+
+
+class IntakeInsurance(BaseModel):
+    insurance_name: str | None = Field(default=None, max_length=255)
+    member_id: str | None = Field(default=None, max_length=128)
+    insurance_plan: str | None = Field(default=None, max_length=255)
+    insured_group_name: str | None = Field(default=None, max_length=255)
+    group_number: str | None = Field(default=None, max_length=128)
+    effective_start_date: date | None = None
+    effective_end_date: date | None = None
+    # Data-URLs inline for the first ship — swap to object storage later.
+    card_front_url: str | None = None
+    card_back_url: str | None = None
+
+
+class IntakePastSurgery(BaseModel):
+    name: str | None = Field(default=None, max_length=255)
+    onset_date: date | None = None
+    hospital: str | None = Field(default=None, max_length=255)
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class IntakeMedication(BaseModel):
+    name: str | None = Field(default=None, max_length=255)
+    frequency: str | None = Field(default=None, max_length=128)
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class IntakeAllergy(BaseModel):
+    type: str | None = Field(default=None, max_length=64)
+    name: str | None = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, max_length=2000)
+
+
+class IntakeHealthHistory(BaseModel):
+    childhood_illnesses: list[str] = Field(default_factory=list)
+    diagnosed_problems: str | None = Field(default=None, max_length=4000)
+    past_surgeries: list[IntakePastSurgery] = Field(default_factory=list)
+    current_medications: list[IntakeMedication] = Field(default_factory=list)
+    allergies: list[IntakeAllergy] = Field(default_factory=list)
+
+
+class IntakeFamilyCondition(BaseModel):
+    condition_name: str | None = Field(default=None, max_length=255)
+    relation: str | None = Field(default=None, max_length=64)
+    onset_date: date | None = None
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class IntakeFamilyHistory(BaseModel):
+    conditions: list[IntakeFamilyCondition] = Field(default_factory=list)
 
 
 class IntakeFormPayload(BaseModel):
     form_type: Literal["intake"] = "intake"
-    chief_complaint: str = Field(min_length=1, max_length=2000)
-    current_medications: str | None = Field(default=None, max_length=2000)
-    allergies: str | None = Field(default=None, max_length=2000)
-    past_medical_history: str | None = Field(default=None, max_length=4000)
-    family_history: str | None = Field(default=None, max_length=2000)
-    visit_date: date
+    demographics: IntakeDemographics
+    contact: IntakeContact = Field(default_factory=IntakeContact)
+    insurance: IntakeInsurance = Field(default_factory=IntakeInsurance)
+    health_history: IntakeHealthHistory = Field(default_factory=IntakeHealthHistory)
+    family_health_history: IntakeFamilyHistory = Field(
+        default_factory=IntakeFamilyHistory
+    )
 
 
 RoiCategory = Literal[

@@ -5,6 +5,7 @@
  * to one patient and without page chrome.
  */
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ interface Props {
 export function PatientForms({ patientId }: Props) {
   const user = useAuthStore((s) => s.user);
   const canRequest = user?.role === "provider" || user?.role === "admin";
+  const navigate = useNavigate();
 
   const { data, isLoading, isError, error, refetch, isFetching } =
     useFormRequests({ patient_id: patientId, page: 1, page_size: 50 });
@@ -48,8 +50,16 @@ export function PatientForms({ patientId }: Props) {
 
   const forms = data?.items ?? [];
 
+  const fillForm = (f: FormRequest) => {
+    if (f.formType === "intake" || f.formType === "consent") {
+      navigate(`/forms/${f.id}/edit`);
+    } else {
+      setFillingId(f.id);
+    }
+  };
+
   const onRowClick = (f: FormRequest) => {
-    if (f.status === "pending") setFillingId(f.id);
+    if (f.status === "pending") fillForm(f);
     else setViewingId(f.id);
   };
 
@@ -160,7 +170,7 @@ export function PatientForms({ patientId }: Props) {
                                 variant="ghost"
                                 size="sm"
                                 className="h-7 px-3 rounded-full bg-white hover:bg-white/80 text-primary font-semibold"
-                                onClick={() => setFillingId(f.id)}
+                                onClick={() => fillForm(f)}
                               >
                                 <Pencil className="size-3" /> Fill out
                               </Button>
@@ -211,7 +221,7 @@ export function PatientForms({ patientId }: Props) {
         onOpenChange={(open) => !open && setViewingId(null)}
         onFill={(f) => {
           setViewingId(null);
-          setFillingId(f.id);
+          fillForm(f);
         }}
         canModify={canRequest}
       />
