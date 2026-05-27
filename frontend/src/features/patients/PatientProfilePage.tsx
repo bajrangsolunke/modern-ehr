@@ -9,7 +9,7 @@ import { ProfileSkeleton } from "@/features/patients/components/ProfileSkeleton"
 import { AlertsStrip } from "@/features/patients/components/AlertsStrip";
 import { PatientHeader } from "@/features/patients/components/PatientHeader";
 import { KeyClinicalOverview } from "@/features/patients/components/KeyClinicalOverview";
-import { PatientDocuments } from "@/features/patients/components/PatientDocuments";
+import { PatientForms } from "@/features/forms/components/PatientForms";
 import { ChecklistCard } from "@/features/patients/components/Checklist";
 import { Timeline } from "@/features/patients/components/Timeline";
 import { Vitals } from "@/features/patients/components/Vitals";
@@ -40,7 +40,7 @@ const TABS = [
   { value: "notes", label: "Clinical notes" },
   { value: "vitals", label: "Vitals & Labs" },
   { value: "medications", label: "Medications" },
-  { value: "documents", label: "Documents" },
+  { value: "documents", label: "Forms" },
   { value: "care-plan", label: "Care plan" },
 ] as const;
 
@@ -161,7 +161,7 @@ export function PatientProfilePage() {
             </TabsContent>
 
             <TabsContent value="documents" className="mt-0">
-              <PatientDocuments patientId={patient.id} />
+              <PatientForms patientId={patient.id} />
             </TabsContent>
 
             <TabsContent value="care-plan" className="mt-0">

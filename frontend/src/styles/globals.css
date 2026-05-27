@@ -99,3 +99,28 @@
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Print styles — used by the forms preview download flow.                    */
+/* Hide app chrome and any "no-print" marked element so the page prints       */
+/* only the .form-preview content, no app shell.                              */
+/* -------------------------------------------------------------------------- */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .form-preview,
+  .form-preview * {
+    visibility: visible;
+  }
+  .form-preview {
+    position: absolute;
+    inset: 0;
+    padding: 24px;
+    background: white;
+  }
+  .no-print,
+  .no-print * {
+    display: none !important;
+  }
+}

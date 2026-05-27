@@ -26,7 +26,7 @@ const navItems: NavItem[] = [
   { to: "/patients", label: "Patients" },
   { to: "/messages", label: "Communication", useBadge: useUnreadCount },
   { to: "/appointments", label: "Appointments" },
-  { to: "/docs", label: "Docs" },
+  { to: "/forms", label: "Forms" },
   { to: "/reports", label: "Reports" },
   { to: "/users", label: "Users", roles: ["admin"] },
   { to: "/tasks", label: "Tasks" },

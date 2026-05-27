@@ -6,6 +6,8 @@ export const ROUTES = {
   patients: "/patients",
   patientProfile: (id: string) => `/patients/${id}`,
   appointments: "/appointments",
+  forms: "/forms",
+  /** Legacy — redirects to /forms. Keep for bookmarks. */
   docs: "/docs",
   users: "/users",
   settings: "/settings",
