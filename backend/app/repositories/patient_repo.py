@@ -1,8 +1,9 @@
 from typing import Literal
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.patient import Patient, PatientStatus, RiskLevel
 from app.repositories.base import BaseRepository
@@ -63,13 +64,27 @@ class PatientRepository(BaseRepository[Patient]):
         col = _SORTABLE.get(sort_by, Patient.created_at)
         order_by = col.asc() if sort_dir == "asc" else col.desc()
 
-        return await self.list(
-            offset=offset,
-            limit=limit,
-            order_by=order_by,
-            filters=filters,
-        )
+        # Custom query so we can eager-load the assigned provider —
+        # PatientListItem renders the provider's display name.
+        stmt = select(Patient).options(selectinload(Patient.assigned_physician))
+        for f in filters:
+            stmt = stmt.where(f)
+        stmt = stmt.order_by(order_by)
+
+        total = await self.db.scalar(
+            select(func.count()).select_from(stmt.subquery())
+        ) or 0
+        result = await self.db.execute(stmt.offset(offset).limit(limit))
+        return list(result.scalars().unique().all()), int(total)
 
     async def get_by_mrn(self, mrn: str) -> Patient | None:
         result = await self.db.execute(select(Patient).where(Patient.mrn == mrn))
+        return result.scalar_one_or_none()
+
+    async def get(self, id_: UUID) -> Patient | None:
+        result = await self.db.execute(
+            select(Patient)
+            .options(selectinload(Patient.assigned_physician))
+            .where(Patient.id == id_)
+        )
         return result.scalar_one_or_none()

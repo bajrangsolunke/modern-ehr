@@ -32,7 +32,11 @@ export interface Patient {
   procedure: string;
   status: PatientStatus;
   procedureDate: string;
-  assignedPhysician: { name: string; avatarUrl?: string };
+  /**
+   * The provider this patient is assigned to. `id` is the FK and is
+   * what the picker writes back; `name` is for display only.
+   */
+  assignedPhysician: { id?: string; name: string; avatarUrl?: string };
   tags: string[];
   risk: RiskLevel;
   asa?: "I" | "II" | "III" | "IV";

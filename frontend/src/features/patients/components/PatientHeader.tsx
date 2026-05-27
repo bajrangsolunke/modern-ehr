@@ -98,7 +98,7 @@ export function PatientHeader({ patient, onEdit, onRemove }: Props) {
                   }
                 />
                 <ProcKv
-                  label="Attending physician"
+                  label="Assigned provider"
                   value={patient.assignedPhysician?.name || "—"}
                 />
                 <ProcKv label="Anesthesiologist" value="Dr. med. Weber" />

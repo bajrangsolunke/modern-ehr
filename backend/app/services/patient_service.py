@@ -61,10 +61,12 @@ class PatientService:
             raise HTTPException(status_code=404, detail="Patient not found")
         return patient
 
-    # Fields the client may modify after create. mrn/sex/dob are intentionally
-    # omitted (MRN is immutable, demographic changes need a separate flow).
+    # Fields the client may modify after create. sex/dob stay locked down
+    # because they're clinically immutable — fixing them needs a separate
+    # audited flow.
     _UPDATE_ALLOWED = frozenset(
         {
+            "mrn",
             "first_name",
             "last_name",
             "email",
@@ -85,6 +87,16 @@ class PatientService:
     async def update(self, patient_id: UUID, payload: PatientUpdate) -> Patient:
         patient = await self.get(patient_id)
         data = payload.model_dump(exclude_unset=True, include=self._UPDATE_ALLOWED)
+
+        new_mrn = data.get("mrn")
+        if new_mrn and new_mrn != patient.mrn:
+            clash = await self.repo.get_by_mrn(new_mrn)
+            if clash and clash.id != patient.id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Another patient already has MRN {new_mrn}",
+                )
+
         for k, v in data.items():
             setattr(patient, k, v)
         await self.db.flush()

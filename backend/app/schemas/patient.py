@@ -2,7 +2,14 @@ from datetime import date
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.models.patient import PatientStatus, RiskLevel
 
@@ -42,6 +49,7 @@ class PatientCreate(PatientBase):
 
 
 class PatientUpdate(BaseModel):
+    mrn: str | None = Field(default=None, min_length=1, max_length=64)
     first_name: str | None = Field(default=None, min_length=1, max_length=128)
     last_name: str | None = Field(default=None, min_length=1, max_length=128)
     email: EmailStr | None = None
@@ -56,8 +64,8 @@ class PatientUpdate(BaseModel):
     risk: RiskLevel | None = None
     tags: list[str] | None = None
     assigned_physician_id: UUID | None = None
-    # Intentionally NOT exposed: risk_score (server-derived), mrn (immutable
-    # after create), sex/dob (clinically immutable — needs a separate flow).
+    # Intentionally NOT exposed: risk_score (server-derived), sex/dob
+    # (clinically immutable — needs a separate flow).
 
 
 class PatientOut(PatientBase):
@@ -68,6 +76,30 @@ class PatientOut(PatientBase):
     risk: RiskLevel
     risk_score: int
     assigned_physician_id: UUID | None
+    assigned_physician_name: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _flatten_provider(cls, data):
+        if isinstance(data, dict):
+            return data
+        provider = getattr(data, "assigned_physician", None)
+        if provider is None:
+            return data
+        return _PatientRowWithProvider(data, provider.full_name)
+
+
+class _PatientRowWithProvider:
+    """Attribute proxy that surfaces the joined provider's display name."""
+
+    def __init__(self, row, provider_name: str):
+        self._row = row
+        self._provider_name = provider_name
+
+    def __getattr__(self, item):
+        if item == "assigned_physician_name":
+            return self._provider_name
+        return getattr(self._row, item)
 
 
 class PatientListItem(BaseModel):
@@ -84,6 +116,17 @@ class PatientListItem(BaseModel):
     tags: list[str] | None
     avatar_url: str | None
     assigned_physician_id: UUID | None
+    assigned_physician_name: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _flatten_provider(cls, data):
+        if isinstance(data, dict):
+            return data
+        provider = getattr(data, "assigned_physician", None)
+        if provider is None:
+            return data
+        return _PatientRowWithProvider(data, provider.full_name)
 
 
 SortBy = Literal["mrn", "first_name", "procedure_date", "risk_score", "created_at"]

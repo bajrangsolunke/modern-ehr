@@ -6,6 +6,7 @@ import { FormField } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { PortraitUploader } from "@/features/patients/components/PortraitUploader";
+import { useUsers } from "@/features/users/hooks/use-users";
 import type { PatientInput } from "@/features/patients/api/patients-api";
 import type { Patient } from "@/types";
 
@@ -24,6 +25,7 @@ const schema = z.object({
   phone: z.string().optional().or(z.literal("")),
   city: z.string().optional().or(z.literal("")),
   avatar_url: z.string().optional().or(z.literal("")),
+  assigned_physician_id: z.string().optional().or(z.literal("")),
   procedure: z.string().optional().or(z.literal("")),
   procedure_date: z.string().optional().or(z.literal("")),
   asa: z.enum(asas).optional().or(z.literal("")),
@@ -60,6 +62,7 @@ export function PatientForm({
     phone: defaultPatient?.phone ?? "",
     city: defaultPatient?.city ?? "",
     avatar_url: defaultPatient?.avatarUrl ?? "",
+    assigned_physician_id: defaultPatient?.assignedPhysician?.id ?? "",
     procedure: defaultPatient?.procedure ?? "",
     procedure_date: defaultPatient?.procedureDate ?? "",
     asa: (defaultPatient?.asa as (typeof asas)[number]) ?? "",
@@ -96,6 +99,7 @@ export function PatientForm({
       phone: values.phone || null,
       city: values.city || null,
       avatar_url: values.avatar_url || null,
+      assigned_physician_id: values.assigned_physician_id || null,
       procedure: values.procedure || null,
       procedure_date: values.procedure_date || null,
       asa: (values.asa || null) as PatientInput["asa"],
@@ -114,78 +118,74 @@ export function PatientForm({
 
   return (
     <form onSubmit={submit} className="space-y-4 lg:space-y-5" noValidate>
-      <Section title="Identity">
-        <Field span={3}>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-[15px]">Identity</CardTitle>
+        </CardHeader>
+        <CardContent className="pb-5">
           <div className="flex items-start gap-5">
-            <PortraitUploader
-              name={portraitName}
-              src={avatarUrl || undefined}
-              onChange={(dataUrl) =>
-                setValue("avatar_url", dataUrl, { shouldDirty: true })
-              }
-            />
-            <div className="flex-1 min-w-0 self-center">
-              <div className="text-sm font-semibold">Profile photo</div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Optional. Tap the camera to upload. We resize to a passport-
-                sized image so the chart stays light.
-              </p>
+            <div className="flex flex-col items-center gap-2 shrink-0">
+              <PortraitUploader
+                name={portraitName}
+                src={avatarUrl || undefined}
+                onChange={(dataUrl) =>
+                  setValue("avatar_url", dataUrl, { shouldDirty: true })
+                }
+              />
+              <span className="text-[11px] text-muted-foreground text-center max-w-[140px] leading-snug">
+                Optional. Resized to passport size.
+              </span>
+            </div>
+
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 auto-rows-min">
+              <FormField label="MRN" required htmlFor="mrn" error={errors.mrn?.message}>
+                <Input id="mrn" placeholder="e.g. 1042" {...register("mrn")} />
+              </FormField>
+              <FormField label="Sex" required htmlFor="sex" error={errors.sex?.message}>
+                <Select id="sex" {...register("sex")}>
+                  {sexes.map((s) => (
+                    <option key={s} value={s}>
+                      {s === "F" ? "Female" : s === "M" ? "Male" : "Other"}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField
+                label="Date of birth"
+                required
+                htmlFor="dob"
+                error={errors.dob?.message}
+              >
+                <Input id="dob" type="date" {...register("dob")} />
+              </FormField>
+              <FormField
+                label="First name"
+                required
+                htmlFor="first_name"
+                error={errors.first_name?.message}
+              >
+                <Input
+                  id="first_name"
+                  {...register("first_name")}
+                  placeholder="Robert"
+                />
+              </FormField>
+              <FormField
+                label="Last name"
+                required
+                htmlFor="last_name"
+                error={errors.last_name?.message}
+              >
+                <Input id="last_name" {...register("last_name")} placeholder="Fox" />
+              </FormField>
+              <FormField label="City" htmlFor="city" error={errors.city?.message}>
+                <Input id="city" {...register("city")} placeholder="Berlin, Germany" />
+              </FormField>
             </div>
           </div>
           <input type="hidden" {...register("avatar_url")} />
-        </Field>
-        <Field>
-          <FormField label="MRN" required htmlFor="mrn" error={errors.mrn?.message}>
-            <Input id="mrn" placeholder="e.g. 1042" {...register("mrn")} />
-          </FormField>
-        </Field>
-        <Field>
-          <FormField label="Sex" required htmlFor="sex" error={errors.sex?.message}>
-            <Select id="sex" {...register("sex")}>
-              {sexes.map((s) => (
-                <option key={s} value={s}>
-                  {s === "F" ? "Female" : s === "M" ? "Male" : "Other"}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-        </Field>
-        <Field>
-          <FormField
-            label="Date of birth"
-            required
-            htmlFor="dob"
-            error={errors.dob?.message}
-          >
-            <Input id="dob" type="date" {...register("dob")} />
-          </FormField>
-        </Field>
-        <Field>
-          <FormField
-            label="First name"
-            required
-            htmlFor="first_name"
-            error={errors.first_name?.message}
-          >
-            <Input id="first_name" {...register("first_name")} placeholder="Robert" />
-          </FormField>
-        </Field>
-        <Field>
-          <FormField
-            label="Last name"
-            required
-            htmlFor="last_name"
-            error={errors.last_name?.message}
-          >
-            <Input id="last_name" {...register("last_name")} placeholder="Fox" />
-          </FormField>
-        </Field>
-        <Field>
-          <FormField label="City" htmlFor="city" error={errors.city?.message}>
-            <Input id="city" {...register("city")} placeholder="Berlin, Germany" />
-          </FormField>
-        </Field>
-      </Section>
+        </CardContent>
+      </Card>
 
       <Section title="Contact">
         <Field span={2}>
@@ -259,6 +259,22 @@ export function PatientForm({
       </Section>
 
       <Section title="Care plan">
+        <Field span={3}>
+          <FormField
+            label="Assigned provider"
+            htmlFor="assigned_physician_id"
+            hint="Optional. Pick the provider who's primarily responsible for this patient."
+            error={errors.assigned_physician_id?.message}
+          >
+            <ProviderPicker
+              value={watch("assigned_physician_id") || ""}
+              onChange={(id) =>
+                setValue("assigned_physician_id", id, { shouldDirty: true })
+              }
+            />
+            <input type="hidden" {...register("assigned_physician_id")} />
+          </FormField>
+        </Field>
         <Field>
           <FormField
             label="Status"
@@ -381,4 +397,36 @@ function labelFor(v: string) {
     .split(/[-_]/)
     .map((s) => s[0].toUpperCase() + s.slice(1))
     .join(" ");
+}
+
+function ProviderPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  // Active providers only — staff and admins aren't clinicians and
+  // shouldn't be the "assigned provider" on a chart.
+  const { data } = useUsers({
+    role: "provider",
+    is_active: true,
+    page: 1,
+    page_size: 100,
+  });
+  return (
+    <Select
+      id="assigned_physician_id"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="">Unassigned</option>
+      {(data?.items ?? []).map((u) => (
+        <option key={u.id} value={u.id}>
+          {u.fullName}
+          {u.specialty ? ` · ${u.specialty}` : ""}
+        </option>
+      ))}
+    </Select>
+  );
 }

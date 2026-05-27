@@ -76,7 +76,7 @@ export function PatientCardGrid({ data }: { data: Patient[] }) {
                   <Row label="Status" value={<StatusPill status={p.status} />} />
                   <Row label="Procedure date" value={formatDate(p.procedureDate)} />
                   <Row
-                    label="Assigned physician"
+                    label="Assigned provider"
                     value={
                       <div className="flex items-center gap-1.5">
                         <UserAvatar name={p.assignedPhysician.name} size="xs" />

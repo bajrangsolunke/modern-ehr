@@ -137,88 +137,96 @@ export function UserDrawer({ open, onOpenChange, user }: Props) {
     >
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         <div className="flex items-start gap-5">
-          <PortraitUploader
-            name={fullNameValue || "New user"}
-            src={avatarUrl || undefined}
-            onChange={(dataUrl) =>
-              setValue("avatar_url", dataUrl, { shouldDirty: true })
-            }
-          />
-          <div className="flex-1 min-w-0 self-center">
-            <div className="text-sm font-semibold">Profile photo</div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Optional. Tap the camera to upload. The photo is resized to
-              passport size so the chart stays light.
-            </p>
+          <div className="flex flex-col items-center gap-2 shrink-0">
+            <PortraitUploader
+              name={fullNameValue || "New user"}
+              src={avatarUrl || undefined}
+              onChange={(dataUrl) =>
+                setValue("avatar_url", dataUrl, { shouldDirty: true })
+              }
+            />
+            <span className="text-[11px] text-muted-foreground text-center max-w-[140px] leading-snug">
+              Optional. Resized to passport size.
+            </span>
+          </div>
+
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 auto-rows-min">
+            <FormField
+              label="Full name"
+              required
+              htmlFor="u-name"
+              error={errors.full_name?.message}
+            >
+              <Input
+                id="u-name"
+                placeholder="Dr. Jane Cooper"
+                {...register("full_name")}
+              />
+            </FormField>
+
+            <FormField
+              label="Email"
+              required
+              htmlFor="u-email"
+              hint={
+                isEdit
+                  ? "Email is the durable identity and can't be changed."
+                  : undefined
+              }
+              error={errors.email?.message}
+            >
+              <Input
+                id="u-email"
+                type="email"
+                placeholder="jane@padmavat.health"
+                disabled={isEdit}
+                {...register("email")}
+              />
+            </FormField>
+
+            <FormField
+              label="Role"
+              required
+              htmlFor="u-role"
+              error={errors.role?.message}
+            >
+              <Select id="u-role" {...register("role")}>
+                <option value="provider">Provider</option>
+                <option value="staff">Staff</option>
+                <option value="admin">Admin</option>
+              </Select>
+            </FormField>
+
+            <FormField
+              label="Specialty"
+              htmlFor="u-specialty"
+              hint={role === "provider" ? "e.g. Orthopedics" : "Optional"}
+              error={errors.specialty?.message}
+            >
+              <Input id="u-specialty" {...register("specialty")} />
+            </FormField>
           </div>
         </div>
         <input type="hidden" {...register("avatar_url")} />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-          <FormField
-            label="Full name"
-            required
-            htmlFor="u-name"
-            error={errors.full_name?.message}
-          >
-            <Input id="u-name" placeholder="Dr. Jane Cooper" {...register("full_name")} />
-          </FormField>
-
-          <FormField
-            label="Email"
-            required
-            htmlFor="u-email"
-            hint={
-              isEdit ? "Email is the durable identity and can't be changed." : undefined
-            }
-            error={errors.email?.message}
-          >
-            <Input
-              id="u-email"
-              type="email"
-              placeholder="jane@padmavat.health"
-              disabled={isEdit}
-              {...register("email")}
-            />
-          </FormField>
-
-          <FormField label="Role" required htmlFor="u-role" error={errors.role?.message}>
-            <Select id="u-role" {...register("role")}>
-              <option value="provider">Provider</option>
-              <option value="staff">Staff</option>
-              <option value="admin">Admin</option>
-            </Select>
-          </FormField>
-
-          <FormField
-            label="Specialty"
-            htmlFor="u-specialty"
-            hint={role === "provider" ? "e.g. Orthopedics" : "Optional"}
-            error={errors.specialty?.message}
-          >
-            <Input id="u-specialty" {...register("specialty")} />
-          </FormField>
-
-          <FormField
-            label={isEdit ? "Reset password" : "Password"}
-            required={!isEdit}
-            htmlFor="u-password"
-            hint={
-              isEdit
-                ? "Leave blank to keep the current password."
-                : "Minimum 8 characters."
-            }
-            error={errors.password?.message}
-            className="md:col-span-2"
-          >
-            <Input
-              id="u-password"
-              type="password"
-              autoComplete="new-password"
-              {...register("password")}
-            />
-          </FormField>
-        </div>
+        <FormField
+          label={isEdit ? "Reset password" : "Password"}
+          required={!isEdit}
+          htmlFor="u-password"
+          hint={
+            isEdit
+              ? "Leave blank to keep the current password."
+              : "Minimum 8 characters."
+          }
+          error={errors.password?.message}
+        >
+          <Input
+            id="u-password"
+            type="password"
+            autoComplete="new-password"
+            {...register("password")}
+          />
+        </FormField>
 
         <div className="flex justify-end gap-2 pt-2">
           <Button

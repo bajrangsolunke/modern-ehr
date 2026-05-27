@@ -21,6 +21,7 @@ interface BackendPatientDto {
   risk_score: number;
   tags?: string[] | null;
   assigned_physician_id: string | null;
+  assigned_physician_name?: string | null;
 }
 
 interface PageDto<T> {
@@ -80,7 +81,10 @@ function mapPatient(dto: BackendPatientDto): Patient {
     procedure: dto.procedure ?? "",
     status: dto.status,
     procedureDate: dto.procedure_date ?? "",
-    assignedPhysician: { name: "—" },
+    assignedPhysician: {
+      id: dto.assigned_physician_id ?? undefined,
+      name: dto.assigned_physician_name ?? "Unassigned",
+    },
     tags: dto.tags ?? [],
     risk: dto.risk,
     asa: dto.asa ?? undefined,
@@ -223,6 +227,7 @@ function patientToBackendDto(p: Patient): BackendPatientDto {
     risk: p.risk,
     risk_score: 0,
     tags: p.tags ?? null,
-    assigned_physician_id: null,
+    assigned_physician_id: p.assignedPhysician.id ?? null,
+    assigned_physician_name: p.assignedPhysician.name ?? null,
   };
 }

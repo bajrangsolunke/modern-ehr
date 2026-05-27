@@ -42,7 +42,7 @@ export function PatientTable({ data }: { data: Patient[] }) {
                 <Th>Procedure</Th>
                 <Th>Status</Th>
                 <Th>Procedure date</Th>
-                <Th>Assigned physician</Th>
+                <Th>Assigned provider</Th>
                 <Th>Tags</Th>
                 <th
                   className="font-medium px-4 py-2 text-right last:rounded-r-full"

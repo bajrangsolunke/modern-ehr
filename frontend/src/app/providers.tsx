@@ -45,11 +45,35 @@ export function AppProviders({ children }: Props) {
             <AuthListenerBridge />
             {children}
             <Toaster
-              position="top-right"
-              richColors
+              position="bottom-right"
               closeButton
               duration={4000}
-              toastOptions={{ style: { borderRadius: "12px" } }}
+              theme="light"
+              visibleToasts={4}
+              offset={20}
+              gap={10}
+              expand={false}
+              toastOptions={{
+                unstyled: false,
+                classNames: {
+                  // Card-style toast that matches the rest of the app.
+                  toast:
+                    "group !rounded-2xl !border !border-border !bg-white !text-foreground !shadow-elev !p-4 !gap-3 !items-start",
+                  title: "!text-sm !font-semibold !leading-snug !text-foreground",
+                  description:
+                    "!text-xs !leading-relaxed !text-muted-foreground !mt-0.5",
+                  closeButton:
+                    "!bg-white !border !border-border !text-muted-foreground hover:!text-foreground !rounded-full !left-auto !right-2 !top-2",
+                  // Severity bars + icon backgrounds.
+                  success:
+                    "[&_[data-icon]]:!bg-success/10 [&_[data-icon]]:!text-success",
+                  error:
+                    "[&_[data-icon]]:!bg-danger/10 [&_[data-icon]]:!text-danger",
+                  warning:
+                    "[&_[data-icon]]:!bg-warning/10 [&_[data-icon]]:!text-warning",
+                  info: "[&_[data-icon]]:!bg-info/10 [&_[data-icon]]:!text-info",
+                },
+              }}
             />
           </BrowserRouter>
         </TooltipProvider>

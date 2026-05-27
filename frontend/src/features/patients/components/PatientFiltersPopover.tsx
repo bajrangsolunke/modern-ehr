@@ -123,7 +123,7 @@ export function PatientFiltersPopover({ filters, onChange, physicians = [] }: Pr
 
           {physicians.length > 0 && (
             <Facet
-              label="Assigned physician"
+              label="Assigned provider"
               current={filters.physician_id}
               options={physicians.map((p) => ({ v: p.id, label: p.name }))}
               onSet={(v) => setFacet("physician_id", v)}
