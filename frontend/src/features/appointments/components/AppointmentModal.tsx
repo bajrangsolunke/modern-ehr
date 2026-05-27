@@ -137,7 +137,23 @@ function BookAppointmentModal({
     open && Boolean(date)
   );
 
-  const grouped = useMemo(() => groupSlotsByHour(slots ?? []), [slots]);
+  // Flat list with a pre-formatted display time per row — the grid
+  // renders all slots in one continuous row without hour headings.
+  const flatSlots = useMemo(
+    () =>
+      (slots ?? []).map((s) => {
+        const d = new Date(s.startsAt);
+        return {
+          ...s,
+          time: d.toLocaleTimeString(undefined, {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          }),
+        };
+      }),
+    [slots]
+  );
   const canSubmit = Boolean(patientId && selectedSlot);
 
   const handleBook = async () => {
@@ -269,11 +285,10 @@ function BookAppointmentModal({
         {/* Step 4: slot picker */}
         <Section title="4 · Pick a slot" required>
           <SlotGrid
-            grouped={grouped}
+            slots={flatSlots}
             loading={slotsLoading}
             selected={selectedSlot}
             onSelect={setSelectedSlot}
-            singleProvider={Boolean(physicianId)}
           />
         </Section>
 
@@ -608,52 +623,26 @@ function ProviderPicker({
 /* Slot grid                                                                  */
 /* -------------------------------------------------------------------------- */
 
-type GroupedSlots = Array<{
-  hour: number;
-  slots: {
-    startsAt: string;
-    physicianId: string;
-    physicianName: string;
-    load: number;
-    time: string;
-  }[];
-}>;
-
-function groupSlotsByHour(
-  slots: { startsAt: string; physicianId: string; physicianName: string; load: number }[]
-): GroupedSlots {
-  const byHour = new Map<number, GroupedSlots[number]["slots"]>();
-  for (const s of slots) {
-    const d = new Date(s.startsAt);
-    const hour = d.getHours();
-    if (!byHour.has(hour)) byHour.set(hour, []);
-    byHour.get(hour)!.push({
-      ...s,
-      time: d.toLocaleTimeString(undefined, {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      }),
-    });
-  }
-  return [...byHour.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([hour, slots]) => ({ hour, slots }));
+interface FlatSlot {
+  physicianId: string;
+  physicianName: string;
+  startsAt: string;
+  durationMinutes: number;
+  load: number;
+  /** Pre-formatted local time, e.g. "9:30 AM". */
+  time: string;
 }
 
 function SlotGrid({
-  grouped,
+  slots,
   loading,
   selected,
   onSelect,
 }: {
-  grouped: GroupedSlots;
+  slots: FlatSlot[];
   loading: boolean;
   selected: { startsAt: string; physicianId: string } | null;
   onSelect: (s: { startsAt: string; physicianId: string }) => void;
-  /* singleProvider arg retained on the type signature out of habit,
-   * but the tile no longer shows provider info — keep it tight. */
-  singleProvider?: boolean;
 }) {
   if (loading) {
     return (
@@ -665,7 +654,7 @@ function SlotGrid({
     );
   }
 
-  if (grouped.length === 0) {
+  if (slots.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border bg-surface-subtle p-6 text-center">
         <Clock className="size-5 text-muted-foreground mx-auto mb-2" />
@@ -679,46 +668,37 @@ function SlotGrid({
   }
 
   return (
-    <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1">
-      {grouped.map((group) => (
-        <div key={group.hour}>
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 px-1">
-            {formatHourLabel(group.hour)}
-          </div>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
-            {group.slots.map((s) => {
-              const isSelected =
-                selected?.startsAt === s.startsAt &&
-                selected?.physicianId === s.physicianId;
-              return (
-                <button
-                  key={`${s.physicianId}-${s.startsAt}`}
-                  type="button"
-                  // Provider + load context lives in the tooltip so the
-                  // tile itself stays a single-line time picker. Six per
-                  // row on lg means a typical 9-5 schedule fits without
-                  // scrolling.
-                  title={`${s.time} · ${s.physicianName} · ${loadLabel(s.load)} load`}
-                  onClick={() =>
-                    onSelect({
-                      startsAt: s.startsAt,
-                      physicianId: s.physicianId,
-                    })
-                  }
-                  className={cn(
-                    "h-10 rounded-xl border bg-white text-sm font-semibold transition ring-focus text-center",
-                    isSelected
-                      ? "border-primary ring-2 ring-primary/30 bg-primary/5 text-primary"
-                      : "border-border text-foreground hover:border-foreground/30"
-                  )}
-                >
-                  {s.time}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+    <div className="max-h-[340px] overflow-y-auto pr-1">
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+        {slots.map((s) => {
+          const isSelected =
+            selected?.startsAt === s.startsAt &&
+            selected?.physicianId === s.physicianId;
+          return (
+            <button
+              key={`${s.physicianId}-${s.startsAt}`}
+              type="button"
+              // Provider + load context lives in the tooltip so the
+              // tile stays a single-line time pill.
+              title={`${s.time} · ${s.physicianName} · ${loadLabel(s.load)} load`}
+              onClick={() =>
+                onSelect({
+                  startsAt: s.startsAt,
+                  physicianId: s.physicianId,
+                })
+              }
+              className={cn(
+                "h-10 rounded-xl border bg-white text-sm font-semibold transition ring-focus text-center",
+                isSelected
+                  ? "border-primary ring-2 ring-primary/30 bg-primary/5 text-primary"
+                  : "border-border text-foreground hover:border-foreground/30"
+              )}
+            >
+              {s.time}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -727,12 +707,6 @@ function loadLabel(load: number): "Light" | "Busy" | "Heavy" {
   if (load <= 2) return "Light";
   if (load <= 5) return "Busy";
   return "Heavy";
-}
-
-function formatHourLabel(hour: number): string {
-  if (hour === 0) return "12:00 AM";
-  if (hour === 12) return "12:00 PM";
-  return hour < 12 ? `${hour}:00 AM` : `${hour - 12}:00 PM`;
 }
 
 /* -------------------------------------------------------------------------- */
