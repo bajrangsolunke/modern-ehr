@@ -49,13 +49,29 @@ export function UserDrawer({ open, onOpenChange, user }: Props) {
   const create = useCreateUser();
   const update = useUpdateUser(user?.id);
 
-  const defaults = {
-    full_name: user?.fullName ?? "",
-    email: user?.email ?? "",
-    role: (user?.role ?? "provider") as Role,
-    specialty: user?.specialty ?? "",
+  /*
+   * Always feed `values` (not just `defaultValues`) so RHF resets the
+   * form whenever the `user` prop flips. Without this, opening Edit
+   * for user A → closing → opening "New user" leaves A's fields
+   * sitting in the create form because RHF treats undefined `values`
+   * as "leave it alone".
+   */
+  const blank = {
+    full_name: "",
+    email: "",
+    role: "provider" as Role,
+    specialty: "",
     password: "",
   };
+  const valuesFromUser = user
+    ? {
+        full_name: user.fullName,
+        email: user.email,
+        role: user.role,
+        specialty: user.specialty ?? "",
+        password: "",
+      }
+    : blank;
 
   const {
     register,
@@ -65,16 +81,8 @@ export function UserDrawer({ open, onOpenChange, user }: Props) {
     formState: { errors },
   } = useForm<CreateValues | UpdateValues>({
     resolver: zodResolver(isEdit ? updateSchema : createSchema) as never,
-    defaultValues: defaults,
-    values: user
-      ? {
-          full_name: user.fullName,
-          email: user.email,
-          role: user.role,
-          specialty: user.specialty ?? "",
-          password: "",
-        }
-      : undefined,
+    defaultValues: blank,
+    values: valuesFromUser,
   });
 
   const role = watch("role");
@@ -115,7 +123,7 @@ export function UserDrawer({ open, onOpenChange, user }: Props) {
           ? `Update profile and access for ${user?.fullName}.`
           : "Invite a new teammate. They'll sign in with the password you set."
       }
-      size="xl"
+      size="lg"
     >
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">

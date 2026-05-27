@@ -26,6 +26,24 @@ export function useUser(id: string | undefined) {
   });
 }
 
+export function useUserStats(id: string | undefined) {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.users.byId(id ?? "none"), "stats"],
+    queryFn: () => usersApi.stats(id as string),
+    enabled: Boolean(id),
+    staleTime: 30_000,
+  });
+}
+
+export function useUserAppointments(id: string | undefined, limit = 20) {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.users.byId(id ?? "none"), "appointments", limit],
+    queryFn: () => usersApi.appointments(id as string, limit),
+    enabled: Boolean(id),
+    staleTime: 30_000,
+  });
+}
+
 export function useCreateUser() {
   const qc = useQueryClient();
   return useMutation({

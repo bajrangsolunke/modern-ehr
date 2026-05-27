@@ -29,44 +29,64 @@ export function ConfirmDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm animate-fade-in" />
-        <Dialog.Content
+        {/*
+          Centering: we use a flex wrapper, not -translate-x/-y on the
+          Content itself. tailwindcss-animate's `animate-in` keyframe
+          overwrites the element's transform during the animation, so
+          translate-based centering causes a brief off-center frame
+          before snapping back. Flex centering keeps position stable
+          across the whole animation.
+        */}
+        <Dialog.Overlay
           className={cn(
-            "fixed left-1/2 top-1/2 z-50 w-[90vw] max-w-md -translate-x-1/2 -translate-y-1/2",
-            "rounded-2xl bg-white shadow-elev border border-border p-6 animate-fade-in focus:outline-none"
+            "fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out",
+            "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "duration-200"
           )}
-        >
-          <div className="flex items-start gap-3 mb-4">
-            {destructive && (
-              <div className="size-10 rounded-xl bg-danger/10 text-danger grid place-items-center shrink-0">
-                <AlertTriangle className="size-5" />
-              </div>
+        />
+        <div className="fixed inset-0 z-50 grid place-items-center p-4 pointer-events-none">
+          <Dialog.Content
+            className={cn(
+              "pointer-events-auto w-full max-w-md rounded-2xl bg-white shadow-elev border border-border p-6 focus:outline-none",
+              "data-[state=open]:animate-in data-[state=closed]:animate-out",
+              "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+              "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+              "duration-200"
             )}
-            <div className="flex-1 min-w-0">
-              <Dialog.Title className="text-base font-bold">{title}</Dialog.Title>
-              {description && (
-                <Dialog.Description className="text-sm text-muted-foreground mt-1 leading-relaxed">
-                  {description}
-                </Dialog.Description>
+          >
+            <div className="flex items-start gap-3 mb-4">
+              {destructive && (
+                <div className="size-10 rounded-xl bg-danger/10 text-danger grid place-items-center shrink-0">
+                  <AlertTriangle className="size-5" />
+                </div>
               )}
+              <div className="flex-1 min-w-0">
+                <Dialog.Title className="text-base font-bold">{title}</Dialog.Title>
+                {description && (
+                  <Dialog.Description className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                    {description}
+                  </Dialog.Description>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="flex justify-end gap-2 mt-6">
-            <Dialog.Close asChild>
-              <Button variant="secondary" disabled={busy}>
-                {cancelLabel}
+            <div className="flex justify-end gap-2 mt-6">
+              <Dialog.Close asChild>
+                <Button variant="secondary" disabled={busy}>
+                  {cancelLabel}
+                </Button>
+              </Dialog.Close>
+              <Button
+                variant={destructive ? "destructive" : "default"}
+                disabled={busy}
+                onClick={onConfirm}
+              >
+                {busy && <Loader2 className="size-4 animate-spin" />}
+                {busy ? "Working…" : confirmLabel}
               </Button>
-            </Dialog.Close>
-            <Button
-              variant={destructive ? "destructive" : "default"}
-              disabled={busy}
-              onClick={onConfirm}
-            >
-              {busy && <Loader2 className="size-4 animate-spin" />}
-              {busy ? "Working…" : confirmLabel}
-            </Button>
-          </div>
-        </Dialog.Content>
+            </div>
+          </Dialog.Content>
+        </div>
       </Dialog.Portal>
     </Dialog.Root>
   );

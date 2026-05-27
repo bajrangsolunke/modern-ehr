@@ -7,7 +7,7 @@ import { PatientsPage, PatientProfilePage } from "@/features/patients";
 import { InsightsPage } from "@/features/analytics";
 import { AppointmentsPage } from "@/features/appointments";
 import { MobilePage } from "@/features/mobile";
-import { UsersPage } from "@/features/users";
+import { UsersPage, UserDetailPage } from "@/features/users";
 import { useAuthStore } from "@/stores/auth-store";
 import { ROUTES } from "@/config/constants";
 import { currentUser as mockUser } from "@/mocks";
@@ -36,6 +36,7 @@ export function AppRouter() {
           <Route path={ROUTES.docs} element={<Placeholder title="Docs" />} />
           <Route element={<AdminRoute />}>
             <Route path={ROUTES.users} element={<UsersPage />} />
+            <Route path="/users/:userId" element={<UserDetailPage />} />
           </Route>
           {/* Legacy /team redirects to /users for bookmarked links. */}
           <Route path="/team" element={<Navigate to={ROUTES.users} replace />} />

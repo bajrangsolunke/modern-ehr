@@ -1,12 +1,17 @@
+from datetime import datetime, timezone
 from math import ceil
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentUser, DbSession, require_roles
 from app.core.security import hash_password
+from app.models.appointment import Appointment, AppointmentStatus
+from app.models.patient import Patient
 from app.models.user import User, UserRole
+from app.schemas.appointment import AppointmentOut
 from app.schemas.common import Page
 from app.schemas.user import UserCreate, UserOut, UserUpdate
 from app.services.audit_service import AuditService
@@ -174,6 +179,82 @@ async def update_user(
         payload=audit_payload,
     )
     return UserOut.model_validate(user)
+
+
+class UserStats(BaseModel):
+    """Summary metrics for the user detail page."""
+
+    patient_count: int
+    upcoming_appointments: int
+    completed_appointments: int
+
+
+@router.get(
+    "/{user_id}/stats",
+    response_model=UserStats,
+    dependencies=[admin_only],
+)
+async def user_stats(
+    user_id: UUID,
+    db: DbSession,
+    current: CurrentUser,  # noqa: ARG001
+) -> UserStats:
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    patient_count = (
+        await db.execute(
+            select(func.count(Patient.id)).where(Patient.assigned_physician_id == user_id)
+        )
+    ).scalar_one()
+
+    now = datetime.now(timezone.utc)
+    upcoming = (
+        await db.execute(
+            select(func.count(Appointment.id)).where(
+                Appointment.physician_id == user_id,
+                Appointment.starts_at >= now,
+                Appointment.status != AppointmentStatus.cancelled,
+            )
+        )
+    ).scalar_one()
+    completed = (
+        await db.execute(
+            select(func.count(Appointment.id)).where(
+                Appointment.physician_id == user_id,
+                Appointment.status == AppointmentStatus.completed,
+            )
+        )
+    ).scalar_one()
+
+    return UserStats(
+        patient_count=patient_count,
+        upcoming_appointments=upcoming,
+        completed_appointments=completed,
+    )
+
+
+@router.get(
+    "/{user_id}/appointments",
+    response_model=list[AppointmentOut],
+    dependencies=[admin_only],
+)
+async def user_appointments(
+    user_id: UUID,
+    db: DbSession,
+    current: CurrentUser,  # noqa: ARG001
+    limit: int = Query(20, ge=1, le=100),
+) -> list[AppointmentOut]:
+    items = (
+        await db.execute(
+            select(Appointment)
+            .where(Appointment.physician_id == user_id)
+            .order_by(Appointment.starts_at.desc())
+            .limit(limit)
+        )
+    ).scalars().all()
+    return [AppointmentOut.model_validate(a) for a in items]
 
 
 @router.delete(

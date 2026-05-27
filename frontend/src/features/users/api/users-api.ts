@@ -93,6 +93,38 @@ function stripUndefined<T extends object>(obj: T): Partial<T> {
   return out as Partial<T>;
 }
 
+export interface UserStats {
+  patientCount: number;
+  upcomingAppointments: number;
+  completedAppointments: number;
+}
+
+interface BackendUserStats {
+  patient_count: number;
+  upcoming_appointments: number;
+  completed_appointments: number;
+}
+
+export interface UserAppointment {
+  id: string;
+  patientId: string;
+  type: string;
+  status: string;
+  startsAt: string;
+  durationMinutes: number;
+  room: string | null;
+}
+
+interface BackendAppointment {
+  id: string;
+  patient_id: string;
+  type: string;
+  status: string;
+  starts_at: string;
+  duration_minutes: number;
+  room?: string | null;
+}
+
 export const usersApi = {
   list: async (filters: UserFilters): Promise<UserPage> => {
     const data = await api.get<BackendUserPage>("/users", {
@@ -129,4 +161,28 @@ export const usersApi = {
   },
 
   deactivate: (id: string): Promise<void> => api.delete(`/users/${id}`),
+
+  stats: async (id: string): Promise<UserStats> => {
+    const dto = await api.get<BackendUserStats>(`/users/${id}/stats`);
+    return {
+      patientCount: dto.patient_count,
+      upcomingAppointments: dto.upcoming_appointments,
+      completedAppointments: dto.completed_appointments,
+    };
+  },
+
+  appointments: async (id: string, limit = 20): Promise<UserAppointment[]> => {
+    const data = await api.get<BackendAppointment[]>(`/users/${id}/appointments`, {
+      searchParams: { limit },
+    });
+    return data.map((a) => ({
+      id: a.id,
+      patientId: a.patient_id,
+      type: a.type,
+      status: a.status,
+      startsAt: a.starts_at,
+      durationMinutes: a.duration_minutes,
+      room: a.room ?? null,
+    }));
+  },
 };

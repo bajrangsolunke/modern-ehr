@@ -10,12 +10,15 @@
  * US-5 (route gating) is handled in app/router.tsx via <AdminRoute />.
  */
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
   ChevronsUpDown,
+  LayoutGrid,
   Pencil,
   Plus,
+  Rows3,
   Search,
   ShieldOff,
   UserCheck,
@@ -31,6 +34,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { UserAvatar } from "@/components/ui/avatar";
 import { UserDrawer } from "@/features/users/components/UserDrawer";
+import { UserCardGrid } from "@/features/users/components/UserCardGrid";
 import {
   useDeactivateUser,
   useReactivateUser,
@@ -56,8 +60,11 @@ const roleVariant: Record<Role, "info" | "neutral" | "danger"> = {
   admin: "danger",
 };
 
+type ViewMode = "table" | "cards";
+
 export function UsersPage() {
   const [filters, setFilters] = useState<UserFilters>({ page: 1, page_size: 20 });
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<AppUser | null>(null);
   const [pendingDeactivate, setPendingDeactivate] = useState<AppUser | null>(null);
@@ -77,6 +84,8 @@ export function UsersPage() {
 
   const setFilter = (patch: Partial<UserFilters>) =>
     setFilters((prev) => ({ ...prev, ...patch, page: 1 }));
+  const setPage = (p: number) =>
+    setFilters((prev) => ({ ...prev, page: p }));
 
   const counts = useMemo(() => {
     const items = data?.items ?? [];
@@ -101,6 +110,34 @@ export function UsersPage() {
               value={filters.q ?? ""}
               onChange={(e) => setFilter({ q: e.target.value || undefined })}
             />
+            <div className="bg-[#F1F4F9] rounded-full p-1 flex items-center gap-1">
+              <button
+                onClick={() => setViewMode("table")}
+                className={cn(
+                  "size-8 grid place-items-center rounded-full transition",
+                  viewMode === "table"
+                    ? "bg-primary-gradient text-white shadow-glow"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                aria-label="Table view"
+                aria-pressed={viewMode === "table"}
+              >
+                <Rows3 className="size-3.5" />
+              </button>
+              <button
+                onClick={() => setViewMode("cards")}
+                className={cn(
+                  "size-8 grid place-items-center rounded-full transition",
+                  viewMode === "cards"
+                    ? "bg-primary-gradient text-white shadow-glow"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                aria-label="Card view"
+                aria-pressed={viewMode === "cards"}
+              >
+                <LayoutGrid className="size-3.5" />
+              </button>
+            </div>
             <Button className="h-10" onClick={openCreate}>
               <Plus className="size-4" /> New user
             </Button>
@@ -180,144 +217,159 @@ export function UsersPage() {
 
       {!isLoading && !isError && data && (
         <>
-          <Card className="overflow-hidden p-3 sm:p-4">
-            <div className="overflow-x-auto">
-              <table
-                className="w-full text-sm border-separate"
-                style={{ borderSpacing: "0 6px" }}
-              >
-                <thead>
-                  <tr className="text-xs text-muted-foreground text-left">
-                    <Th first>Name</Th>
-                    <Th>Email</Th>
-                    <Th>Role</Th>
-                    <Th>Specialty</Th>
-                    <Th>Status</Th>
-                    <Th>Created</Th>
-                    <th
-                      className="font-medium px-4 py-2 text-right last:rounded-r-full"
-                      style={{ background: HEADER_BG, boxShadow: HEADER_SHADOW }}
-                    >
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.items.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={7}
-                        className="px-4 py-10 text-center text-muted-foreground rounded-2xl"
-                        style={{ background: ROW_BG }}
+          {viewMode === "table" ? (
+            <Card className="overflow-hidden p-3 sm:p-4">
+              <div className="overflow-x-auto">
+                <table
+                  className="w-full text-sm border-separate"
+                  style={{ borderSpacing: "0 6px" }}
+                >
+                  <thead>
+                    <tr className="text-xs text-muted-foreground text-left">
+                      <Th first>Name</Th>
+                      <Th>Email</Th>
+                      <Th>Role</Th>
+                      <Th>Specialty</Th>
+                      <Th>Status</Th>
+                      <Th>Created</Th>
+                      <th
+                        className="font-medium px-4 py-2 text-right last:rounded-r-full"
+                        style={{ background: HEADER_BG, boxShadow: HEADER_SHADOW }}
                       >
-                        No users match these filters.
-                      </td>
+                        Actions
+                      </th>
                     </tr>
-                  )}
-                  {data.items.map((u) => (
-                    <tr
-                      key={u.id}
-                      className={cn(
-                        "hover:[&_td]:bg-[#EEF2F8] transition group",
-                        !u.isActive && "opacity-60"
-                      )}
-                    >
-                      <td
-                        className="px-4 py-2 first:rounded-l-full"
-                        style={{ background: ROW_BG }}
-                      >
-                        <div className="flex items-center gap-2">
-                          <UserAvatar
-                            name={u.fullName}
-                            src={u.avatarUrl ?? undefined}
-                            size="sm"
-                          />
-                          <span className="font-semibold">{u.fullName}</span>
-                        </div>
-                      </td>
-                      <td
-                        className="px-4 py-2 text-foreground/80"
-                        style={{ background: ROW_BG }}
-                      >
-                        {u.email}
-                      </td>
-                      <td className="px-4 py-2" style={{ background: ROW_BG }}>
-                        <Badge variant={roleVariant[u.role]} size="sm">
-                          {roleLabel[u.role]}
-                        </Badge>
-                      </td>
-                      <td
-                        className="px-4 py-2 text-foreground/80"
-                        style={{ background: ROW_BG }}
-                      >
-                        {u.specialty || "—"}
-                      </td>
-                      <td className="px-4 py-2" style={{ background: ROW_BG }}>
-                        {u.isActive ? (
-                          <Badge variant="success" dot size="sm">
-                            Active
-                          </Badge>
-                        ) : (
-                          <Badge variant="neutral" dot size="sm">
-                            Deactivated
-                          </Badge>
+                  </thead>
+                  <tbody>
+                    {data.items.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={7}
+                          className="px-4 py-10 text-center text-muted-foreground rounded-2xl"
+                          style={{ background: ROW_BG }}
+                        >
+                          No users match these filters.
+                        </td>
+                      </tr>
+                    )}
+                    {data.items.map((u) => (
+                      <tr
+                        key={u.id}
+                        className={cn(
+                          "hover:[&_td]:bg-[#EEF2F8] transition group",
+                          !u.isActive && "opacity-60"
                         )}
-                      </td>
-                      <td
-                        className="px-4 py-2 text-foreground/80"
-                        style={{ background: ROW_BG }}
                       >
-                        {formatDate(u.createdAt)}
-                      </td>
-                      <td
-                        className="px-4 py-2 last:rounded-r-full"
-                        style={{ background: ROW_BG }}
-                      >
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7 rounded-full bg-white hover:bg-white/80 text-foreground/70"
-                            aria-label="Edit user"
-                            onClick={() => openEdit(u)}
-                          >
-                            <Pencil className="size-3" />
-                          </Button>
+                        <td
+                          className="px-4 py-2 first:rounded-l-full"
+                          style={{ background: ROW_BG }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <UserAvatar
+                              name={u.fullName}
+                              src={u.avatarUrl ?? undefined}
+                              size="sm"
+                            />
+                            <Link
+                              to={`/users/${u.id}`}
+                              className="font-semibold hover:text-primary transition"
+                            >
+                              {u.fullName}
+                            </Link>
+                          </div>
+                        </td>
+                        <td
+                          className="px-4 py-2 text-foreground/80"
+                          style={{ background: ROW_BG }}
+                        >
+                          {u.email}
+                        </td>
+                        <td className="px-4 py-2" style={{ background: ROW_BG }}>
+                          <Badge variant={roleVariant[u.role]} size="sm">
+                            {roleLabel[u.role]}
+                          </Badge>
+                        </td>
+                        <td
+                          className="px-4 py-2 text-foreground/80"
+                          style={{ background: ROW_BG }}
+                        >
+                          {u.specialty || "—"}
+                        </td>
+                        <td className="px-4 py-2" style={{ background: ROW_BG }}>
                           {u.isActive ? (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="size-7 rounded-full bg-white hover:bg-rose-50 text-danger"
-                              aria-label="Deactivate user"
-                              onClick={() => setPendingDeactivate(u)}
-                            >
-                              <ShieldOff className="size-3" />
-                            </Button>
+                            <Badge variant="success" dot size="sm">
+                              Active
+                            </Badge>
                           ) : (
+                            <Badge variant="neutral" dot size="sm">
+                              Deactivated
+                            </Badge>
+                          )}
+                        </td>
+                        <td
+                          className="px-4 py-2 text-foreground/80"
+                          style={{ background: ROW_BG }}
+                        >
+                          {formatDate(u.createdAt)}
+                        </td>
+                        <td
+                          className="px-4 py-2 last:rounded-r-full"
+                          style={{ background: ROW_BG }}
+                        >
+                          <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="size-7 rounded-full bg-white hover:bg-emerald-50 text-success"
-                              aria-label="Reactivate user"
-                              onClick={() => reactivate.mutate(u.id)}
+                              className="size-7 rounded-full bg-white hover:bg-white/80 text-foreground/70"
+                              aria-label="Edit user"
+                              onClick={() => openEdit(u)}
                             >
-                              <UserCheck className="size-3" />
+                              <Pencil className="size-3" />
                             </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+                            {u.isActive ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-7 rounded-full bg-white hover:bg-rose-50 text-danger"
+                                aria-label="Deactivate user"
+                                onClick={() => setPendingDeactivate(u)}
+                              >
+                                <ShieldOff className="size-3" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-7 rounded-full bg-white hover:bg-emerald-50 text-success"
+                                aria-label="Reactivate user"
+                                onClick={() => reactivate.mutate(u.id)}
+                              >
+                                <UserCheck className="size-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ) : (
+            <UserCardGrid
+              data={data.items}
+              onEdit={openEdit}
+              onDeactivate={(u) => setPendingDeactivate(u)}
+              onReactivate={(u) => reactivate.mutate(u.id)}
+            />
+          )}
 
           <Pagination
             page={data.page}
             pages={data.pages}
             total={data.total}
-            onChange={(p) => setFilters((prev) => ({ ...prev, page: p }))}
+            shown={data.items.length}
+            onChange={setPage}
           />
         </>
       )}
@@ -476,45 +528,42 @@ function Pagination({
   page,
   pages,
   total,
+  shown,
   onChange,
 }: {
   page: number;
   pages: number;
   total: number;
+  shown: number;
   onChange: (p: number) => void;
 }) {
-  if (pages <= 1) {
-    return (
-      <div className="mt-4 text-xs text-muted-foreground text-right">
-        Showing {total} {total === 1 ? "user" : "users"}.
-      </div>
-    );
-  }
   return (
-    <div className="mt-4 flex items-center justify-between text-sm">
-      <span className="text-xs text-muted-foreground">
-        Page {page} of {pages} · {total} users
+    <div className="mt-6 flex items-center justify-between text-sm text-muted-foreground">
+      <span>
+        Showing {shown} of {total}
       </span>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
         <Button
           variant="secondary"
           size="icon"
           className="size-9 rounded-full"
+          onClick={() => onChange(Math.max(1, page - 1))}
           disabled={page <= 1}
-          onClick={() => onChange(page - 1)}
           aria-label="Previous page"
         >
-          <ChevronLeft className="size-4" />
+          <ChevronLeft className="size-3.5" />
         </Button>
+        <span className="px-3 py-1 rounded-full bg-white border border-border text-xs">
+          Page <strong className="text-foreground">{page}</strong> of {Math.max(1, pages)}
+        </span>
         <Button
-          variant="secondary"
           size="icon"
           className="size-9 rounded-full"
+          onClick={() => onChange(Math.min(pages, page + 1))}
           disabled={page >= pages}
-          onClick={() => onChange(page + 1)}
           aria-label="Next page"
         >
-          <ChevronRight className="size-4" />
+          <ChevronRight className="size-3.5" />
         </Button>
       </div>
     </div>
