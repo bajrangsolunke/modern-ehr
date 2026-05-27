@@ -49,17 +49,40 @@ export interface Alert {
   patientId?: string;
 }
 
+export type AppointmentType =
+  | "consultation"
+  | "surgery"
+  | "diagnosis"
+  | "biopsy"
+  | "follow-up";
+
+export type AppointmentStatus =
+  | "scheduled"
+  | "confirmed"
+  | "pending"
+  | "completed"
+  | "cancelled"
+  | "no-show";
+
 export interface Appointment {
   id: string;
-  patientName: string;
   patientId: string;
-  type: "consultation" | "surgery" | "diagnosis" | "biopsy" | "follow-up";
-  status: "confirmed" | "pending" | "cancelled" | "completed";
+  patientName: string;
+  patientMrn?: string;
+  patientAvatarUrl?: string;
+  physicianId?: string;
+  physician: string;
+  type: AppointmentType;
+  status: AppointmentStatus;
+  /** ISO timestamp of the slot start. */
+  startsAt: string;
+  /** Local date "Apr 03" — derived from startsAt for legacy callers. */
   date: string;
+  /** Local time "9:30 AM" — derived. */
   time: string;
   duration: number;
-  physician: string;
   room?: string;
+  reason?: string;
 }
 
 export interface VitalSign {

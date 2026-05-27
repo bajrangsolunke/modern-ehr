@@ -104,7 +104,11 @@ export function UpcomingAppointments() {
                       style={{ background: ROW_BG }}
                     >
                       <div className="flex items-center gap-2.5">
-                        <UserAvatar name={a.patientName} size="sm" />
+                        <UserAvatar
+                          name={a.patientName}
+                          src={a.patientAvatarUrl}
+                          size="sm"
+                        />
                         <span className="font-semibold text-[14px]">
                           {a.patientName}
                         </span>

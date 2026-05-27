@@ -10,7 +10,7 @@ export const appointments: Appointment[] = [
     date: "Mar 22",
     time: "10:00 AM",
     duration: 30,
-    physician: "Dr. Robert Fox",
+    physician: "Dr. Robert Fox", startsAt: new Date().toISOString(),
   },
   {
     id: "ap-2",
@@ -21,7 +21,7 @@ export const appointments: Appointment[] = [
     date: "Mar 22",
     time: "11:00 AM",
     duration: 45,
-    physician: "Dr. Robert Fox",
+    physician: "Dr. Robert Fox", startsAt: new Date().toISOString(),
   },
   {
     id: "ap-3",
@@ -32,7 +32,7 @@ export const appointments: Appointment[] = [
     date: "Mar 22",
     time: "12:30 PM",
     duration: 120,
-    physician: "Dr. Robert Fox",
+    physician: "Dr. Robert Fox", startsAt: new Date().toISOString(),
     room: "OR-04",
   },
   {
@@ -44,7 +44,7 @@ export const appointments: Appointment[] = [
     date: "Mar 22",
     time: "3:00 PM",
     duration: 30,
-    physician: "Dr. Robert Fox",
+    physician: "Dr. Robert Fox", startsAt: new Date().toISOString(),
   },
   {
     id: "ap-5",
@@ -55,7 +55,7 @@ export const appointments: Appointment[] = [
     date: "Mar 22",
     time: "3:40 PM",
     duration: 60,
-    physician: "Dr. Robert Fox",
+    physician: "Dr. Robert Fox", startsAt: new Date().toISOString(),
   },
 ];
 
