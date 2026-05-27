@@ -22,13 +22,10 @@ import {
   useMarkConversationRead,
   useSendMessage,
 } from "./hooks/use-messages";
-import { useMessagesSocket } from "./hooks/use-messages-socket";
 import type { Audience, ConditionTag } from "./types";
 import { cn } from "@/lib/utils";
 
 export function MessagesPage() {
-  useMessagesSocket();
-
   const [audience, setAudience] = useState<Audience>("patient");
   const [query, setQuery] = useState("");
   const [condition, setCondition] = useState<ConditionTag | null>(null);

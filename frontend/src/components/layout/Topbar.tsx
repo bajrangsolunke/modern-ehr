@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLogout } from "@/features/auth/hooks/use-logout";
 import { DemoBadge } from "@/features/auth/components/DemoBadge";
+import { useUnreadCount } from "@/features/messages/hooks/use-unread-count";
+import { useMessagesSocket } from "@/features/messages/hooks/use-messages-socket";
 import { currentUser as mockUser } from "@/mocks";
 import { cn } from "@/lib/utils";
 
@@ -15,12 +17,14 @@ interface NavItem {
   label: string;
   /** When set, the item only renders for users whose role is in the list. */
   roles?: ("provider" | "staff" | "admin")[];
+  /** Hook returning a count to render as a badge next to the label. */
+  useBadge?: () => number;
 }
 
 const navItems: NavItem[] = [
   { to: "/", label: "Dashboard" },
   { to: "/patients", label: "Patients" },
-  { to: "/messages", label: "Communication" },
+  { to: "/messages", label: "Communication", useBadge: useUnreadCount },
   { to: "/appointments", label: "Appointments" },
   { to: "/docs", label: "Docs" },
   { to: "/reports", label: "Reports" },
@@ -32,6 +36,9 @@ export function Topbar() {
   const user = useAuthStore((s) => s.user) ?? mockUser;
   const logout = useLogout();
   const navigate = useNavigate();
+  // App-wide subscription — keeps the unread badge live even while the
+  // user isn't on the Messages page.
+  useMessagesSocket();
   const visibleNav = navItems.filter(
     (item) => !item.roles || item.roles.includes(user.role)
   );
@@ -55,21 +62,7 @@ export function Topbar() {
 
         <nav className="hidden lg:flex items-center gap-1 mx-auto bg-[#F1F4F9] rounded-full p-1">
           {visibleNav.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              className={({ isActive }) =>
-                cn(
-                  "px-4 xl:px-5 py-2 rounded-full text-[14px] font-medium transition-all",
-                  isActive
-                    ? "bg-slate-900 text-white shadow-soft"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
-                )
-              }
-            >
-              {item.label}
-            </NavLink>
+            <NavItemLink key={item.to} item={item} />
           ))}
         </nav>
 
@@ -166,5 +159,31 @@ export function Topbar() {
         </div>
       </div>
     </header>
+  );
+}
+
+function NavItemLink({ item }: { item: NavItem }) {
+  // Hooks must be called unconditionally; default to a no-op badge.
+  const badge = (item.useBadge ?? (() => 0))();
+  return (
+    <NavLink
+      to={item.to}
+      end={item.to === "/"}
+      className={({ isActive }) =>
+        cn(
+          "px-4 xl:px-5 py-2 rounded-full text-[14px] font-medium transition-all inline-flex items-center gap-2",
+          isActive
+            ? "bg-slate-900 text-white shadow-soft"
+            : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+        )
+      }
+    >
+      {item.label}
+      {badge > 0 && (
+        <span className="inline-grid place-items-center min-w-5 h-5 px-1.5 rounded-full bg-danger text-white text-[10px] font-bold tabular-nums">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
+    </NavLink>
   );
 }
