@@ -5,12 +5,15 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  Briefcase,
   LayoutGrid,
   Pencil,
   Plus,
   Rows3,
   Search,
+  Shield,
   ShieldOff,
+  Stethoscope,
   UserCheck,
   Users,
 } from "lucide-react";
@@ -106,16 +109,31 @@ export function UsersPage() {
         }
       />
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:gap-4 mb-4">
-        <SummaryTile label="Total users" value={counts.total} icon={<Users />} />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 lg:gap-3 mb-3">
+        <SummaryTile
+          label="Total users"
+          value={counts.total}
+          icon={<Users />}
+          tone="primary"
+        />
         <SummaryTile
           label="Admins"
           value={counts.admins}
-          icon={<UserCheck />}
+          icon={<Shield />}
           tone="danger"
         />
-        <SummaryTile label="Providers" value={counts.providers} tone="info" />
-        <SummaryTile label="Staff" value={counts.staff} tone="neutral" />
+        <SummaryTile
+          label="Providers"
+          value={counts.providers}
+          icon={<Stethoscope />}
+          tone="info"
+        />
+        <SummaryTile
+          label="Staff"
+          value={counts.staff}
+          icon={<Briefcase />}
+          tone="neutral"
+        />
       </div>
 
       <FilterBar filters={filters} setFilter={setFilter} />

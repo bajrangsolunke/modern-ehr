@@ -5,16 +5,20 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  CalendarCheck2,
   CalendarDays,
   CalendarPlus,
+  CalendarX,
   Check,
   CheckCheck,
+  Clock,
   Filter,
   List,
   MoreVertical,
   Pencil,
   Search,
   Trash2,
+  UserX,
   X,
   XCircle,
 } from "lucide-react";
@@ -31,6 +35,7 @@ import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { UserAvatar } from "@/components/ui/avatar";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { SortableTh, TABLE_ROW_BG } from "@/components/ui/sortable-th";
+import { SummaryTile } from "@/components/ui/summary-tile";
 import { AppointmentModal } from "@/features/appointments/components/AppointmentModal";
 import { AppointmentDetailsModal } from "@/features/appointments/components/AppointmentDetailsModal";
 import {
@@ -180,16 +185,28 @@ export function AppointmentsPage() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-3 mb-3">
-        <CompactStat label="Today" value={stats?.today ?? "—"} tone="primary" />
-        <CompactStat label="This week" value={stats?.thisWeek ?? "—"} tone="info" />
-        <CompactStat
+        <SummaryTile
+          label="Today"
+          value={stats?.today ?? "—"}
+          icon={<Clock />}
+          tone="primary"
+        />
+        <SummaryTile
+          label="This week"
+          value={stats?.thisWeek ?? "—"}
+          icon={<CalendarCheck2 />}
+          tone="info"
+        />
+        <SummaryTile
           label="Cancelled · 7d"
           value={stats?.cancellationsThisWeek ?? "—"}
+          icon={<CalendarX />}
           tone="warning"
         />
-        <CompactStat
+        <SummaryTile
           label="No-shows · 7d"
           value={stats?.noShowsThisWeek ?? "—"}
+          icon={<UserX />}
           tone="muted"
         />
       </div>
@@ -505,35 +522,6 @@ function FilterGroup({
       </div>
       <div className="flex flex-wrap gap-1.5">{children}</div>
     </div>
-  );
-}
-
-function CompactStat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: React.ReactNode;
-  tone: "primary" | "info" | "warning" | "muted";
-}) {
-  const toneClass = {
-    primary: "text-primary",
-    info: "text-info",
-    warning: "text-warning",
-    muted: "text-muted-foreground",
-  }[tone];
-  return (
-    <Card>
-      <CardContent className="px-3 py-2.5 flex items-center justify-between gap-2">
-        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-          {label}
-        </span>
-        <span className={cn("text-xl font-bold tabular-nums", toneClass)}>
-          {value}
-        </span>
-      </CardContent>
-    </Card>
   );
 }
 
