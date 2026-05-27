@@ -242,7 +242,7 @@ class MessagesService:
     async def mark_read(
         self, conversation_id: UUID, *, viewer_id: UUID, ts: datetime | None = None
     ) -> None:
-        await self.get_conversation(conversation_id, viewer_id=viewer_id)
+        conv = await self.get_conversation(conversation_id, viewer_id=viewer_id)
         row = (
             await self.db.execute(
                 select(ConversationParticipant).where(
@@ -263,6 +263,17 @@ class MessagesService:
         else:
             row.last_read_at = when
         await self.db.flush()
+
+        # Tell everyone in the thread so their outgoing bubbles can
+        # flip to "read".
+        payload = {
+            "type": "conversation.read",
+            "conversation_id": str(conversation_id),
+            "user_id": str(viewer_id),
+            "last_read_at": when.isoformat(),
+        }
+        for user_id in await self._subscriber_ids(conv):
+            await ws_manager.send_to_user(str(user_id), payload)
 
     # ------------------------------------------------------------ broadcast
 
@@ -316,13 +327,15 @@ class MessagesService:
                     condition_tag=patient.condition_tag,
                 )
 
-        # Project participants → users.
+        # Project participants → users, with each participant's
+        # last_read_at attached so the FE can compute read receipts.
         participants_out: list[ParticipantOut] = []
         if conv.participants:
             user_ids = [p.user_id for p in conv.participants]
             users = (
                 await self.db.execute(select(User).where(User.id.in_(user_ids)))
             ).scalars().all()
+            read_by_user = {p.user_id: p.last_read_at for p in conv.participants}
             participants_out = [
                 ParticipantOut(
                     id=u.id,
@@ -331,6 +344,7 @@ class MessagesService:
                     role=str(u.role.value) if u.role else None,
                     specialty=u.specialty,
                     avatar_url=u.avatar_url,
+                    last_read_at=read_by_user.get(u.id),
                 )
                 for u in users
             ]

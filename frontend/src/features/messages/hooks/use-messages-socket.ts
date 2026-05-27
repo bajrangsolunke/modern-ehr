@@ -48,7 +48,10 @@ export function useMessagesSocket() {
       ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data) as WsEnvelope;
-          if (payload.type === "message.created") {
+          if (
+            payload.type === "message.created" ||
+            payload.type === "conversation.read"
+          ) {
             qc.invalidateQueries({ queryKey: messagesQueryKey });
             if (payload.conversation_id) {
               qc.invalidateQueries({

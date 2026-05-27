@@ -11,6 +11,7 @@ interface BackendParticipantDto {
   role: string | null;
   specialty: string | null;
   avatar_url: string | null;
+  last_read_at: string | null;
 }
 
 interface BackendPatientSummaryDto {
@@ -62,6 +63,7 @@ function mapParticipant(dto: BackendParticipantDto): Participant {
     email: dto.email ?? undefined,
     role: (dto.role as Participant["role"]) ?? undefined,
     specialty: dto.specialty ?? undefined,
+    lastReadAt: dto.last_read_at ?? undefined,
   };
 }
 
@@ -125,6 +127,9 @@ export interface ConversationFilters {
 export interface ConversationDetail {
   conversation: Conversation;
   messages: Message[];
+  /** All staff participants in the thread — used to compute read
+   *  receipts on outgoing bubbles. Empty for patient threads. */
+  participants: Participant[];
 }
 
 export const messagesApi = {
@@ -147,6 +152,7 @@ export const messagesApi = {
     return {
       conversation: mapConversation(data),
       messages: data.messages.map(mapMessage),
+      participants: data.participants.map(mapParticipant),
     };
   },
 
@@ -180,6 +186,7 @@ export const messagesApi = {
     return {
       conversation: mapConversation(data),
       messages: data.messages.map(mapMessage),
+      participants: data.participants.map(mapParticipant),
     };
   },
 
@@ -199,6 +206,7 @@ export const messagesApi = {
     return {
       conversation: mapConversation(data),
       messages: data.messages.map(mapMessage),
+      participants: data.participants.map(mapParticipant),
     };
   },
 

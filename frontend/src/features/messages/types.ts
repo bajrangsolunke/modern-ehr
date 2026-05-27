@@ -31,6 +31,9 @@ export interface Participant {
   specialty?: string;
   /** First match wins for filter chips. */
   conditionTag?: ConditionTag;
+  /** When this participant last read the thread (ISO). Drives read
+   *  receipts on the other side's outgoing bubbles. */
+  lastReadAt?: string;
 }
 
 export interface Message {

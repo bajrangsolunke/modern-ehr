@@ -1,5 +1,10 @@
 import { useEffect, useRef } from "react";
-import { AlertCircle, MessageSquarePlus } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  CheckCheck,
+  MessageSquarePlus,
+} from "lucide-react";
 import { UserAvatar } from "@/components/ui/avatar";
 import type { Message, Participant } from "../types";
 import { cn, formatTime } from "@/lib/utils";
@@ -9,6 +14,10 @@ interface Props {
   participant: Participant;
   /** True when the user hasn't sent the first message yet (draft chat). */
   isDraft?: boolean;
+  /** Highest last_read_at across other staff participants — outgoing
+   *  bubbles sent at/before this timestamp show as read. Null for
+   *  patient threads or unread threads. */
+  readWatermark?: string | null;
 }
 
 interface RenderedItem {
@@ -69,7 +78,12 @@ function decorate(messages: Message[]): RenderedItem[] {
   return items;
 }
 
-export function MessageThread({ messages, participant, isDraft = false }: Props) {
+export function MessageThread({
+  messages,
+  participant,
+  isDraft = false,
+  readWatermark = null,
+}: Props) {
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -93,6 +107,11 @@ export function MessageThread({ messages, participant, isDraft = false }: Props)
               participant={participant}
               groupStart={item.groupStart!}
               groupEnd={item.groupEnd!}
+              read={
+                item.message!.direction === "outgoing" &&
+                readWatermark !== null &&
+                item.message!.sentAt <= readWatermark
+              }
             />
           )
         )
@@ -109,11 +128,13 @@ function Bubble({
   participant,
   groupStart,
   groupEnd,
+  read,
 }: {
   message: Message;
   participant: Participant;
   groupStart: boolean;
   groupEnd: boolean;
+  read: boolean;
 }) {
   const outgoing = message.direction === "outgoing";
 
@@ -172,11 +193,23 @@ function Bubble({
         {groupEnd && (
           <div
             className={cn(
-              "mt-1 px-1 text-[10px] text-muted-foreground tabular-nums",
-              outgoing ? "text-right" : "text-left"
+              "mt-1 px-1 text-[10px] text-muted-foreground tabular-nums inline-flex items-center gap-1",
+              outgoing ? "self-end" : "self-start"
             )}
           >
-            {formatTime(message.sentAt)}
+            <span>{formatTime(message.sentAt)}</span>
+            {outgoing &&
+              (read ? (
+                <CheckCheck
+                  className="size-3 text-primary"
+                  aria-label="Read"
+                />
+              ) : (
+                <Check
+                  className="size-3 text-muted-foreground"
+                  aria-label="Sent"
+                />
+              ))}
           </div>
         )}
       </div>

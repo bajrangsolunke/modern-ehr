@@ -20,6 +20,7 @@ class ParticipantOut(BaseModel):
     role: str | None = None
     specialty: str | None = None
     avatar_url: str | None = None
+    last_read_at: datetime | None = None
 
 
 class PatientSummary(BaseModel):

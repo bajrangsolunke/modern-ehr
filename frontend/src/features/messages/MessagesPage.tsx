@@ -208,6 +208,21 @@ export function MessagesPage() {
     ? detail.conversation.participant
     : draftParticipant;
 
+  // Highest last_read_at across other staff participants. Outgoing
+  // bubbles sent at or before this timestamp are "read". Patient
+  // threads have no staff "other side" — read receipts only show for
+  // clinician threads.
+  const readWatermark = useMemo<string | null>(() => {
+    if (!detail || !currentUser) return null;
+    let max: string | null = null;
+    for (const p of detail.participants) {
+      if (p.id === currentUser.id) continue;
+      if (!p.lastReadAt) continue;
+      if (max === null || p.lastReadAt > max) max = p.lastReadAt;
+    }
+    return max;
+  }, [detail, currentUser]);
+
   return (
     <>
       <PageHeader
@@ -258,6 +273,7 @@ export function MessagesPage() {
                   messages={detail?.messages ?? []}
                   participant={activeParticipant}
                   isDraft={!detail}
+                  readWatermark={readWatermark}
                 />
                 <MessageComposer
                   onSend={handleSendActive}
