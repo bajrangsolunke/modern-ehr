@@ -350,7 +350,7 @@ function Toolbar({
         <Input
           placeholder="Search patient name or MRN…"
           icon={<Search className="size-4" />}
-          className="flex-1 min-w-[12rem] h-10"
+          className="w-64 h-10"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
