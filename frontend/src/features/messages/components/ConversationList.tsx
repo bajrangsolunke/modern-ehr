@@ -1,13 +1,31 @@
 import { Search } from "lucide-react";
+import { UserAvatar } from "@/components/ui/avatar";
 import { FilterChip } from "@/components/ui/filter-chip";
-import type { ConditionTag, Conversation } from "../types";
+import type { ConditionTag, Conversation, Participant } from "../types";
 import { conditionLabel, conditionTone } from "../utils";
 import { cn, formatTime } from "@/lib/utils";
 
+/**
+ * A row in the conversation list. Existing conversations carry a real
+ * id + last-message; "draft" rows are users you haven't messaged yet
+ * (only used on the My Users tab — clicking opens an empty thread and
+ * the first send creates the conversation server-side).
+ */
+export type ConversationRow =
+  | {
+      kind: "conversation";
+      conversation: Conversation;
+    }
+  | {
+      kind: "draft";
+      userId: string;
+      participant: Participant;
+    };
+
 interface Props {
-  conversations: Conversation[];
-  activeId: string | null;
-  onSelect: (id: string) => void;
+  rows: ConversationRow[];
+  activeKey: string | null;
+  onSelect: (row: ConversationRow) => void;
   query: string;
   onQueryChange: (q: string) => void;
   showFilters: boolean;
@@ -18,8 +36,8 @@ interface Props {
 const CONDITIONS: ConditionTag[] = ["diabetic", "asthma", "cancer", "bp", "mental"];
 
 export function ConversationList({
-  conversations,
-  activeId,
+  rows,
+  activeKey,
   onSelect,
   query,
   onQueryChange,
@@ -58,57 +76,94 @@ export function ConversationList({
       )}
 
       <ul className="flex flex-col gap-2 overflow-y-auto pr-1 min-h-0">
-        {conversations.length === 0 && (
+        {rows.length === 0 && (
           <li className="rounded-2xl border border-dashed border-border bg-surface-subtle p-6 text-center text-xs text-muted-foreground">
-            No conversations match.
+            No matches.
           </li>
         )}
-        {conversations.map((c) => (
-          <li key={c.id}>
-            <button
-              type="button"
-              onClick={() => onSelect(c.id)}
-              className={cn(
-                "w-full text-left rounded-2xl border bg-white p-3 transition ring-focus",
-                activeId === c.id
-                  ? "border-primary shadow-soft"
-                  : "border-border hover:border-foreground/20"
-              )}
-            >
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-sm font-semibold truncate">
-                    {c.participant.name}
-                  </span>
-                  {c.participant.conditionTag && (
-                    <span
-                      className={cn(
-                        "shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                        conditionTone(c.participant.conditionTag)
-                      )}
-                    >
-                      {conditionLabel(c.participant.conditionTag)}
-                    </span>
-                  )}
-                </div>
-                {c.unread > 0 && (
-                  <span className="shrink-0 inline-grid place-items-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
-                    {c.unread}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground line-clamp-1 mb-1.5">
-                {c.lastMessage}
-              </p>
-              <p className="text-[11px] text-muted-foreground tabular-nums">
-                {formatLastTime(c.lastMessageAt)}
-              </p>
-            </button>
-          </li>
+        {rows.map((row) => (
+          <ConversationRowItem
+            key={rowKey(row)}
+            row={row}
+            active={rowKey(row) === activeKey}
+            onSelect={onSelect}
+          />
         ))}
       </ul>
     </aside>
   );
+}
+
+function ConversationRowItem({
+  row,
+  active,
+  onSelect,
+}: {
+  row: ConversationRow;
+  active: boolean;
+  onSelect: (row: ConversationRow) => void;
+}) {
+  const participant =
+    row.kind === "conversation" ? row.conversation.participant : row.participant;
+  const conv = row.kind === "conversation" ? row.conversation : null;
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onSelect(row)}
+        className={cn(
+          "w-full text-left rounded-2xl border bg-white p-3 transition ring-focus",
+          active
+            ? "border-primary shadow-soft"
+            : "border-border hover:border-foreground/20"
+        )}
+      >
+        <div className="flex items-start gap-2.5">
+          <UserAvatar name={participant.name} size="md" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2 mb-0.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-sm font-semibold truncate">
+                  {participant.name}
+                </span>
+                {participant.conditionTag && (
+                  <span
+                    className={cn(
+                      "shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                      conditionTone(participant.conditionTag)
+                    )}
+                  >
+                    {conditionLabel(participant.conditionTag)}
+                  </span>
+                )}
+              </div>
+              {conv && conv.unread > 0 && (
+                <span className="shrink-0 inline-grid place-items-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+                  {conv.unread}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground line-clamp-1">
+              {conv?.lastMessage ||
+                (participant.specialty ??
+                  participant.role ??
+                  "Start a conversation")}
+            </p>
+            <p className="text-[11px] text-muted-foreground tabular-nums mt-1">
+              {conv ? formatLastTime(conv.lastMessageAt) : participant.email ?? ""}
+            </p>
+          </div>
+        </div>
+      </button>
+    </li>
+  );
+}
+
+export function rowKey(row: ConversationRow): string {
+  return row.kind === "conversation"
+    ? `c:${row.conversation.id}`
+    : `d:${row.userId}`;
 }
 
 function formatLastTime(iso: string): string {

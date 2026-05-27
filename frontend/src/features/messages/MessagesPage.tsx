@@ -5,13 +5,23 @@
  * Wired to the real /messages endpoints + the existing /ws channel.
  * Each server-side write fans out a "message.created" frame on the
  * socket which invalidates the relevant React Query caches.
+ *
+ * The "My Users" tab (audience=clinician) shows every active user —
+ * not just the ones you've already messaged. Clicking a user without
+ * an existing thread opens an empty draft; the first message triggers
+ * createClinicianConversation server-side and switches us to the new
+ * persistent thread.
  */
 import { useEffect, useMemo, useState } from "react";
 import { MessageSquarePlus, Plus } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ConversationList } from "./components/ConversationList";
+import {
+  ConversationList,
+  rowKey,
+  type ConversationRow,
+} from "./components/ConversationList";
 import { ParticipantHeader } from "./components/ParticipantHeader";
 import { MessageThread } from "./components/MessageThread";
 import { MessageComposer } from "./components/MessageComposer";
@@ -21,52 +31,181 @@ import {
   useConversations,
   useMarkConversationRead,
   useSendMessage,
+  useComposeBroadcast,
 } from "./hooks/use-messages";
-import type { Audience, ConditionTag } from "./types";
+import { useUsers } from "@/features/users/hooks/use-users";
+import { useAuthStore } from "@/stores/auth-store";
+import type { Audience, ConditionTag, Participant } from "./types";
 import { cn } from "@/lib/utils";
 
 export function MessagesPage() {
+  const currentUser = useAuthStore((s) => s.user);
+
   const [audience, setAudience] = useState<Audience>("patient");
   const [query, setQuery] = useState("");
   const [condition, setCondition] = useState<ConditionTag | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(
+    null
+  );
+  const [activeDraftUserId, setActiveDraftUserId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
 
   const { data: conversations = [], isLoading } = useConversations({
     audience,
     q: query.trim() ? query.trim() : undefined,
   });
-  const { data: detail } = useConversation(activeId);
+  const { data: detail } = useConversation(activeConversationId);
   const sendMessage = useSendMessage();
+  const compose = useComposeBroadcast();
   const markRead = useMarkConversationRead();
 
-  const filtered = useMemo(() => {
-    if (audience !== "patient" || !condition) return conversations;
-    return conversations.filter(
-      (c) => c.participant.conditionTag === condition
-    );
-  }, [conversations, audience, condition]);
+  // Pull every active staff user — only enabled on the My Users tab.
+  const usersQuery = useUsers(
+    audience === "clinician"
+      ? { page: 1, page_size: 100, is_active: true }
+      : { page: 1, page_size: 1 }
+  );
+  const allUsers = audience === "clinician" ? usersQuery.data?.items ?? [] : [];
 
-  // Auto-select the first conversation when the list loads or the
-  // active one drops out of view (after audience switch).
+  // Build the unified row list.
+  const rows: ConversationRow[] = useMemo(() => {
+    if (audience === "patient") {
+      let visible = conversations;
+      if (condition) {
+        visible = visible.filter((c) => c.participant.conditionTag === condition);
+      }
+      return visible.map((c) => ({ kind: "conversation" as const, conversation: c }));
+    }
+
+    // My Users tab — combine existing conversations + remaining users.
+    const conversationByUserId = new Map<string, ConversationRow>();
+    for (const c of conversations) {
+      const userId = c.participant.id;
+      conversationByUserId.set(userId, {
+        kind: "conversation",
+        conversation: c,
+      });
+    }
+
+    const ordered: ConversationRow[] = [];
+    // Existing conversations first (in their server-sorted order — most
+    // recent at the top), then the remaining users alphabetical.
+    for (const c of conversations) {
+      ordered.push({ kind: "conversation", conversation: c });
+    }
+    const remaining: ConversationRow[] = allUsers
+      .filter(
+        (u) =>
+          u.id !== currentUser?.id && // don't message yourself
+          !conversationByUserId.has(u.id)
+      )
+      .sort((a, b) => a.fullName.localeCompare(b.fullName))
+      .map((u) => ({
+        kind: "draft" as const,
+        userId: u.id,
+        participant: {
+          id: u.id,
+          audience: "clinician" as const,
+          name: u.fullName,
+          email: u.email,
+          role: u.role,
+          specialty: u.specialty ?? undefined,
+        } satisfies Participant,
+      }));
+
+    const q = query.trim().toLowerCase();
+    const all = [...ordered, ...remaining];
+    if (!q) return all;
+    return all.filter((r) => {
+      const p = r.kind === "conversation" ? r.conversation.participant : r.participant;
+      return (
+        p.name.toLowerCase().includes(q) ||
+        (p.email?.toLowerCase().includes(q) ?? false) ||
+        (r.kind === "conversation" &&
+          r.conversation.lastMessage.toLowerCase().includes(q))
+      );
+    });
+  }, [audience, conversations, condition, allUsers, query, currentUser?.id]);
+
+  // The "active" row is either a real conversation or a draft user.
+  const activeKey = activeConversationId
+    ? `c:${activeConversationId}`
+    : activeDraftUserId
+      ? `d:${activeDraftUserId}`
+      : null;
+
+  // Auto-select first row when the list loads or selection drops out.
   useEffect(() => {
-    if (filtered.length === 0) {
-      setActiveId(null);
+    if (rows.length === 0) {
+      setActiveConversationId(null);
+      setActiveDraftUserId(null);
       return;
     }
-    if (!activeId || !filtered.some((c) => c.id === activeId)) {
-      setActiveId(filtered[0]!.id);
+    const stillVisible =
+      activeKey !== null && rows.some((r) => rowKey(r) === activeKey);
+    if (!stillVisible) {
+      const first = rows[0]!;
+      if (first.kind === "conversation") {
+        setActiveConversationId(first.conversation.id);
+        setActiveDraftUserId(null);
+      } else {
+        setActiveConversationId(null);
+        setActiveDraftUserId(first.userId);
+      }
     }
-  }, [filtered, activeId]);
+  }, [rows, activeKey]);
 
   // Mark the active conversation read whenever we open it or it
-  // receives a new message (cache flips and we re-run this effect).
+  // receives a new message.
   useEffect(() => {
-    if (activeId && detail) markRead.mutate(activeId);
+    if (activeConversationId && detail) markRead.mutate(activeConversationId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId, detail?.messages.length]);
+  }, [activeConversationId, detail?.messages.length]);
 
-  const active = filtered.find((c) => c.id === activeId) ?? null;
+  const draftParticipant: Participant | null = useMemo(() => {
+    if (!activeDraftUserId) return null;
+    const row = rows.find(
+      (r) => r.kind === "draft" && r.userId === activeDraftUserId
+    );
+    return row && row.kind === "draft" ? row.participant : null;
+  }, [activeDraftUserId, rows]);
+
+  const handleSelect = (row: ConversationRow) => {
+    if (row.kind === "conversation") {
+      setActiveConversationId(row.conversation.id);
+      setActiveDraftUserId(null);
+    } else {
+      setActiveDraftUserId(row.userId);
+      setActiveConversationId(null);
+    }
+  };
+
+  const handleSendActive = async (body: string) => {
+    if (activeConversationId) {
+      await sendMessage.mutateAsync({
+        conversationId: activeConversationId,
+        body,
+      });
+      return;
+    }
+    if (activeDraftUserId) {
+      const results = await compose.mutateAsync({
+        audience: "clinician",
+        recipientIds: [activeDraftUserId],
+        body,
+        urgent: false,
+      });
+      const created = results[0];
+      if (created) {
+        setActiveConversationId(created.conversation.id);
+        setActiveDraftUserId(null);
+      }
+    }
+  };
+
+  const activeParticipant: Participant | null = detail
+    ? detail.conversation.participant
+    : draftParticipant;
 
   return (
     <>
@@ -80,7 +219,8 @@ export function MessagesPage() {
                 setAudience(a);
                 setCondition(null);
                 setQuery("");
-                setActiveId(null);
+                setActiveConversationId(null);
+                setActiveDraftUserId(null);
               }}
             />
             <Button className="h-10" onClick={() => setComposeOpen(true)}>
@@ -94,9 +234,9 @@ export function MessagesPage() {
         <div className="flex flex-col md:flex-row min-h-[70vh] max-h-[calc(100vh-220px)]">
           <div className="md:border-r border-border p-3 md:p-4 md:flex-shrink-0 md:flex md:flex-col min-h-0">
             <ConversationList
-              conversations={filtered}
-              activeId={active?.id ?? null}
-              onSelect={setActiveId}
+              rows={rows}
+              activeKey={activeKey}
+              onSelect={handleSelect}
               query={query}
               onQueryChange={setQuery}
               showFilters={audience === "patient"}
@@ -106,21 +246,21 @@ export function MessagesPage() {
           </div>
 
           <div className="flex-1 flex flex-col min-h-0 bg-white">
-            {isLoading && !active ? (
+            {isLoading && !activeParticipant ? (
               <div className="flex-1 grid place-items-center p-10 text-xs text-muted-foreground">
                 Loading conversations…
               </div>
-            ) : active && detail ? (
+            ) : activeParticipant ? (
               <>
-                <ParticipantHeader participant={detail.conversation.participant} />
+                <ParticipantHeader participant={activeParticipant} />
                 <MessageThread
-                  messages={detail.messages}
-                  participantName={detail.conversation.participant.name}
+                  messages={detail?.messages ?? []}
+                  participant={activeParticipant}
+                  isDraft={!detail}
                 />
                 <MessageComposer
-                  onSend={(body) =>
-                    sendMessage.mutate({ conversationId: active.id, body })
-                  }
+                  onSend={handleSendActive}
+                  busy={sendMessage.isPending || compose.isPending}
                 />
               </>
             ) : (
@@ -158,7 +298,7 @@ function AudienceToggle({
       <AudienceButton
         active={audience === "clinician"}
         onClick={() => onChange("clinician")}
-        label="Clinicians"
+        label="My Users"
       />
     </div>
   );
