@@ -21,6 +21,7 @@ interface BackendPatientSummaryDto {
   gender: string | null;
   phone: string | null;
   email: string | null;
+  condition_tag: string | null;
 }
 
 interface BackendMessageDto {
@@ -72,6 +73,8 @@ function patientToParticipant(dto: BackendPatientSummaryDto): Participant {
     gender: (dto.gender as Participant["gender"]) ?? undefined,
     phone: dto.phone ?? undefined,
     email: dto.email ?? undefined,
+    conditionTag:
+      (dto.condition_tag as Participant["conditionTag"]) ?? undefined,
   };
 }
 

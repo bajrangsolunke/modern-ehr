@@ -20,6 +20,7 @@ interface BackendPatientDto {
   risk: Patient["risk"];
   risk_score: number;
   tags?: string[] | null;
+  condition_tag?: string | null;
   assigned_physician_id: string | null;
   assigned_physician_name?: string | null;
 }
@@ -86,6 +87,7 @@ function mapPatient(dto: BackendPatientDto): Patient {
       name: dto.assigned_physician_name ?? "Unassigned",
     },
     tags: dto.tags ?? [],
+    conditionTag: dto.condition_tag ?? undefined,
     risk: dto.risk,
     asa: dto.asa ?? undefined,
     icu: dto.icu_needed,
@@ -190,6 +192,7 @@ export interface PatientInput {
   status?: Patient["status"];
   risk?: Patient["risk"];
   tags?: string[] | null;
+  condition_tag?: string | null;
   assigned_physician_id?: string | null;
 }
 
@@ -227,6 +230,7 @@ function patientToBackendDto(p: Patient): BackendPatientDto {
     risk: p.risk,
     risk_score: 0,
     tags: p.tags ?? null,
+    condition_tag: p.conditionTag ?? null,
     assigned_physician_id: p.assignedPhysician.id ?? null,
     assigned_physician_name: p.assignedPhysician.name ?? null,
   };

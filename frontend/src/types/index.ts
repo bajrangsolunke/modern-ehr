@@ -38,6 +38,9 @@ export interface Patient {
    */
   assignedPhysician: { id?: string; name: string; avatarUrl?: string };
   tags: string[];
+  /** Controlled-vocabulary chip — drives the Communication filter and
+   *  future analytics roll-ups. Distinct from the free-form `tags`. */
+  conditionTag?: string;
   risk: RiskLevel;
   asa?: "I" | "II" | "III" | "IV";
   icu?: boolean;

@@ -312,6 +312,7 @@ class MessagesService:
                     gender=patient.sex,
                     phone=patient.phone,
                     email=patient.email,
+                    condition_tag=patient.condition_tag,
                 )
 
         # Project participants → users.

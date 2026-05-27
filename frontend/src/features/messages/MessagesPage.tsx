@@ -40,14 +40,11 @@ export function MessagesPage() {
   const sendMessage = useSendMessage();
   const markRead = useMarkConversationRead();
 
-  // Patient-side condition tags aren't on the backend yet — surface them
-  // in the UI by tag-matching the patient's MRN range so the filter
-  // chip behavior still works. Backend support is a future iteration.
   const filtered = useMemo(() => {
     if (audience !== "patient" || !condition) return conversations;
-    // Until the BE returns condition tags, we just hide nothing — the
-    // chip remains a visual affordance for upcoming work.
-    return conversations;
+    return conversations.filter(
+      (c) => c.participant.conditionTag === condition
+    );
   }, [conversations, audience, condition]);
 
   // Auto-select the first conversation when the list loads or the

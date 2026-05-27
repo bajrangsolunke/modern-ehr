@@ -14,6 +14,20 @@ const sexes = ["F", "M", "O"] as const;
 const asas = ["I", "II", "III", "IV"] as const;
 const statuses = ["scheduled", "ready", "in-progress", "at-risk", "discharged"] as const;
 const risks = ["low", "moderate", "high", "critical"] as const;
+const conditionTags = [
+  "diabetic",
+  "asthma",
+  "cancer",
+  "bp",
+  "mental",
+] as const;
+const conditionTagLabel: Record<(typeof conditionTags)[number], string> = {
+  diabetic: "Diabetic",
+  asthma: "Asthma",
+  cancer: "Cancer",
+  bp: "BP",
+  mental: "Mental",
+};
 
 const schema = z.object({
   mrn: z.string().min(1, "MRN is required"),
@@ -33,6 +47,7 @@ const schema = z.object({
   status: z.enum(statuses),
   risk: z.enum(risks),
   tags: z.string().optional().or(z.literal("")),
+  condition_tag: z.enum(conditionTags).optional().or(z.literal("")),
 });
 
 export type PatientFormValues = z.infer<typeof schema>;
@@ -70,6 +85,8 @@ export function PatientForm({
     status: defaultPatient?.status ?? "scheduled",
     risk: defaultPatient?.risk ?? "low",
     tags: defaultPatient?.tags?.join(", ") ?? "",
+    condition_tag:
+      (defaultPatient?.conditionTag as (typeof conditionTags)[number]) ?? "",
   };
 
   const {
@@ -112,6 +129,7 @@ export function PatientForm({
             .map((t) => t.trim())
             .filter(Boolean)
         : null,
+      condition_tag: values.condition_tag || null,
     };
     await onSubmit(input);
   });
@@ -302,6 +320,23 @@ export function PatientForm({
               {risks.map((r) => (
                 <option key={r} value={r}>
                   {labelFor(r)}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+        </Field>
+        <Field>
+          <FormField
+            label="Condition tag"
+            htmlFor="condition_tag"
+            hint="Drives messaging filter chips + roll-ups."
+            error={errors.condition_tag?.message}
+          >
+            <Select id="condition_tag" {...register("condition_tag")}>
+              <option value="">—</option>
+              {conditionTags.map((c) => (
+                <option key={c} value={c}>
+                  {conditionTagLabel[c]}
                 </option>
               ))}
             </Select>

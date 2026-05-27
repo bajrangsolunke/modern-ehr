@@ -34,6 +34,7 @@ class PatientSummary(BaseModel):
     gender: str | None = None
     phone: str | None = None
     email: str | None = None
+    condition_tag: str | None = None
 
 
 class MessageOut(BaseModel):

@@ -68,6 +68,10 @@ class Patient(Base, UUIDMixin, TimestampMixin):
     )
     risk_score: Mapped[int] = mapped_column(Integer, default=0)
     tags: Mapped[list[str] | None] = mapped_column(ARRAY(String))
+    # Controlled-vocabulary chip used for messaging filters, patient
+    # roll-ups, and analytics. One value per patient — distinct from
+    # `tags` which is free-form (#ASA II etc.).
+    condition_tag: Mapped[str | None] = mapped_column(String(32), index=True)
     notes_internal: Mapped[str | None] = mapped_column(Text)
 
     assigned_physician_id: Mapped[UUID | None] = mapped_column(

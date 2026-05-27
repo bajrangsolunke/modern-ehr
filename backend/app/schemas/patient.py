@@ -33,6 +33,7 @@ class PatientBase(BaseModel):
     asa: AsaClass | None = None
     icu_needed: bool = False
     tags: list[str] | None = None
+    condition_tag: str | None = None
 
     @field_validator("dob")
     @classmethod
@@ -63,6 +64,7 @@ class PatientUpdate(BaseModel):
     status: PatientStatus | None = None
     risk: RiskLevel | None = None
     tags: list[str] | None = None
+    condition_tag: str | None = None
     assigned_physician_id: UUID | None = None
     # Intentionally NOT exposed: risk_score (server-derived), sex/dob
     # (clinically immutable — needs a separate flow).
