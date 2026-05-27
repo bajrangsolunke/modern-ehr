@@ -11,10 +11,9 @@
  */
 import { useMemo, useState } from "react";
 import {
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  MoreVertical,
+  ChevronsUpDown,
   Pencil,
   Plus,
   Search,
@@ -22,7 +21,6 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +39,10 @@ import {
 import type { AppUser, UserFilters } from "@/features/users/api/users-api";
 import type { Role } from "@/types";
 import { cn, formatDate } from "@/lib/utils";
+
+const ROW_BG = "#F5F7FB";
+const HEADER_BG = "#FFFFFF";
+const HEADER_SHADOW = "0 4px 12px rgba(17,24,39,0.06)";
 
 const roleLabel: Record<Role, string> = {
   provider: "Provider",
@@ -121,10 +123,10 @@ export function UsersPage() {
       <Card className="mb-4">
         <CardContent className="p-3 flex flex-wrap items-center gap-2">
           <span className="text-xs uppercase tracking-wide text-muted-foreground font-semibold px-2">
-            Filter
+            Role
           </span>
           <RoleChip
-            label="All roles"
+            label="All"
             active={filters.role === undefined}
             onClick={() => setFilter({ role: undefined })}
           />
@@ -136,9 +138,15 @@ export function UsersPage() {
               onClick={() => setFilter({ role: r })}
             />
           ))}
-          <div className="w-px h-5 bg-border mx-1" />
-          <RoleChip
+
+          <div className="w-px h-6 bg-border mx-2" />
+
+          <span className="text-xs uppercase tracking-wide text-muted-foreground font-semibold px-2">
+            Status
+          </span>
+          <StatusChip
             label="Active"
+            tone="success"
             active={filters.is_active === true}
             onClick={() =>
               setFilter({
@@ -146,8 +154,9 @@ export function UsersPage() {
               })
             }
           />
-          <RoleChip
+          <StatusChip
             label="Deactivated"
+            tone="muted"
             active={filters.is_active === false}
             onClick={() =>
               setFilter({
@@ -171,23 +180,36 @@ export function UsersPage() {
 
       {!isLoading && !isError && data && (
         <>
-          <Card className="overflow-hidden">
+          <Card className="overflow-hidden p-3 sm:p-4">
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-surface-subtle">
-                  <tr className="text-left">
-                    <Th>User</Th>
+              <table
+                className="w-full text-sm border-separate"
+                style={{ borderSpacing: "0 6px" }}
+              >
+                <thead>
+                  <tr className="text-xs text-muted-foreground text-left">
+                    <Th first>Name</Th>
+                    <Th>Email</Th>
                     <Th>Role</Th>
                     <Th>Specialty</Th>
                     <Th>Status</Th>
                     <Th>Created</Th>
-                    <Th className="text-right">Actions</Th>
+                    <th
+                      className="font-medium px-4 py-2 text-right last:rounded-r-full"
+                      style={{ background: HEADER_BG, boxShadow: HEADER_SHADOW }}
+                    >
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.items.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-10 text-center text-muted-foreground">
+                      <td
+                        colSpan={7}
+                        className="px-4 py-10 text-center text-muted-foreground rounded-2xl"
+                        style={{ background: ROW_BG }}
+                      >
                         No users match these filters.
                       </td>
                     </tr>
@@ -196,34 +218,41 @@ export function UsersPage() {
                     <tr
                       key={u.id}
                       className={cn(
-                        "border-t border-border/70 hover:bg-surface-subtle/60",
+                        "hover:[&_td]:bg-[#EEF2F8] transition group",
                         !u.isActive && "opacity-60"
                       )}
                     >
-                      <Td>
-                        <div className="flex items-center gap-3">
+                      <td
+                        className="px-4 py-2 first:rounded-l-full"
+                        style={{ background: ROW_BG }}
+                      >
+                        <div className="flex items-center gap-2">
                           <UserAvatar
                             name={u.fullName}
                             src={u.avatarUrl ?? undefined}
-                            size="md"
+                            size="sm"
                           />
-                          <div className="min-w-0">
-                            <div className="font-semibold truncate">{u.fullName}</div>
-                            <div className="text-xs text-muted-foreground truncate">
-                              {u.email}
-                            </div>
-                          </div>
+                          <span className="font-semibold">{u.fullName}</span>
                         </div>
-                      </Td>
-                      <Td>
+                      </td>
+                      <td
+                        className="px-4 py-2 text-foreground/80"
+                        style={{ background: ROW_BG }}
+                      >
+                        {u.email}
+                      </td>
+                      <td className="px-4 py-2" style={{ background: ROW_BG }}>
                         <Badge variant={roleVariant[u.role]} size="sm">
                           {roleLabel[u.role]}
                         </Badge>
-                      </Td>
-                      <Td>
-                        <span className="text-sm">{u.specialty || "—"}</span>
-                      </Td>
-                      <Td>
+                      </td>
+                      <td
+                        className="px-4 py-2 text-foreground/80"
+                        style={{ background: ROW_BG }}
+                      >
+                        {u.specialty || "—"}
+                      </td>
+                      <td className="px-4 py-2" style={{ background: ROW_BG }}>
                         {u.isActive ? (
                           <Badge variant="success" dot size="sm">
                             Active
@@ -233,20 +262,50 @@ export function UsersPage() {
                             Deactivated
                           </Badge>
                         )}
-                      </Td>
-                      <Td>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDate(u.createdAt)}
-                        </span>
-                      </Td>
-                      <Td className="text-right">
-                        <RowMenu
-                          user={u}
-                          onEdit={() => openEdit(u)}
-                          onDeactivate={() => setPendingDeactivate(u)}
-                          onReactivate={() => reactivate.mutate(u.id)}
-                        />
-                      </Td>
+                      </td>
+                      <td
+                        className="px-4 py-2 text-foreground/80"
+                        style={{ background: ROW_BG }}
+                      >
+                        {formatDate(u.createdAt)}
+                      </td>
+                      <td
+                        className="px-4 py-2 last:rounded-r-full"
+                        style={{ background: ROW_BG }}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 rounded-full bg-white hover:bg-white/80 text-foreground/70"
+                            aria-label="Edit user"
+                            onClick={() => openEdit(u)}
+                          >
+                            <Pencil className="size-3" />
+                          </Button>
+                          {u.isActive ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 rounded-full bg-white hover:bg-rose-50 text-danger"
+                              aria-label="Deactivate user"
+                              onClick={() => setPendingDeactivate(u)}
+                            >
+                              <ShieldOff className="size-3" />
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 rounded-full bg-white hover:bg-emerald-50 text-success"
+                              aria-label="Reactivate user"
+                              onClick={() => reactivate.mutate(u.id)}
+                            >
+                              <UserCheck className="size-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -294,21 +353,21 @@ export function UsersPage() {
   );
 }
 
-function Th({ children, className }: { children: React.ReactNode; className?: string }) {
+function Th({ children, first }: { children: React.ReactNode; first?: boolean }) {
   return (
     <th
-      className={cn(
-        "px-4 py-3 text-[11px] uppercase tracking-wider text-muted-foreground font-semibold",
-        className
-      )}
+      className={cn("font-medium px-4 py-2", first && "first:rounded-l-full")}
+      style={{ background: HEADER_BG, boxShadow: HEADER_SHADOW }}
     >
-      {children}
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 hover:text-foreground transition"
+      >
+        {children}
+        <ChevronsUpDown className="size-3 opacity-60" />
+      </button>
     </th>
   );
-}
-
-function Td({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <td className={cn("px-4 py-3 align-middle", className)}>{children}</td>;
 }
 
 function RoleChip({
@@ -331,6 +390,40 @@ function RoleChip({
           : "bg-white border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
       )}
     >
+      {label}
+    </button>
+  );
+}
+
+function StatusChip({
+  label,
+  tone,
+  active,
+  onClick,
+}: {
+  label: string;
+  tone: "success" | "muted";
+  active: boolean;
+  onClick: () => void;
+}) {
+  const dot = tone === "success" ? "bg-success" : "bg-slate-400";
+  const activeRing =
+    tone === "success"
+      ? "border-success/40 bg-success/10 text-success"
+      : "border-slate-400/40 bg-slate-100 text-slate-700";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "inline-flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-medium border bg-white transition ring-focus",
+        active
+          ? activeRing
+          : "border-dashed border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+      )}
+    >
+      <span className={cn("h-1.5 w-1.5 rounded-full", dot)} />
       {label}
     </button>
   );
@@ -359,7 +452,12 @@ function SummaryTile({
     <Card>
       <CardContent className="p-4 flex items-center gap-3">
         {icon && (
-          <div className={cn("size-10 rounded-2xl bg-surface-subtle grid place-items-center", toneClass)}>
+          <div
+            className={cn(
+              "size-10 rounded-2xl bg-surface-subtle grid place-items-center",
+              toneClass
+            )}
+          >
             <span className="[&_svg]:size-5">{icon}</span>
           </div>
         )}
@@ -371,63 +469,6 @@ function SummaryTile({
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function RowMenu({
-  user,
-  onEdit,
-  onDeactivate,
-  onReactivate,
-}: {
-  user: AppUser;
-  onEdit: () => void;
-  onDeactivate: () => void;
-  onReactivate: () => void;
-}) {
-  return (
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 rounded-full"
-          aria-label="User actions"
-        >
-          <MoreVertical className="size-4" />
-        </Button>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          align="end"
-          sideOffset={6}
-          className="z-50 w-48 rounded-2xl bg-white shadow-elev border border-border p-1.5 animate-fade-in"
-        >
-          <DropdownMenu.Item
-            onSelect={onEdit}
-            className="flex items-center gap-2 px-3 py-2 text-sm rounded-xl cursor-pointer outline-none hover:bg-secondary"
-          >
-            <Pencil className="size-4" /> Edit
-          </DropdownMenu.Item>
-          <DropdownMenu.Separator className="h-px bg-border my-1" />
-          {user.isActive ? (
-            <DropdownMenu.Item
-              onSelect={onDeactivate}
-              className="flex items-center gap-2 px-3 py-2 text-sm rounded-xl cursor-pointer outline-none hover:bg-danger/10 text-danger"
-            >
-              <ShieldOff className="size-4" /> Deactivate
-            </DropdownMenu.Item>
-          ) : (
-            <DropdownMenu.Item
-              onSelect={onReactivate}
-              className="flex items-center gap-2 px-3 py-2 text-sm rounded-xl cursor-pointer outline-none hover:bg-success/10 text-success"
-            >
-              <UserCheck className="size-4" /> Reactivate
-            </DropdownMenu.Item>
-          )}
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
   );
 }
 

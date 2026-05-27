@@ -115,35 +115,37 @@ export function UserDrawer({ open, onOpenChange, user }: Props) {
           ? `Update profile and access for ${user?.fullName}.`
           : "Invite a new teammate. They'll sign in with the password you set."
       }
-      size="md"
+      size="xl"
     >
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
-        <FormField
-          label="Full name"
-          required
-          htmlFor="u-name"
-          error={errors.full_name?.message}
-        >
-          <Input id="u-name" placeholder="Dr. Jane Cooper" {...register("full_name")} />
-        </FormField>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+          <FormField
+            label="Full name"
+            required
+            htmlFor="u-name"
+            error={errors.full_name?.message}
+          >
+            <Input id="u-name" placeholder="Dr. Jane Cooper" {...register("full_name")} />
+          </FormField>
 
-        <FormField
-          label="Email"
-          required
-          htmlFor="u-email"
-          hint={isEdit ? "Email is the durable identity and can't be changed." : undefined}
-          error={errors.email?.message}
-        >
-          <Input
-            id="u-email"
-            type="email"
-            placeholder="jane@padmavat.health"
-            disabled={isEdit}
-            {...register("email")}
-          />
-        </FormField>
+          <FormField
+            label="Email"
+            required
+            htmlFor="u-email"
+            hint={
+              isEdit ? "Email is the durable identity and can't be changed." : undefined
+            }
+            error={errors.email?.message}
+          >
+            <Input
+              id="u-email"
+              type="email"
+              placeholder="jane@padmavat.health"
+              disabled={isEdit}
+              {...register("email")}
+            />
+          </FormField>
 
-        <div className="grid grid-cols-2 gap-3">
           <FormField label="Role" required htmlFor="u-role" error={errors.role?.message}>
             <Select id="u-role" {...register("role")}>
               <option value="provider">Provider</option>
@@ -151,6 +153,7 @@ export function UserDrawer({ open, onOpenChange, user }: Props) {
               <option value="admin">Admin</option>
             </Select>
           </FormField>
+
           <FormField
             label="Specialty"
             htmlFor="u-specialty"
@@ -159,26 +162,27 @@ export function UserDrawer({ open, onOpenChange, user }: Props) {
           >
             <Input id="u-specialty" {...register("specialty")} />
           </FormField>
-        </div>
 
-        <FormField
-          label={isEdit ? "Reset password" : "Password"}
-          required={!isEdit}
-          htmlFor="u-password"
-          hint={
-            isEdit
-              ? "Leave blank to keep the current password."
-              : "Minimum 8 characters."
-          }
-          error={errors.password?.message}
-        >
-          <Input
-            id="u-password"
-            type="password"
-            autoComplete="new-password"
-            {...register("password")}
-          />
-        </FormField>
+          <FormField
+            label={isEdit ? "Reset password" : "Password"}
+            required={!isEdit}
+            htmlFor="u-password"
+            hint={
+              isEdit
+                ? "Leave blank to keep the current password."
+                : "Minimum 8 characters."
+            }
+            error={errors.password?.message}
+            className="md:col-span-2"
+          >
+            <Input
+              id="u-password"
+              type="password"
+              autoComplete="new-password"
+              {...register("password")}
+            />
+          </FormField>
+        </div>
 
         <div className="flex justify-end gap-2 pt-2">
           <Button
