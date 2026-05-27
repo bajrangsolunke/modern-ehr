@@ -29,7 +29,7 @@ const navItems: NavItem[] = [
   { to: "/docs", label: "Docs" },
   { to: "/reports", label: "Reports" },
   { to: "/users", label: "Users", roles: ["admin"] },
-  { to: "/mobile", label: "Mobile" },
+  { to: "/tasks", label: "Tasks" },
 ];
 
 export function Topbar() {

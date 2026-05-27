@@ -37,8 +37,8 @@ const MessagesPage = lazy(() =>
 const AppointmentsPage = lazy(() =>
   import("@/features/appointments").then((m) => ({ default: m.AppointmentsPage }))
 );
-const MobilePage = lazy(() =>
-  import("@/features/mobile").then((m) => ({ default: m.MobilePage }))
+const TasksPage = lazy(() =>
+  import("@/features/tasks").then((m) => ({ default: m.TasksPage }))
 );
 const UsersPage = lazy(() =>
   import("@/features/users").then((m) => ({ default: m.UsersPage }))
@@ -105,7 +105,7 @@ export function AppRouter() {
             <Route path={ROUTES.settings} element={<SettingsPage />} />
             {/* Legacy /team redirects to /users for bookmarked links. */}
             <Route path="/team" element={<Navigate to={ROUTES.users} replace />} />
-            <Route path={ROUTES.mobile} element={<MobilePage />} />
+            <Route path={ROUTES.tasks} element={<TasksPage />} />
           </Route>
         </Route>
 

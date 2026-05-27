@@ -9,10 +9,10 @@ export const ROUTES = {
   docs: "/docs",
   users: "/users",
   settings: "/settings",
-  mobile: "/mobile",
   messages: "/messages",
   reports: "/reports",
   reportsInsights: "/reports/insights",
+  tasks: "/tasks",
 } as const;
 
 export const QUERY_KEYS = {

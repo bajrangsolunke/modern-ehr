@@ -21,6 +21,12 @@ from app.models.conversation import (
     Message,
     MessageAttachment,
 )
+from app.models.task import (
+    Task,
+    TaskCategory,
+    TaskPriority,
+    TaskStatus,
+)
 
 __all__ = [
     "User",
@@ -51,4 +57,8 @@ __all__ = [
     "ConversationParticipant",
     "Message",
     "MessageAttachment",
+    "Task",
+    "TaskCategory",
+    "TaskPriority",
+    "TaskStatus",
 ]
