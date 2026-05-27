@@ -18,6 +18,9 @@ interface Props {
    *  bubbles sent at/before this timestamp show as read. Null for
    *  patient threads or unread threads. */
   readWatermark?: string | null;
+  /** When non-empty, render a "{name} is typing…" indicator below the
+   *  last message. */
+  typingNames?: string[];
 }
 
 interface RenderedItem {
@@ -83,6 +86,7 @@ export function MessageThread({
   participant,
   isDraft = false,
   readWatermark = null,
+  typingNames = [],
 }: Props) {
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -116,8 +120,39 @@ export function MessageThread({
           )
         )
       )}
+      {typingNames.length > 0 && <TypingIndicator names={typingNames} />}
       <div ref={endRef} />
     </div>
+  );
+}
+
+function TypingIndicator({ names }: { names: string[] }) {
+  const label =
+    names.length === 1
+      ? `${names[0]} is typing`
+      : names.length === 2
+        ? `${names[0]} and ${names[1]} are typing`
+        : `${names.length} people are typing`;
+  return (
+    <div className="flex items-end gap-2 mt-2 pl-9">
+      <div className="bg-surface-subtle border border-border rounded-2xl px-3.5 py-2 inline-flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">{label}</span>
+        <span className="flex gap-1" aria-hidden="true">
+          <Dot delay="0ms" />
+          <Dot delay="150ms" />
+          <Dot delay="300ms" />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function Dot({ delay }: { delay: string }) {
+  return (
+    <span
+      className="size-1.5 rounded-full bg-muted-foreground/70 animate-bounce"
+      style={{ animationDelay: delay, animationDuration: "1s" }}
+    />
   );
 }
 

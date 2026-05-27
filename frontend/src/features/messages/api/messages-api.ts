@@ -214,4 +214,7 @@ export const messagesApi = {
     api.post(`/messages/conversations/${conversationId}/read`, {
       last_read_at: new Date().toISOString(),
     }),
+
+  pingTyping: (conversationId: string): Promise<void> =>
+    api.post(`/messages/conversations/${conversationId}/typing`, {}),
 };

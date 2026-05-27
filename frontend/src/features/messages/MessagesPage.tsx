@@ -35,6 +35,11 @@ import {
 } from "./hooks/use-messages";
 import { useUsers } from "@/features/users/hooks/use-users";
 import { useAuthStore } from "@/stores/auth-store";
+import {
+  selectTypingUsers,
+  useTypingStore,
+} from "./stores/typing-store";
+import { messagesApi } from "./api/messages-api";
 import type { Audience, ConditionTag, Participant } from "./types";
 import { cn } from "@/lib/utils";
 
@@ -223,6 +228,29 @@ export function MessagesPage() {
     return max;
   }, [detail, currentUser]);
 
+  // Resolve typing user IDs → display names. Falls back to "Someone"
+  // when we don't have the user in the participants projection yet.
+  const typingUserIds = useTypingStore((s) =>
+    selectTypingUsers(s, activeConversationId)
+  );
+  const typingNames = useMemo(() => {
+    if (!detail || !currentUser) return [];
+    return typingUserIds
+      .filter((uid) => uid !== currentUser.id)
+      .map((uid) => {
+        const p = detail.participants.find((x) => x.id === uid);
+        return p?.name ?? "Someone";
+      });
+  }, [typingUserIds, detail, currentUser]);
+
+  const pingTyping = () => {
+    if (activeConversationId) {
+      // Best-effort ping; failures are silent (the indicator just
+      // won't render on the other side).
+      messagesApi.pingTyping(activeConversationId).catch(() => {});
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -274,10 +302,12 @@ export function MessagesPage() {
                   participant={activeParticipant}
                   isDraft={!detail}
                   readWatermark={readWatermark}
+                  typingNames={typingNames}
                 />
                 <MessageComposer
                   onSend={handleSendActive}
                   busy={sendMessage.isPending || compose.isPending}
+                  onTyping={activeConversationId ? pingTyping : undefined}
                 />
               </>
             ) : (

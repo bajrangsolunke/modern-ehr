@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, Paperclip, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
@@ -7,7 +7,12 @@ import { cn } from "@/lib/utils";
 interface Props {
   onSend: (body: string) => void | Promise<void>;
   busy?: boolean;
+  /** Called at most once per ~2s while the user is typing — drives
+   *  the "X is typing…" indicator on the other side. */
+  onTyping?: () => void;
 }
+
+const TYPING_THROTTLE_MS = 2_000;
 
 /**
  * Common provider replies. Tapping a chip inserts the text into the
@@ -24,12 +29,29 @@ const QUICK_REPLIES = [
   "Lab results look normal — no follow-up needed.",
 ];
 
-export function MessageComposer({ onSend, busy }: Props) {
+export function MessageComposer({ onSend, busy, onTyping }: Props) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const lastTypingAtRef = useRef<number>(0);
 
   const trimmed = value.trim();
   const canSend = trimmed.length > 0 && !busy;
+
+  // Reset throttle when the conversation changes so the next keystroke
+  // pings immediately.
+  useEffect(() => {
+    lastTypingAtRef.current = 0;
+  }, [onTyping]);
+
+  const handleChange = (next: string) => {
+    setValue(next);
+    if (!onTyping) return;
+    const now = Date.now();
+    if (now - lastTypingAtRef.current > TYPING_THROTTLE_MS) {
+      lastTypingAtRef.current = now;
+      onTyping();
+    }
+  };
 
   const send = async () => {
     if (!canSend) return;
@@ -75,7 +97,7 @@ export function MessageComposer({ onSend, busy }: Props) {
         <textarea
           ref={textareaRef}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => handleChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();

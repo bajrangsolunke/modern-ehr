@@ -239,6 +239,28 @@ class MessagesService:
         await self._broadcast_message(conv, msg)
         return msg
 
+    async def ping_typing(
+        self, conversation_id: UUID, *, viewer_id: UUID
+    ) -> None:
+        """Broadcast a typing event to other participants.
+
+        Doesn't write anything to the DB — typing is purely transient
+        UI state. The endpoint exists so the FE can use the standard
+        REST + auth pipe instead of inventing a separate client-to-
+        server WS protocol.
+        """
+        conv = await self.get_conversation(conversation_id, viewer_id=viewer_id)
+        payload = {
+            "type": "conversation.typing",
+            "conversation_id": str(conversation_id),
+            "user_id": str(viewer_id),
+            "ts": datetime.now(timezone.utc).isoformat(),
+        }
+        for user_id in await self._subscriber_ids(conv):
+            if user_id == viewer_id:
+                continue  # don't echo to the sender
+            await ws_manager.send_to_user(str(user_id), payload)
+
     async def mark_read(
         self, conversation_id: UUID, *, viewer_id: UUID, ts: datetime | None = None
     ) -> None:

@@ -13,10 +13,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { env } from "@/config/env";
 import { STORAGE_KEYS } from "@/config/constants";
 import { messagesQueryKey } from "./use-messages";
+import { useTypingStore } from "../stores/typing-store";
 
 interface WsEnvelope {
   type: string;
   conversation_id?: string;
+  user_id?: string;
   [key: string]: unknown;
 }
 
@@ -57,6 +59,12 @@ export function useMessagesSocket() {
               qc.invalidateQueries({
                 queryKey: [...messagesQueryKey, "byId", payload.conversation_id],
               });
+            }
+          } else if (payload.type === "conversation.typing") {
+            if (payload.conversation_id && payload.user_id) {
+              useTypingStore
+                .getState()
+                .recordTyping(payload.conversation_id, payload.user_id);
             }
           }
         } catch {

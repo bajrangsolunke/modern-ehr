@@ -168,6 +168,20 @@ async def mark_read(
     )
 
 
+@router.post(
+    "/conversations/{conversation_id}/typing",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def ping_typing(
+    conversation_id: UUID,
+    db: DbSession,
+    current: CurrentUser,
+) -> None:
+    """Throwaway endpoint — broadcasts a transient "typing" event to
+    other participants over the existing WS channel. No DB writes."""
+    await MessagesService(db).ping_typing(conversation_id, viewer_id=current.id)
+
+
 # Silence unused import warning in some IDEs; HTTPException is re-exported
 # above for use by FastAPI's exception handling chain.
 _ = HTTPException
