@@ -3,7 +3,7 @@
  * (docs/superpowers/specs/2026-05-27-workflow-user-stories.md).
  */
 import { useMemo, useState } from "react";
-import { ChevronDown, Filter, MoreVertical, Plus, Search } from "lucide-react";
+import { ChevronDown, Filter, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -15,6 +15,7 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { FilterChip } from "@/components/ui/filter-chip";
+import { SortableTh, TABLE_ROW_BG } from "@/components/ui/sortable-th";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useAuthStore } from "@/stores/auth-store";
@@ -297,38 +298,54 @@ function TaskTable({
   canModify: boolean;
 }) {
   return (
-    <Card className="overflow-hidden p-0">
+    <Card className="overflow-hidden p-3 sm:p-4">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table
+          className="w-full text-sm border-separate"
+          style={{ borderSpacing: "0 6px" }}
+        >
           <thead>
-            <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground font-semibold border-b border-border bg-surface-subtle">
-              <th className="px-4 py-2.5">Task ID</th>
-              <th className="px-3 py-2.5">Task</th>
-              <th className="px-3 py-2.5">Category</th>
-              <th className="px-3 py-2.5">Created By</th>
-              <th className="px-3 py-2.5">Created Date</th>
-              <th className="px-3 py-2.5">Assigned To</th>
-              <th className="px-3 py-2.5">Due Date</th>
-              <th className="px-3 py-2.5">Priority</th>
-              <th className="px-3 py-2.5">Status</th>
-              <th className="px-3 py-2.5 w-12" />
+            <tr className="text-xs text-muted-foreground text-left">
+              <SortableTh first>Task ID</SortableTh>
+              <SortableTh>Task</SortableTh>
+              <SortableTh>Category</SortableTh>
+              <SortableTh>Created By</SortableTh>
+              <SortableTh>Created Date</SortableTh>
+              <SortableTh>Assigned To</SortableTh>
+              <SortableTh>Due Date</SortableTh>
+              <SortableTh>Priority</SortableTh>
+              <SortableTh>Status</SortableTh>
+              <SortableTh last>Action</SortableTh>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border">
+          <tbody>
             {items.map((t) => (
-              <tr key={t.id} className="hover:bg-surface-subtle transition">
-                <td className="px-4 py-3 align-top">
-                  <span className="text-xs font-mono text-muted-foreground tabular-nums">
-                    {taskIdLabel(t.id)}
-                  </span>
-                </td>
-                <td className="px-3 py-3 align-top max-w-[280px]">
+              <tr
+                key={t.id}
+                className="hover:[&_td]:bg-[#EEF2F8] transition group"
+              >
+                <td
+                  className="px-4 py-2 first:rounded-l-full text-primary font-semibold"
+                  style={{ background: TABLE_ROW_BG }}
+                >
                   <button
                     type="button"
                     onClick={() => onView(t)}
-                    className="text-left ring-focus"
+                    className="hover:underline font-mono tabular-nums"
                   >
-                    <div className="text-sm font-semibold text-primary truncate hover:underline">
+                    {taskIdLabel(t.id)}
+                  </button>
+                </td>
+                <td
+                  className="px-4 py-2 max-w-[280px]"
+                  style={{ background: TABLE_ROW_BG }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onView(t)}
+                    className="text-left ring-focus block min-w-0"
+                  >
+                    <div className="font-semibold hover:text-primary transition truncate">
                       {t.title}
                     </div>
                     {t.description && (
@@ -338,37 +355,47 @@ function TaskTable({
                     )}
                   </button>
                 </td>
-                <td className="px-3 py-3 align-top">
-                  <span className="text-xs">{CATEGORY_LABEL[t.category]}</span>
+                <td
+                  className="px-4 py-2 text-foreground/80"
+                  style={{ background: TABLE_ROW_BG }}
+                >
+                  {CATEGORY_LABEL[t.category]}
                 </td>
-                <td className="px-3 py-3 align-top">
-                  <span className="text-xs">
-                    {t.createdByName ?? "System"}
-                  </span>
+                <td
+                  className="px-4 py-2 text-foreground/80"
+                  style={{ background: TABLE_ROW_BG }}
+                >
+                  {t.createdByName ?? (
+                    <span className="text-muted-foreground italic">System</span>
+                  )}
                 </td>
-                <td className="px-3 py-3 align-top">
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {formatDate(t.createdAt)}
-                  </span>
+                <td
+                  className="px-4 py-2 text-foreground/80 tabular-nums"
+                  style={{ background: TABLE_ROW_BG }}
+                >
+                  {formatDate(t.createdAt)}
                 </td>
-                <td className="px-3 py-3 align-top">
+                <td
+                  className="px-4 py-2"
+                  style={{ background: TABLE_ROW_BG }}
+                >
                   <span
                     className={cn(
-                      "text-xs",
                       t.assignedToName
-                        ? "font-medium"
+                        ? "text-foreground font-medium"
                         : "text-muted-foreground italic"
                     )}
                   >
                     {t.assignedToName ?? "Unassigned"}
                   </span>
                 </td>
-                <td className="px-3 py-3 align-top">
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {t.dueDate ? formatDate(t.dueDate) : "—"}
-                  </span>
+                <td
+                  className="px-4 py-2 text-foreground/80 tabular-nums"
+                  style={{ background: TABLE_ROW_BG }}
+                >
+                  {t.dueDate ? formatDate(t.dueDate) : "—"}
                 </td>
-                <td className="px-3 py-3 align-top">
+                <td className="px-4 py-2" style={{ background: TABLE_ROW_BG }}>
                   <Badge
                     className={cn(
                       "border-transparent",
@@ -378,23 +405,48 @@ function TaskTable({
                     {PRIORITY_LABEL[t.priority]}
                   </Badge>
                 </td>
-                <td className="px-3 py-3 align-top">
+                <td className="px-4 py-2" style={{ background: TABLE_ROW_BG }}>
                   <Badge
                     className={cn("border-transparent", STATUS_TONE[t.status])}
                   >
                     {STATUS_LABEL[t.status]}
                   </Badge>
                 </td>
-                <td className="px-3 py-3 align-top">
-                  {canModify && (
-                    <RowMenu
-                      task={t}
-                      onView={() => onView(t)}
-                      onEdit={() => onEdit(t)}
-                      onStatusChange={(next) => onStatusChange(t, next)}
-                      onDelete={() => onDelete(t)}
-                    />
-                  )}
+                <td
+                  className="px-4 py-2 last:rounded-r-full"
+                  style={{ background: TABLE_ROW_BG }}
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    {canModify && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 rounded-full bg-white hover:bg-white/80 text-foreground/70"
+                          aria-label="Edit task"
+                          onClick={() => onEdit(t)}
+                        >
+                          <Pencil className="size-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 rounded-full bg-white hover:bg-rose-50 text-danger"
+                          aria-label="Delete task"
+                          onClick={() => onDelete(t)}
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
+                        <RowMenu
+                          task={t}
+                          onView={() => onView(t)}
+                          onEdit={() => onEdit(t)}
+                          onStatusChange={(next) => onStatusChange(t, next)}
+                          onDelete={() => onDelete(t)}
+                        />
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -418,15 +470,19 @@ function RowMenu({
   onStatusChange: (next: TaskStatus) => void;
   onDelete: () => void;
 }) {
+  // Edit + Delete live as inline icon buttons next to this kebab.
+  // The kebab carries View + status-transition shortcuts.
+  void onEdit;
+  void onDelete;
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
-          aria-label="Task actions"
-          className="size-8 grid place-items-center rounded-full hover:bg-secondary text-muted-foreground transition ring-focus"
+          aria-label="More actions"
+          className="size-7 grid place-items-center rounded-full bg-white hover:bg-white/80 text-foreground/70 transition ring-focus"
         >
-          <MoreVertical className="size-4" />
+          <MoreVertical className="size-3" />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
@@ -436,7 +492,6 @@ function RowMenu({
           className="z-50 min-w-[180px] rounded-2xl bg-white shadow-elev border border-border p-1 animate-fade-in"
         >
           <Item label="View details" onSelect={onView} />
-          <Item label="Edit" onSelect={onEdit} />
           <DropdownMenu.Separator className="h-px bg-border my-1" />
           <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
             Move to
@@ -444,8 +499,6 @@ function RowMenu({
           {STATUSES.filter((s) => s !== task.status).map((s) => (
             <Item key={s} label={STATUS_LABEL[s]} onSelect={() => onStatusChange(s)} />
           ))}
-          <DropdownMenu.Separator className="h-px bg-border my-1" />
-          <Item label="Delete" danger onSelect={onDelete} />
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

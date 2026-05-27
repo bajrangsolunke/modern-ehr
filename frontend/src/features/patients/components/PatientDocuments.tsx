@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FilterChip } from "@/components/ui/filter-chip";
+import { SortableTh, TABLE_ROW_BG } from "@/components/ui/sortable-th";
 import { DocumentUploadModal } from "@/features/docs/components/DocumentUploadModal";
 import { DocumentDetailsModal } from "@/features/docs/components/DocumentDetailsModal";
 import {
@@ -182,37 +183,70 @@ function DocumentList({
   onOpen: (d: Document) => void;
 }) {
   return (
-    <Card className="overflow-hidden">
-      <ul className="divide-y divide-border">
-        {items.map((d) => (
-          <li key={d.id}>
-            <button
-              type="button"
-              onClick={() => onOpen(d)}
-              className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-surface-subtle transition ring-focus"
-            >
-              <Glyph mime={d.mimeType} />
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold truncate">{d.name}</div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">
-                  {humanMime(d.mimeType)} · {formatBytes(d.sizeBytes)}
-                  {d.uploadedBy && ` · ${d.uploadedBy}`}
-                </div>
-              </div>
-              <Badge
-                variant={CATEGORY_TONE[d.category as never] ?? "neutral"}
-                size="sm"
-                className="shrink-0"
+    <Card className="overflow-hidden p-3 sm:p-4">
+      <div className="overflow-x-auto">
+        <table
+          className="w-full text-sm border-separate"
+          style={{ borderSpacing: "0 6px" }}
+        >
+          <thead>
+            <tr className="text-xs text-muted-foreground text-left">
+              <SortableTh first>Document</SortableTh>
+              <SortableTh>Category</SortableTh>
+              <SortableTh>Uploaded by</SortableTh>
+              <SortableTh last>Uploaded</SortableTh>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((d) => (
+              <tr
+                key={d.id}
+                className="hover:[&_td]:bg-[#EEF2F8] transition group cursor-pointer"
+                onClick={() => onOpen(d)}
               >
-                {categoryLabel(d.category)}
-              </Badge>
-              <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums w-20 text-right">
-                {formatDate(d.createdAt)}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+                <td
+                  className="px-4 py-2 first:rounded-l-full"
+                  style={{ background: TABLE_ROW_BG }}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Glyph mime={d.mimeType} />
+                    <div className="min-w-0">
+                      <div className="font-semibold hover:text-primary transition truncate">
+                        {d.name}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        {humanMime(d.mimeType)} · {formatBytes(d.sizeBytes)}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-2" style={{ background: TABLE_ROW_BG }}>
+                  <Badge
+                    variant={CATEGORY_TONE[d.category as never] ?? "neutral"}
+                    size="sm"
+                  >
+                    {categoryLabel(d.category)}
+                  </Badge>
+                </td>
+                <td
+                  className="px-4 py-2 text-foreground/80"
+                  style={{ background: TABLE_ROW_BG }}
+                >
+                  {d.uploadedBy ?? (
+                    <span className="text-muted-foreground italic">—</span>
+                  )}
+                </td>
+                <td
+                  className="px-4 py-2 text-foreground/80 tabular-nums last:rounded-r-full text-right"
+                  style={{ background: TABLE_ROW_BG }}
+                >
+                  {formatDate(d.createdAt)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Card>
   );
 }
