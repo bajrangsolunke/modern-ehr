@@ -127,13 +127,10 @@ export function FormsPage() {
     }
   };
 
-  const onRowClick = (f: FormRequest) => {
-    if (f.status === "pending") {
-      fillForm(f);
-    } else {
-      setViewingId(f.id);
-    }
-  };
+  // Clicking a row always opens the read-focused details modal —
+  // editing requires the explicit "Fill out" button. Matches the
+  // view-first pattern in Tasks / Patients.
+  const onRowClick = (f: FormRequest) => setViewingId(f.id);
 
   return (
     <>

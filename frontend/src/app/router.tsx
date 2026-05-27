@@ -46,6 +46,9 @@ const UsersPage = lazy(() =>
 const UserDetailPage = lazy(() =>
   import("@/features/users").then((m) => ({ default: m.UserDetailPage }))
 );
+const DocsPage = lazy(() =>
+  import("@/features/docs").then((m) => ({ default: m.DocsPage }))
+);
 const FormsPage = lazy(() =>
   import("@/features/forms").then((m) => ({ default: m.FormsPage }))
 );
@@ -102,11 +105,7 @@ export function AppRouter() {
             <Route path={ROUTES.appointments} element={<AppointmentsPage />} />
             <Route path={ROUTES.forms} element={<FormsPage />} />
             <Route path="/forms/:formId/edit" element={<FormEditorPage />} />
-            {/* Legacy /docs bookmarks → /forms. */}
-            <Route
-              path={ROUTES.docs}
-              element={<Navigate to={ROUTES.forms} replace />}
-            />
+            <Route path={ROUTES.docs} element={<DocsPage />} />
             <Route element={<AdminRoute />}>
               <Route path={ROUTES.users} element={<UsersPage />} />
               <Route path="/users/:userId" element={<UserDetailPage />} />

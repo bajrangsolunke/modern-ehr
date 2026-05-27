@@ -58,10 +58,8 @@ export function PatientForms({ patientId }: Props) {
     }
   };
 
-  const onRowClick = (f: FormRequest) => {
-    if (f.status === "pending") fillForm(f);
-    else setViewingId(f.id);
-  };
+  // Row click → preview. Use the explicit "Fill out" button to edit.
+  const onRowClick = (f: FormRequest) => setViewingId(f.id);
 
   return (
     <>

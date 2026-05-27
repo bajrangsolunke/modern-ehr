@@ -18,9 +18,13 @@ export function FormEditorPage() {
     formId
   );
 
+  // Use the browser's back history so the editor returns to whatever
+  // page launched it (Forms list, patient profile, search results,
+  // direct deep-link, etc.). If there's no history we land on the
+  // Forms list as a safe default.
   const goBack = () => {
-    if (form?.patientId) {
-      navigate(`/patients/${form.patientId}?tab=documents`);
+    if (window.history.length > 1) {
+      navigate(-1);
     } else {
       navigate(ROUTES.forms);
     }

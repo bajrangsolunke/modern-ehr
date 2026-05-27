@@ -1,5 +1,13 @@
-import { Bell, ChevronDown, LogOut, Settings, User as UserIcon } from "lucide-react";
-import { NavLink, useNavigate } from "react-router-dom";
+import {
+  Bell,
+  ChevronDown,
+  ClipboardList,
+  FileText,
+  LogOut,
+  Settings,
+  User as UserIcon,
+} from "lucide-react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Popover from "@radix-ui/react-popover";
 import { UserAvatar } from "@/components/ui/avatar";
@@ -12,24 +20,68 @@ import { useMessagesSocket } from "@/features/messages/hooks/use-messages-socket
 import { currentUser as mockUser } from "@/mocks";
 import { cn } from "@/lib/utils";
 
-interface NavItem {
+type Role = "provider" | "staff" | "admin";
+
+interface NavLeaf {
+  kind: "leaf";
   to: string;
   label: string;
   /** When set, the item only renders for users whose role is in the list. */
-  roles?: ("provider" | "staff" | "admin")[];
+  roles?: Role[];
   /** Hook returning a count to render as a badge next to the label. */
   useBadge?: () => number;
 }
 
+interface NavGroup {
+  kind: "group";
+  label: string;
+  /** Each leaf's `to` is the actual route; the group's label is the
+   *  dropdown trigger. Active highlight kicks in when the current
+   *  pathname starts with ANY child's `to`. */
+  children: Array<{
+    to: string;
+    label: string;
+    description: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }>;
+  roles?: Role[];
+}
+
+type NavItem = NavLeaf | NavGroup;
+
 const navItems: NavItem[] = [
-  { to: "/", label: "Dashboard" },
-  { to: "/patients", label: "Patients" },
-  { to: "/messages", label: "Communication", useBadge: useUnreadCount },
-  { to: "/appointments", label: "Appointments" },
-  { to: "/forms", label: "Forms" },
-  { to: "/reports", label: "Reports" },
-  { to: "/users", label: "Users", roles: ["admin"] },
-  { to: "/tasks", label: "Tasks" },
+  { kind: "leaf", to: "/", label: "Dashboard" },
+  { kind: "leaf", to: "/patients", label: "Patients" },
+  {
+    kind: "leaf",
+    to: "/messages",
+    label: "Communication",
+    useBadge: useUnreadCount,
+  },
+  { kind: "leaf", to: "/appointments", label: "Appointments" },
+  {
+    kind: "group",
+    label: "Docs",
+    children: [
+      {
+        to: "/docs",
+        label: "Documents",
+        description:
+          "Upload and send patient docs — labs, insurance, imaging, and more.",
+        icon: FileText,
+      },
+      {
+        to: "/forms",
+        label: "Forms",
+        description:
+          "Consent, intake, ROI, insurance, discharge, referral workflow.",
+        icon: ClipboardList,
+      },
+    ],
+  },
+  { kind: "leaf", to: "/reports", label: "Reports" },
+  { kind: "leaf", to: "/users", label: "Users", roles: ["admin"] },
+  { kind: "leaf", to: "/tasks", label: "Tasks" },
 ];
 
 export function Topbar() {
@@ -61,9 +113,13 @@ export function Topbar() {
         </div>
 
         <nav className="hidden lg:flex items-center gap-1 mx-auto bg-[#F1F4F9] rounded-full p-1">
-          {visibleNav.map((item) => (
-            <NavItemLink key={item.to} item={item} />
-          ))}
+          {visibleNav.map((item) =>
+            item.kind === "leaf" ? (
+              <NavItemLink key={item.to} item={item} />
+            ) : (
+              <NavItemGroup key={item.label} item={item} />
+            )
+          )}
         </nav>
 
         <div className="flex items-center gap-2 min-w-fit">
@@ -162,7 +218,7 @@ export function Topbar() {
   );
 }
 
-function NavItemLink({ item }: { item: NavItem }) {
+function NavItemLink({ item }: { item: NavLeaf }) {
   // Hooks must be called unconditionally; default to a no-op badge.
   const badge = (item.useBadge ?? (() => 0))();
   return (
@@ -185,5 +241,84 @@ function NavItemLink({ item }: { item: NavItem }) {
         </span>
       )}
     </NavLink>
+  );
+}
+
+function NavItemGroup({ item }: { item: NavGroup }) {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  // The group highlights when the current path matches any child.
+  const isActive = item.children.some(
+    (c) => pathname === c.to || pathname.startsWith(`${c.to}/`)
+  );
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "px-4 xl:px-5 py-2 rounded-full text-[14px] font-medium transition-all inline-flex items-center gap-1.5 ring-focus",
+            isActive
+              ? "bg-slate-900 text-white shadow-soft"
+              : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+          )}
+        >
+          {item.label}
+          <ChevronDown
+            className={cn(
+              "size-3.5 transition",
+              isActive ? "text-white/80" : "text-muted-foreground"
+            )}
+          />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          sideOffset={8}
+          align="start"
+          className="z-50 w-72 rounded-2xl bg-white shadow-elev border border-border p-1.5 animate-fade-in"
+        >
+          {item.children.map((child) => {
+            const Icon = child.icon;
+            const childActive =
+              pathname === child.to || pathname.startsWith(`${child.to}/`);
+            return (
+              <DropdownMenu.Item
+                key={child.to}
+                onSelect={() => navigate(child.to)}
+                className={cn(
+                  "flex items-start gap-3 px-3 py-2.5 rounded-xl cursor-pointer outline-none",
+                  childActive ? "bg-primary/10" : "hover:bg-secondary"
+                )}
+              >
+                <div
+                  className={cn(
+                    "size-9 rounded-xl grid place-items-center shrink-0 [&_svg]:size-4",
+                    childActive
+                      ? "bg-primary/15 text-primary"
+                      : "bg-surface-subtle text-muted-foreground"
+                  )}
+                >
+                  <Icon />
+                </div>
+                <div className="min-w-0">
+                  <div
+                    className={cn(
+                      "text-sm font-semibold",
+                      childActive && "text-primary"
+                    )}
+                  >
+                    {child.label}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                    {child.description}
+                  </div>
+                </div>
+              </DropdownMenu.Item>
+            );
+          })}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
