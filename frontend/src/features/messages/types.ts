@@ -17,6 +17,8 @@ export interface Participant {
   id: string;
   audience: Audience;
   name: string;
+  /** Optional profile photo. */
+  avatarUrl?: string;
   /** Clinical context — only set for patient participants. */
   mrn?: string;
   dob?: string;

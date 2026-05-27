@@ -10,6 +10,7 @@ interface BackendParticipantDto {
   email: string | null;
   role: string | null;
   specialty: string | null;
+  avatar_url: string | null;
 }
 
 interface BackendPatientSummaryDto {
@@ -21,6 +22,7 @@ interface BackendPatientSummaryDto {
   gender: string | null;
   phone: string | null;
   email: string | null;
+  avatar_url: string | null;
   condition_tag: string | null;
 }
 
@@ -56,6 +58,7 @@ function mapParticipant(dto: BackendParticipantDto): Participant {
     id: dto.id,
     audience: "clinician",
     name: dto.name ?? dto.email ?? "Unknown",
+    avatarUrl: dto.avatar_url ?? undefined,
     email: dto.email ?? undefined,
     role: (dto.role as Participant["role"]) ?? undefined,
     specialty: dto.specialty ?? undefined,
@@ -67,6 +70,7 @@ function patientToParticipant(dto: BackendPatientSummaryDto): Participant {
     id: dto.id,
     audience: "patient",
     name: dto.name,
+    avatarUrl: dto.avatar_url ?? undefined,
     mrn: dto.mrn ?? undefined,
     dob: dto.dob ?? undefined,
     age: dto.age ?? undefined,

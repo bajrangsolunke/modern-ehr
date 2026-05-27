@@ -128,7 +128,11 @@ function Bubble({
       {!outgoing && (
         <div className="size-7 shrink-0 self-end">
           {groupEnd ? (
-            <UserAvatar name={participant.name} size="sm" />
+            <UserAvatar
+              name={participant.name}
+              src={participant.avatarUrl}
+              size="sm"
+            />
           ) : (
             <div className="size-7" />
           )}
@@ -262,8 +266,12 @@ function DraftIntro({
   return (
     <div className="flex-1 grid place-items-center px-6 py-12 text-center">
       <div className="max-w-sm">
-        <div className="mx-auto mb-3">
-          <UserAvatar name={participant.name} size="xl" />
+        <div className="mx-auto mb-3 inline-block">
+          <UserAvatar
+            name={participant.name}
+            src={participant.avatarUrl}
+            size="xl"
+          />
         </div>
         <div className="text-base font-bold">{participant.name}</div>
         {participant.specialty || participant.role || participant.email ? (

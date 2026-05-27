@@ -19,6 +19,7 @@ class ParticipantOut(BaseModel):
     email: str | None = None
     role: str | None = None
     specialty: str | None = None
+    avatar_url: str | None = None
 
 
 class PatientSummary(BaseModel):
@@ -34,6 +35,7 @@ class PatientSummary(BaseModel):
     gender: str | None = None
     phone: str | None = None
     email: str | None = None
+    avatar_url: str | None = None
     condition_tag: str | None = None
 
 

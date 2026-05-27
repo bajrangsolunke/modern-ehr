@@ -312,6 +312,7 @@ class MessagesService:
                     gender=patient.sex,
                     phone=patient.phone,
                     email=patient.email,
+                    avatar_url=patient.avatar_url,
                     condition_tag=patient.condition_tag,
                 )
 
@@ -329,6 +330,7 @@ class MessagesService:
                     email=u.email,
                     role=str(u.role.value) if u.role else None,
                     specialty=u.specialty,
+                    avatar_url=u.avatar_url,
                 )
                 for u in users
             ]

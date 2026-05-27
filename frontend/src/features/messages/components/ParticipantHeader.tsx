@@ -1,4 +1,4 @@
-import { ExternalLink, UserRound } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import { UserAvatar } from "@/components/ui/avatar";
 import type { Participant } from "../types";
@@ -12,13 +12,12 @@ export function ParticipantHeader({ participant }: Props) {
 
   return (
     <div className="flex items-start gap-3 px-4 sm:px-5 py-3 border-b border-border bg-white">
-      <div className="size-10 rounded-full bg-surface-subtle text-muted-foreground grid place-items-center shrink-0">
-        {isPatient ? (
-          <UserRound className="size-5" />
-        ) : (
-          <UserAvatar name={participant.name} size="md" />
-        )}
-      </div>
+      <UserAvatar
+        name={participant.name}
+        src={participant.avatarUrl}
+        size="lg"
+        className="shrink-0"
+      />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="text-[15px] font-bold truncate">

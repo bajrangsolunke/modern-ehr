@@ -120,7 +120,11 @@ function ConversationRowItem({
         )}
       >
         <div className="flex items-start gap-2.5">
-          <UserAvatar name={participant.name} size="md" />
+          <UserAvatar
+            name={participant.name}
+            src={participant.avatarUrl}
+            size="md"
+          />
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2 mb-0.5">
               <div className="flex items-center gap-2 min-w-0">

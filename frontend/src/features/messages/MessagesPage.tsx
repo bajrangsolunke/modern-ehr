@@ -107,6 +107,7 @@ export function MessagesPage() {
           id: u.id,
           audience: "clinician" as const,
           name: u.fullName,
+          avatarUrl: u.avatarUrl ?? undefined,
           email: u.email,
           role: u.role,
           specialty: u.specialty ?? undefined,
