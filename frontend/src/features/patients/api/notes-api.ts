@@ -1,4 +1,5 @@
 import { api } from "@/lib/api-client";
+import { stripUndefined } from "@/lib/api-utils";
 import type { SoapNote } from "@/types";
 
 interface BackendNoteDto {
@@ -54,14 +55,6 @@ function noteToBackendDto(n: SoapNote): BackendNoteDto {
     created_at: n.date,
     updated_at: n.updatedAt ?? n.date,
   };
-}
-
-function stripUndefined<T extends object>(obj: T): Partial<T> {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) out[k] = v;
-  }
-  return out as Partial<T>;
 }
 
 export const notesApi = {

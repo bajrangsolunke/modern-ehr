@@ -1,4 +1,5 @@
 import { api } from "@/lib/api-client";
+import { stripUndefined } from "@/lib/api-utils";
 import type {
   Appointment,
   AppointmentStatus,
@@ -94,14 +95,6 @@ function mapAppointment(dto: BackendAppointmentDto): Appointment {
     room: dto.room ?? undefined,
     reason: dto.reason ?? undefined,
   };
-}
-
-function stripUndefined<T extends object>(obj: T): Partial<T> {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) out[k] = v;
-  }
-  return out as Partial<T>;
 }
 
 export interface BookingSlot {

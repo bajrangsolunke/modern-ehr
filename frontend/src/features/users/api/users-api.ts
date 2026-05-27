@@ -1,4 +1,5 @@
 import { api } from "@/lib/api-client";
+import { stripUndefined } from "@/lib/api-utils";
 import type { Role } from "@/types";
 
 export interface AppUser {
@@ -83,14 +84,6 @@ function mapUser(dto: BackendUserDto): AppUser {
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
   };
-}
-
-function stripUndefined<T extends object>(obj: T): Partial<T> {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) out[k] = v;
-  }
-  return out as Partial<T>;
 }
 
 export interface UserStats {

@@ -1,4 +1,5 @@
 import { api } from "@/lib/api-client";
+import { stripUndefined } from "@/lib/api-utils";
 import type { VitalMetricKey } from "@/features/patients/lib/vital-metrics";
 
 export interface VitalReading {
@@ -52,14 +53,6 @@ function vitalToBackendDto(v: VitalReading): BackendVitalDto {
     source: v.source,
     recorded_at: v.recordedAt,
   };
-}
-
-function stripUndefined<T extends object>(obj: T): Partial<T> {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) out[k] = v;
-  }
-  return out as Partial<T>;
 }
 
 export const vitalsApi = {

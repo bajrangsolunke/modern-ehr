@@ -1,4 +1,5 @@
 import { api } from "@/lib/api-client";
+import { stripUndefined } from "@/lib/api-utils";
 import type { User } from "@/types";
 
 export interface LoginPayload {
@@ -57,14 +58,6 @@ export interface SelfUpdateInput {
 export interface PasswordChangeInput {
   current_password: string;
   new_password: string;
-}
-
-function stripUndefined<T extends object>(obj: T): Partial<T> {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) out[k] = v;
-  }
-  return out as Partial<T>;
 }
 
 export const authApi = {

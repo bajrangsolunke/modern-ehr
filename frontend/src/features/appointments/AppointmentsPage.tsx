@@ -1,9 +1,6 @@
 /**
- * Appointments management (US-AP1..US-AP9).
- *
- * Layout: stat tiles → filter bar (search + status chips + date range +
- * "Mine vs. all") → table with row actions → AppointmentModal for
- * create/edit (slot-based booking, drawer-free).
+ * Appointments management page. User stories US-APPT-1..US-APPT-4
+ * in docs/superpowers/specs/2026-05-27-workflow-user-stories.md.
  */
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -11,7 +8,6 @@ import {
   CalendarPlus,
   Check,
   CheckCheck,
-  ChevronsUpDown,
   MoreVertical,
   Pencil,
   Search,
@@ -29,6 +25,9 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { UserAvatar } from "@/components/ui/avatar";
+import { FilterChip } from "@/components/ui/filter-chip";
+import { SortableTh, TABLE_ROW_BG } from "@/components/ui/sortable-th";
+import { SummaryTile } from "@/components/ui/summary-tile";
 import { AppointmentModal } from "@/features/appointments/components/AppointmentModal";
 import {
   useAppointments,
@@ -41,10 +40,6 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import type { Appointment, AppointmentStatus } from "@/types";
 import { cn, formatDate } from "@/lib/utils";
 
-const ROW_BG = "#F5F7FB";
-const HEADER_BG = "#FFFFFF";
-const HEADER_SHADOW = "0 4px 12px rgba(17,24,39,0.06)";
-
 const STATUS_VARIANT: Record<
   AppointmentStatus,
   "info" | "warning" | "success" | "neutral" | "danger"
@@ -56,8 +51,22 @@ const STATUS_VARIANT: Record<
   cancelled: "danger",
   "no-show": "neutral",
 };
+const STATUSES_IN_ORDER: AppointmentStatus[] = [
+  "scheduled",
+  "confirmed",
+  "pending",
+  "completed",
+  "cancelled",
+  "no-show",
+];
 
 type DatePreset = "all" | "today" | "week" | "upcoming";
+const DATE_PRESETS: { value: DatePreset; label: string }[] = [
+  { value: "upcoming", label: "Upcoming" },
+  { value: "today", label: "Today" },
+  { value: "week", label: "This week" },
+  { value: "all", label: "All time" },
+];
 
 function rangeFor(preset: DatePreset): { start?: string; end?: string } {
   const now = new Date();
@@ -74,9 +83,7 @@ function rangeFor(preset: DatePreset): { start?: string; end?: string } {
     end.setDate(end.getDate() + 7);
     return { start: start.toISOString(), end: end.toISOString() };
   }
-  if (preset === "upcoming") {
-    return { start: new Date().toISOString() };
-  }
+  if (preset === "upcoming") return { start: new Date().toISOString() };
   return {};
 }
 
@@ -94,14 +101,9 @@ export function AppointmentsPage() {
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Appointment | null>(null);
 
-  /*
-   * Lock the date range to a stable reference per preset selection.
-   * rangeFor() calls `new Date()` for the "upcoming" preset, which
-   * shifts by milliseconds on every render. Without useMemo, the
-   * filters object's identity (and the React Query key it feeds)
-   * mutates on every render — we end up in a refetch loop that
-   * hammers the API rate limit and returns 429s.
-   */
+  // rangeFor() calls `new Date()` for the "upcoming" preset, which
+  // shifts by milliseconds. Memoize to prevent the React Query key
+  // changing on every render → refetch loop → 429.
   const range = useMemo(() => rangeFor(preset), [preset]);
   const physicianFilter =
     scope === "mine" && user?.role === "provider" ? user.id : undefined;
@@ -113,8 +115,7 @@ export function AppointmentsPage() {
       start_date: range.start,
       end_date: range.end,
       physician_id: physicianFilter,
-      sort_dir:
-        preset === "all" ? ("desc" as const) : ("asc" as const),
+      sort_dir: preset === "all" ? ("desc" as const) : ("asc" as const),
       limit: 200,
     }),
     [debouncedQuery, status, range, physicianFilter, preset]
@@ -154,91 +155,31 @@ export function AppointmentsPage() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-4">
-        <StatTile label="Today" value={stats?.today ?? "—"} tone="primary" />
-        <StatTile label="This week" value={stats?.thisWeek ?? "—"} tone="info" />
-        <StatTile
+        <SummaryTile label="Today" value={stats?.today ?? "—"} tone="primary" />
+        <SummaryTile label="This week" value={stats?.thisWeek ?? "—"} tone="info" />
+        <SummaryTile
           label="Cancellations · 7d"
           value={stats?.cancellationsThisWeek ?? "—"}
           tone="warning"
         />
-        <StatTile
+        <SummaryTile
           label="No-shows · 7d"
           value={stats?.noShowsThisWeek ?? "—"}
           tone="muted"
         />
       </div>
 
-      <Card className="mb-4">
-        <CardContent className="p-3 flex flex-wrap items-center gap-2">
-          <Input
-            placeholder="Search patient name or MRN…"
-            icon={<Search className="size-4" />}
-            className="w-64 h-10"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-
-          <div className="w-px h-6 bg-border mx-1" />
-
-          {(["upcoming", "today", "week", "all"] as DatePreset[]).map((p) => (
-            <Chip
-              key={p}
-              label={
-                p === "all"
-                  ? "All time"
-                  : p === "upcoming"
-                  ? "Upcoming"
-                  : p === "today"
-                  ? "Today"
-                  : "This week"
-              }
-              active={preset === p}
-              onClick={() => setPreset(p)}
-            />
-          ))}
-
-          <div className="w-px h-6 bg-border mx-1" />
-
-          <Chip
-            label="All statuses"
-            active={status === undefined}
-            onClick={() => setStatus(undefined)}
-          />
-          {(
-            [
-              "scheduled",
-              "confirmed",
-              "pending",
-              "completed",
-              "cancelled",
-              "no-show",
-            ] as AppointmentStatus[]
-          ).map((s) => (
-            <Chip
-              key={s}
-              label={labelize(s)}
-              active={status === s}
-              onClick={() => setStatus(status === s ? undefined : s)}
-            />
-          ))}
-
-          {user?.role === "provider" && (
-            <>
-              <div className="w-px h-6 bg-border mx-1" />
-              <Chip
-                label="Mine"
-                active={scope === "mine"}
-                onClick={() => setScope("mine")}
-              />
-              <Chip
-                label="All providers"
-                active={scope === "all"}
-                onClick={() => setScope("all")}
-              />
-            </>
-          )}
-        </CardContent>
-      </Card>
+      <FilterBar
+        query={query}
+        setQuery={setQuery}
+        status={status}
+        setStatus={setStatus}
+        preset={preset}
+        setPreset={setPreset}
+        userRole={user?.role}
+        scope={scope}
+        setScope={setScope}
+      />
 
       {isLoading && <TableSkeleton rows={8} cols={7} />}
 
@@ -252,145 +193,13 @@ export function AppointmentsPage() {
       )}
 
       {!isLoading && !isError && data && (
-        <Card className="overflow-hidden p-3 sm:p-4">
-          <div className="overflow-x-auto">
-            <table
-              className="w-full text-sm border-separate"
-              style={{ borderSpacing: "0 6px" }}
-            >
-              <thead>
-                <tr className="text-xs text-muted-foreground text-left">
-                  <Th first>When</Th>
-                  <Th>Patient</Th>
-                  <Th>Type</Th>
-                  <Th>Status</Th>
-                  <Th>Physician</Th>
-                  <Th>Room</Th>
-                  <th
-                    className="font-medium px-4 py-2 text-right last:rounded-r-full"
-                    style={{ background: HEADER_BG, boxShadow: HEADER_SHADOW }}
-                  >
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="px-4 py-10 text-center text-muted-foreground rounded-2xl"
-                      style={{ background: ROW_BG }}
-                    >
-                      No appointments in this view. Try a wider date range.
-                    </td>
-                  </tr>
-                )}
-                {data.map((a) => (
-                  <tr
-                    key={a.id}
-                    className={cn(
-                      "hover:[&_td]:bg-[#EEF2F8] transition group",
-                      a.status === "cancelled" && "opacity-60"
-                    )}
-                  >
-                    <td
-                      className="px-4 py-2 first:rounded-l-full"
-                      style={{ background: ROW_BG }}
-                    >
-                      <div className="font-semibold leading-tight">
-                        {formatDate(a.startsAt)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {a.time} · {a.duration} min
-                      </div>
-                    </td>
-                    <td className="px-4 py-2" style={{ background: ROW_BG }}>
-                      <Link
-                        to={`/patients/${a.patientId}`}
-                        className="flex items-center gap-2 hover:text-primary transition"
-                      >
-                        <UserAvatar
-                          name={a.patientName}
-                          src={a.patientAvatarUrl}
-                          size="sm"
-                        />
-                        <div className="min-w-0">
-                          <div className="font-semibold truncate">
-                            {a.patientName}
-                          </div>
-                          {a.patientMrn && (
-                            <div className="text-[11px] text-muted-foreground">
-                              MRN {a.patientMrn}
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-                    </td>
-                    <td
-                      className="px-4 py-2 capitalize text-foreground/80"
-                      style={{ background: ROW_BG }}
-                    >
-                      {a.type.replace(/-/g, " ")}
-                    </td>
-                    <td className="px-4 py-2" style={{ background: ROW_BG }}>
-                      <Badge
-                        variant={STATUS_VARIANT[a.status]}
-                        size="sm"
-                        dot
-                        className="capitalize"
-                      >
-                        {a.status}
-                      </Badge>
-                    </td>
-                    <td
-                      className="px-4 py-2 text-foreground/80"
-                      style={{ background: ROW_BG }}
-                    >
-                      {a.physician}
-                    </td>
-                    <td
-                      className="px-4 py-2 text-foreground/80"
-                      style={{ background: ROW_BG }}
-                    >
-                      {a.room || "—"}
-                    </td>
-                    <td
-                      className="px-4 py-2 last:rounded-r-full"
-                      style={{ background: ROW_BG }}
-                    >
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7 rounded-full bg-white hover:bg-white/80 text-foreground/70"
-                          aria-label="Edit appointment"
-                          onClick={() => openEdit(a)}
-                        >
-                          <Pencil className="size-3" />
-                        </Button>
-                        <RowMenu
-                          appointment={a}
-                          onSetStatus={(s) =>
-                            setStatusMutation.mutate(a.id, s)
-                          }
-                          onEdit={() => openEdit(a)}
-                          onDelete={
-                            canDelete ? () => setPendingDelete(a) : undefined
-                          }
-                          busy={setStatusMutation.isPending}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-3 text-xs text-muted-foreground text-right">
-            {data.length} appointment{data.length === 1 ? "" : "s"}
-          </div>
-        </Card>
+        <AppointmentsTable
+          items={data}
+          onEdit={openEdit}
+          onSetStatus={(id, s) => setStatusMutation.mutate(id, s)}
+          onDelete={canDelete ? setPendingDelete : undefined}
+          busy={setStatusMutation.isPending}
+        />
       )}
 
       <AppointmentModal
@@ -420,74 +229,274 @@ export function AppointmentsPage() {
   );
 }
 
-function Th({ children, first }: { children: React.ReactNode; first?: boolean }) {
-  return (
-    <th
-      className={cn("font-medium px-4 py-2", first && "first:rounded-l-full")}
-      style={{ background: HEADER_BG, boxShadow: HEADER_SHADOW }}
-    >
-      <button
-        type="button"
-        className="inline-flex items-center gap-1 hover:text-foreground transition"
-      >
-        {children}
-        <ChevronsUpDown className="size-3 opacity-60" />
-      </button>
-    </th>
-  );
-}
+/* -------------------------------------------------------------------------- */
 
-function Chip({
-  label,
-  active,
-  onClick,
+function FilterBar({
+  query,
+  setQuery,
+  status,
+  setStatus,
+  preset,
+  setPreset,
+  userRole,
+  scope,
+  setScope,
 }: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
+  query: string;
+  setQuery: (v: string) => void;
+  status: AppointmentStatus | undefined;
+  setStatus: (s: AppointmentStatus | undefined) => void;
+  preset: DatePreset;
+  setPreset: (p: DatePreset) => void;
+  userRole?: string;
+  scope: "all" | "mine";
+  setScope: (s: "all" | "mine") => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "px-3 h-8 rounded-full text-xs font-medium border transition ring-focus",
-        active
-          ? "bg-slate-900 text-white border-slate-900"
-          : "bg-white border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
-      )}
-    >
-      {label}
-    </button>
-  );
-}
+    <Card className="mb-4">
+      <CardContent className="p-3 flex flex-wrap items-center gap-2">
+        <Input
+          placeholder="Search patient name or MRN…"
+          icon={<Search className="size-4" />}
+          className="w-64 h-10"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
 
-function StatTile({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number | string;
-  tone: "primary" | "info" | "warning" | "muted";
-}) {
-  const toneClass = {
-    primary: "text-primary",
-    info: "text-info",
-    warning: "text-warning",
-    muted: "text-muted-foreground",
-  }[tone];
-  return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-          {label}
-        </div>
-        <div className={cn("mt-2 text-3xl font-bold", toneClass)}>{value}</div>
+        <Divider />
+
+        {DATE_PRESETS.map((p) => (
+          <FilterChip
+            key={p.value}
+            label={p.label}
+            active={preset === p.value}
+            onClick={() => setPreset(p.value)}
+          />
+        ))}
+
+        <Divider />
+
+        <FilterChip
+          label="All statuses"
+          active={status === undefined}
+          onClick={() => setStatus(undefined)}
+        />
+        {STATUSES_IN_ORDER.map((s) => (
+          <FilterChip
+            key={s}
+            label={labelize(s)}
+            active={status === s}
+            onClick={() => setStatus(status === s ? undefined : s)}
+          />
+        ))}
+
+        {userRole === "provider" && (
+          <>
+            <Divider />
+            <FilterChip
+              label="Mine"
+              active={scope === "mine"}
+              onClick={() => setScope("mine")}
+            />
+            <FilterChip
+              label="All providers"
+              active={scope === "all"}
+              onClick={() => setScope("all")}
+            />
+          </>
+        )}
       </CardContent>
     </Card>
   );
 }
+
+function Divider() {
+  return <div className="w-px h-6 bg-border mx-1" />;
+}
+
+/* -------------------------------------------------------------------------- */
+
+function AppointmentsTable({
+  items,
+  onEdit,
+  onSetStatus,
+  onDelete,
+  busy,
+}: {
+  items: Appointment[];
+  onEdit: (a: Appointment) => void;
+  onSetStatus: (id: string, status: AppointmentStatus) => void;
+  onDelete?: (a: Appointment) => void;
+  busy?: boolean;
+}) {
+  return (
+    <Card className="overflow-hidden p-3 sm:p-4">
+      <div className="overflow-x-auto">
+        <table
+          className="w-full text-sm border-separate"
+          style={{ borderSpacing: "0 6px" }}
+        >
+          <thead>
+            <tr className="text-xs text-muted-foreground text-left">
+              <SortableTh first>When</SortableTh>
+              <SortableTh>Patient</SortableTh>
+              <SortableTh>Type</SortableTh>
+              <SortableTh>Status</SortableTh>
+              <SortableTh>Physician</SortableTh>
+              <SortableTh>Room</SortableTh>
+              <SortableTh last>Actions</SortableTh>
+            </tr>
+          </thead>
+          <tbody>
+            {items.length === 0 && (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="px-4 py-10 text-center text-muted-foreground rounded-2xl"
+                  style={{ background: TABLE_ROW_BG }}
+                >
+                  No appointments in this view. Try a wider date range.
+                </td>
+              </tr>
+            )}
+            {items.map((a) => (
+              <AppointmentRow
+                key={a.id}
+                appointment={a}
+                onEdit={() => onEdit(a)}
+                onSetStatus={(s) => onSetStatus(a.id, s)}
+                onDelete={onDelete ? () => onDelete(a) : undefined}
+                busy={busy}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-3 text-xs text-muted-foreground text-right">
+        {items.length} appointment{items.length === 1 ? "" : "s"}
+      </div>
+    </Card>
+  );
+}
+
+function AppointmentRow({
+  appointment,
+  onEdit,
+  onSetStatus,
+  onDelete,
+  busy,
+}: {
+  appointment: Appointment;
+  onEdit: () => void;
+  onSetStatus: (s: AppointmentStatus) => void;
+  onDelete?: () => void;
+  busy?: boolean;
+}) {
+  const a = appointment;
+  return (
+    <tr
+      className={cn(
+        "hover:[&_td]:bg-[#EEF2F8] transition group",
+        a.status === "cancelled" && "opacity-60"
+      )}
+    >
+      <Cell first>
+        <div className="font-semibold leading-tight">
+          {formatDate(a.startsAt)}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {a.time} · {a.duration} min
+        </div>
+      </Cell>
+      <Cell>
+        <Link
+          to={`/patients/${a.patientId}`}
+          className="flex items-center gap-2 hover:text-primary transition"
+        >
+          <UserAvatar
+            name={a.patientName}
+            src={a.patientAvatarUrl}
+            size="sm"
+          />
+          <div className="min-w-0">
+            <div className="font-semibold truncate">{a.patientName}</div>
+            {a.patientMrn && (
+              <div className="text-[11px] text-muted-foreground">
+                MRN {a.patientMrn}
+              </div>
+            )}
+          </div>
+        </Link>
+      </Cell>
+      <Cell>
+        <span className="capitalize text-foreground/80">
+          {a.type.replace(/-/g, " ")}
+        </span>
+      </Cell>
+      <Cell>
+        <Badge
+          variant={STATUS_VARIANT[a.status]}
+          size="sm"
+          dot
+          className="capitalize"
+        >
+          {a.status}
+        </Badge>
+      </Cell>
+      <Cell>
+        <span className="text-foreground/80">{a.physician}</span>
+      </Cell>
+      <Cell>
+        <span className="text-foreground/80">{a.room || "—"}</span>
+      </Cell>
+      <Cell last>
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 rounded-full bg-white hover:bg-white/80 text-foreground/70"
+            aria-label="Edit appointment"
+            onClick={onEdit}
+          >
+            <Pencil className="size-3" />
+          </Button>
+          <RowMenu
+            appointment={a}
+            onSetStatus={onSetStatus}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            busy={busy}
+          />
+        </div>
+      </Cell>
+    </tr>
+  );
+}
+
+function Cell({
+  children,
+  first,
+  last,
+}: {
+  children: React.ReactNode;
+  first?: boolean;
+  last?: boolean;
+}) {
+  return (
+    <td
+      className={cn(
+        "px-4 py-2",
+        first && "first:rounded-l-full",
+        last && "last:rounded-r-full"
+      )}
+      style={{ background: TABLE_ROW_BG }}
+    >
+      {children}
+    </td>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 
 function RowMenu({
   appointment,

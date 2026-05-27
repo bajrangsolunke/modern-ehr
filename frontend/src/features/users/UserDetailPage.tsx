@@ -21,6 +21,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SummaryTile } from "@/components/ui/summary-tile";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -188,25 +189,25 @@ export function UserDetailPage() {
           </Card>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:gap-4">
-            <StatTile
+            <SummaryTile
               label="Assigned patients"
               value={stats?.patientCount ?? "—"}
               icon={<UsersIcon />}
               tone="info"
             />
-            <StatTile
+            <SummaryTile
               label="Upcoming appointments"
               value={stats?.upcomingAppointments ?? "—"}
               icon={<CalendarClock />}
               tone="primary"
             />
-            <StatTile
+            <SummaryTile
               label="Completed appointments"
               value={stats?.completedAppointments ?? "—"}
               icon={<CheckCircle2 />}
               tone="success"
             />
-            <StatTile
+            <SummaryTile
               label="Weekly hours"
               value={
                 weeklyHours === null
@@ -366,51 +367,6 @@ export function UserDetailPage() {
   );
 }
 
-function StatTile({
-  label,
-  value,
-  icon,
-  hint,
-  tone,
-}: {
-  label: string;
-  value: React.ReactNode;
-  icon?: React.ReactNode;
-  hint?: string;
-  tone: "info" | "primary" | "success" | "muted";
-}) {
-  const toneClass = {
-    info: "text-info",
-    primary: "text-primary",
-    success: "text-success",
-    muted: "text-muted-foreground",
-  }[tone];
-  return (
-    <Card>
-      <CardContent className="p-4 flex items-start gap-3">
-        {icon && (
-          <div
-            className={cn(
-              "size-10 rounded-2xl bg-surface-subtle grid place-items-center",
-              toneClass
-            )}
-          >
-            <span className="[&_svg]:size-5">{icon}</span>
-          </div>
-        )}
-        <div className="min-w-0">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
-            {label}
-          </div>
-          <div className="text-2xl font-bold tracking-tight">{value}</div>
-          {hint && (
-            <div className="text-[10px] text-muted-foreground mt-0.5">{hint}</div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 function statusVariant(
   status: string

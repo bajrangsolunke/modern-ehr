@@ -1,4 +1,5 @@
 import { api } from "@/lib/api-client";
+import { stripUndefined } from "@/lib/api-utils";
 import type { Medication, MedicationStatus } from "@/types";
 
 interface BackendMedicationDto {
@@ -58,14 +59,6 @@ function medicationToBackendDto(m: Medication): BackendMedicationDto {
     status: m.status,
     prescriber: m.prescriber || null,
   };
-}
-
-function stripUndefined<T extends object>(obj: T): Partial<T> {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) out[k] = v;
-  }
-  return out as Partial<T>;
 }
 
 export const medicationsApi = {
