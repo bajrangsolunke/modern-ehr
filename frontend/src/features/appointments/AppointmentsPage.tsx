@@ -9,6 +9,7 @@ import {
   CalendarPlus,
   Check,
   CheckCheck,
+  Filter,
   List,
   MoreVertical,
   Pencil,
@@ -18,6 +19,7 @@ import {
   XCircle,
 } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import * as Popover from "@radix-ui/react-popover";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,11 +31,11 @@ import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { UserAvatar } from "@/components/ui/avatar";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { SortableTh, TABLE_ROW_BG } from "@/components/ui/sortable-th";
-import { SummaryTile } from "@/components/ui/summary-tile";
 import { AppointmentModal } from "@/features/appointments/components/AppointmentModal";
 import {
   AppointmentsCalendar,
-  startOfWeek,
+  rangeForMode,
+  type CalendarMode,
 } from "@/features/appointments/components/AppointmentsCalendar";
 import {
   useAppointments,
@@ -105,7 +107,8 @@ export function AppointmentsPage() {
   const [scope, setScope] = useState<"all" | "mine">(
     user?.role === "provider" ? "mine" : "all"
   );
-  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>("week");
+  const [calendarCursor, setCalendarCursor] = useState<Date>(() => new Date());
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
@@ -118,14 +121,11 @@ export function AppointmentsPage() {
   const physicianFilter =
     scope === "mine" && user?.role === "provider" ? user.id : undefined;
 
-  // Calendar mode pulls the visible week explicitly so the user can
-  // navigate prev/next/today regardless of the filter chip choice.
-  // List mode uses the date preset like before.
+  // Calendar mode drives the date range from its own cursor + sub-view.
   const calendarRange = useMemo(() => {
-    const end = new Date(weekStart);
-    end.setDate(end.getDate() + 7);
-    return { start: weekStart.toISOString(), end: end.toISOString() };
-  }, [weekStart]);
+    const { start, end } = rangeForMode(calendarMode, calendarCursor);
+    return { start: start.toISOString(), end: end.toISOString() };
+  }, [calendarMode, calendarCursor]);
 
   const filters = useMemo(
     () => ({
@@ -135,10 +135,15 @@ export function AppointmentsPage() {
       end_date: view === "calendar" ? calendarRange.end : range.end,
       physician_id: physicianFilter,
       sort_dir: preset === "all" ? ("desc" as const) : ("asc" as const),
-      limit: 200,
+      limit: 500,
     }),
     [view, debouncedQuery, status, range, calendarRange, physicianFilter, preset]
   );
+
+  const activeFilterCount =
+    (status ? 1 : 0) +
+    (view === "list" && preset !== "upcoming" ? 1 : 0) +
+    (user?.role === "provider" && scope === "all" ? 1 : 0);
 
   const { data, isLoading, isError, error, refetch, isFetching } =
     useAppointments(filters);
@@ -161,11 +166,6 @@ export function AppointmentsPage() {
     <>
       <PageHeader
         title="Appointments"
-        subtitle={`Today · ${today.toLocaleDateString(undefined, {
-          weekday: "long",
-          month: "short",
-          day: "numeric",
-        })}`}
         right={
           <>
             <ViewToggle mode={view} onChange={setView} />
@@ -176,32 +176,44 @@ export function AppointmentsPage() {
         }
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-4">
-        <SummaryTile label="Today" value={stats?.today ?? "—"} tone="primary" />
-        <SummaryTile label="This week" value={stats?.thisWeek ?? "—"} tone="info" />
-        <SummaryTile
-          label="Cancellations · 7d"
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-3 mb-3">
+        <CompactStat label="Today" value={stats?.today ?? "—"} tone="primary" />
+        <CompactStat label="This week" value={stats?.thisWeek ?? "—"} tone="info" />
+        <CompactStat
+          label="Cancelled · 7d"
           value={stats?.cancellationsThisWeek ?? "—"}
           tone="warning"
         />
-        <SummaryTile
+        <CompactStat
           label="No-shows · 7d"
           value={stats?.noShowsThisWeek ?? "—"}
           tone="muted"
         />
       </div>
 
-      <FilterBar
+      <Toolbar
         query={query}
         setQuery={setQuery}
-        status={status}
-        setStatus={setStatus}
-        preset={preset}
-        setPreset={setPreset}
-        userRole={user?.role}
-        scope={scope}
-        setScope={setScope}
-        hideDateChips={view === "calendar"}
+        activeFilterCount={activeFilterCount}
+        renderFilterBody={(close) => (
+          <FilterPopoverBody
+            status={status}
+            setStatus={setStatus}
+            preset={preset}
+            setPreset={setPreset}
+            userRole={user?.role}
+            scope={scope}
+            setScope={setScope}
+            hideDateChips={view === "calendar"}
+            today={today}
+            onClear={() => {
+              setStatus(undefined);
+              if (view === "list") setPreset("upcoming");
+              if (user?.role === "provider") setScope("mine");
+              close();
+            }}
+          />
+        )}
       />
 
       {isLoading && <TableSkeleton rows={8} cols={7} />}
@@ -226,8 +238,10 @@ export function AppointmentsPage() {
           />
         ) : (
           <AppointmentsCalendar
-            weekStart={weekStart}
-            onWeekStartChange={setWeekStart}
+            mode={calendarMode}
+            onModeChange={setCalendarMode}
+            cursor={calendarCursor}
+            onCursorChange={setCalendarCursor}
             appointments={data}
             onEdit={openEdit}
             onNew={() => openCreate()}
@@ -318,9 +332,56 @@ function ViewToggleButton({
   );
 }
 
-function FilterBar({
+function Toolbar({
   query,
   setQuery,
+  activeFilterCount,
+  renderFilterBody,
+}: {
+  query: string;
+  setQuery: (v: string) => void;
+  activeFilterCount: number;
+  renderFilterBody: (closePopover: () => void) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card className="mb-3">
+      <CardContent className="p-2 sm:p-3 flex flex-wrap items-center gap-2">
+        <Input
+          placeholder="Search patient name or MRN…"
+          icon={<Search className="size-4" />}
+          className="flex-1 min-w-[12rem] h-10"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <Popover.Root open={open} onOpenChange={setOpen}>
+          <Popover.Trigger asChild>
+            <Button variant="secondary" className="h-10 rounded-full px-4 relative">
+              <Filter className="size-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="ml-1 inline-grid place-items-center min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+          </Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content
+              align="end"
+              sideOffset={6}
+              className="z-50 w-[min(92vw,420px)] rounded-2xl bg-white shadow-elev border border-border p-4 animate-fade-in"
+            >
+              {renderFilterBody(() => setOpen(false))}
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FilterPopoverBody({
   status,
   setStatus,
   preset,
@@ -329,9 +390,9 @@ function FilterBar({
   scope,
   setScope,
   hideDateChips,
+  today,
+  onClear,
 }: {
-  query: string;
-  setQuery: (v: string) => void;
   status: AppointmentStatus | undefined;
   setStatus: (s: AppointmentStatus | undefined) => void;
   preset: DatePreset;
@@ -340,36 +401,38 @@ function FilterBar({
   scope: "all" | "mine";
   setScope: (s: "all" | "mine") => void;
   hideDateChips?: boolean;
+  today: Date;
+  onClear: () => void;
 }) {
   return (
-    <Card className="mb-4">
-      <CardContent className="p-3 flex flex-wrap items-center gap-2">
-        <Input
-          placeholder="Search patient name or MRN…"
-          icon={<Search className="size-4" />}
-          className="w-64 h-10"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-bold">Filters</h3>
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          Reset
+        </button>
+      </div>
 
-        {!hideDateChips && (
-          <>
-            <Divider />
-            {DATE_PRESETS.map((p) => (
-              <FilterChip
-                key={p.value}
-                label={p.label}
-                active={preset === p.value}
-                onClick={() => setPreset(p.value)}
-              />
-            ))}
-          </>
-        )}
+      {!hideDateChips && (
+        <FilterGroup label="Date">
+          {DATE_PRESETS.map((p) => (
+            <FilterChip
+              key={p.value}
+              label={p.label}
+              active={preset === p.value}
+              onClick={() => setPreset(p.value)}
+            />
+          ))}
+        </FilterGroup>
+      )}
 
-        <Divider />
-
+      <FilterGroup label="Status">
         <FilterChip
-          label="All statuses"
+          label="Any"
           active={status === undefined}
           onClick={() => setStatus(undefined)}
         />
@@ -381,29 +444,79 @@ function FilterBar({
             onClick={() => setStatus(status === s ? undefined : s)}
           />
         ))}
+      </FilterGroup>
 
-        {userRole === "provider" && (
-          <>
-            <Divider />
-            <FilterChip
-              label="Mine"
-              active={scope === "mine"}
-              onClick={() => setScope("mine")}
-            />
-            <FilterChip
-              label="All providers"
-              active={scope === "all"}
-              onClick={() => setScope("all")}
-            />
-          </>
-        )}
-      </CardContent>
-    </Card>
+      {userRole === "provider" && (
+        <FilterGroup label="Scope">
+          <FilterChip
+            label="Mine"
+            active={scope === "mine"}
+            onClick={() => setScope("mine")}
+          />
+          <FilterChip
+            label="All providers"
+            active={scope === "all"}
+            onClick={() => setScope("all")}
+          />
+        </FilterGroup>
+      )}
+
+      <div className="text-[11px] text-muted-foreground pt-1 border-t border-border/60">
+        {today.toLocaleDateString(undefined, {
+          weekday: "long",
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })}
+      </div>
+    </div>
   );
 }
 
-function Divider() {
-  return <div className="w-px h-6 bg-border mx-1" />;
+function FilterGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">
+        {label}
+      </div>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
+    </div>
+  );
+}
+
+function CompactStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: React.ReactNode;
+  tone: "primary" | "info" | "warning" | "muted";
+}) {
+  const toneClass = {
+    primary: "text-primary",
+    info: "text-info",
+    warning: "text-warning",
+    muted: "text-muted-foreground",
+  }[tone];
+  return (
+    <Card>
+      <CardContent className="px-3 py-2.5 flex items-center justify-between gap-2">
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+          {label}
+        </span>
+        <span className={cn("text-xl font-bold tabular-nums", toneClass)}>
+          {value}
+        </span>
+      </CardContent>
+    </Card>
+  );
 }
 
 /* -------------------------------------------------------------------------- */

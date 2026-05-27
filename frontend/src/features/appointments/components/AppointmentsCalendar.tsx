@@ -1,11 +1,10 @@
 /**
- * Week-view calendar for the appointments page.
+ * Calendar view for the appointments page. Supports Day, Week, and
+ * Month sub-views. The parent owns `mode` + `cursor` (focal date) so
+ * it can recompute the list-query date range as the user navigates.
  *
- * Layout: a fixed time-axis column on the left (every hour from 7am
- * to 8pm) and seven day columns to the right. Each appointment
- * renders as an absolutely-positioned card placed by start time +
- * duration. Click → edit; click empty space in a day → start a new
- * booking prefilled with the clicked time.
+ * Day / Week share a vertical time-axis grid; Month is a classic
+ * 7-col date grid with event pills per cell + "+N more" overflow.
  */
 import { useMemo } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -15,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Appointment, AppointmentStatus } from "@/types";
 
+export type CalendarMode = "day" | "week" | "month";
+
 const STATUS_BG: Record<AppointmentStatus, string> = {
   scheduled: "bg-info/10 border-info/40 text-info",
   confirmed: "bg-info/10 border-info/40 text-info",
@@ -23,126 +24,118 @@ const STATUS_BG: Record<AppointmentStatus, string> = {
   cancelled: "bg-danger/10 border-danger/40 text-danger opacity-60",
   "no-show": "bg-slate-100 border-slate-300 text-slate-600",
 };
+const STATUS_DOT: Record<AppointmentStatus, string> = {
+  scheduled: "bg-info",
+  confirmed: "bg-info",
+  pending: "bg-warning",
+  completed: "bg-success",
+  cancelled: "bg-danger",
+  "no-show": "bg-slate-400",
+};
 
-const DAY_FULL = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-] as const;
 const DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 const START_HOUR = 7;
 const END_HOUR = 20; // exclusive
-const HOUR_PX = 56;
+const HOUR_PX = 52;
 
 interface Props {
-  weekStart: Date;
-  onWeekStartChange: (d: Date) => void;
+  mode: CalendarMode;
+  onModeChange: (m: CalendarMode) => void;
+  cursor: Date;
+  onCursorChange: (d: Date) => void;
   appointments: Appointment[];
   onEdit: (a: Appointment) => void;
   onNew: (when: Date) => void;
 }
 
 export function AppointmentsCalendar({
-  weekStart,
-  onWeekStartChange,
+  mode,
+  onModeChange,
+  cursor,
+  onCursorChange,
   appointments,
   onEdit,
   onNew,
 }: Props) {
-  const days = useMemo(() => buildWeekDays(weekStart), [weekStart]);
   const today = useMemo(() => stripTime(new Date()), []);
+  const range = useMemo(() => visibleRangeLabel(mode, cursor), [mode, cursor]);
 
-  const range = useMemo(() => formatRange(days[0], days[6]), [days]);
-
-  // Bucket appointments by day index in the visible week.
-  const byDay = useMemo(() => {
-    const buckets: Appointment[][] = Array.from({ length: 7 }, () => []);
-    const weekStartTs = days[0].getTime();
-    const weekEndTs = new Date(days[6]);
-    weekEndTs.setDate(weekEndTs.getDate() + 1);
-    for (const a of appointments) {
-      const start = new Date(a.startsAt);
-      const ts = start.getTime();
-      if (ts < weekStartTs || ts >= weekEndTs.getTime()) continue;
-      const dayIdx = mondayIndex(start);
-      const matchIdx = days.findIndex(
-        (d) =>
-          d.getFullYear() === start.getFullYear() &&
-          d.getMonth() === start.getMonth() &&
-          d.getDate() === start.getDate()
-      );
-      const idx = matchIdx >= 0 ? matchIdx : dayIdx;
-      buckets[idx].push(a);
-    }
-    return buckets;
-  }, [appointments, days]);
-
-  const goPrev = () => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() - 7);
-    onWeekStartChange(d);
-  };
-  const goNext = () => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + 7);
-    onWeekStartChange(d);
-  };
-  const goToday = () => onWeekStartChange(startOfWeek(new Date()));
+  const goPrev = () => onCursorChange(shift(cursor, mode, -1));
+  const goNext = () => onCursorChange(shift(cursor, mode, +1));
+  const goToday = () => onCursorChange(new Date());
 
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-0">
         <Toolbar
+          mode={mode}
+          onModeChange={onModeChange}
           range={range}
           onPrev={goPrev}
           onNext={goNext}
           onToday={goToday}
         />
 
-        <div className="overflow-x-auto">
-          <div className="min-w-[860px]">
-            <HeaderRow days={days} today={today} />
-            <Grid
-              days={days}
-              today={today}
-              byDay={byDay}
-              onEdit={onEdit}
-              onNew={onNew}
-            />
+        {mode === "month" ? (
+          <MonthGrid
+            cursor={cursor}
+            today={today}
+            appointments={appointments}
+            onEdit={onEdit}
+            onPickDay={(d) => {
+              onModeChange("day");
+              onCursorChange(d);
+            }}
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <div className={mode === "week" ? "min-w-[860px]" : ""}>
+              <DayHeaderRow mode={mode} cursor={cursor} today={today} />
+              <TimeGrid
+                mode={mode}
+                cursor={cursor}
+                today={today}
+                appointments={appointments}
+                onEdit={onEdit}
+                onNew={onNew}
+              />
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );
 }
 
 /* -------------------------------------------------------------------------- */
+/* Toolbar                                                                    */
+/* -------------------------------------------------------------------------- */
 
 function Toolbar({
+  mode,
+  onModeChange,
   range,
   onPrev,
   onNext,
   onToday,
 }: {
+  mode: CalendarMode;
+  onModeChange: (m: CalendarMode) => void;
   range: string;
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-border bg-white">
+    <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-white flex-wrap">
       <div className="flex items-center gap-2">
         <Button
           variant="secondary"
           size="icon"
           className="size-9 rounded-full"
           onClick={onPrev}
-          aria-label="Previous week"
+          aria-label="Previous"
         >
           <ChevronLeft className="size-4" />
         </Button>
@@ -158,38 +151,76 @@ function Toolbar({
           size="icon"
           className="size-9 rounded-full"
           onClick={onNext}
-          aria-label="Next week"
+          aria-label="Next"
         >
           <ChevronRight className="size-4" />
         </Button>
+        <span className="ml-2 font-semibold text-sm sm:text-base">{range}</span>
       </div>
-      <div className="font-semibold text-sm sm:text-base">{range}</div>
-      <div className="hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground">
-        <Legend dot="bg-info" label="Scheduled" />
-        <Legend dot="bg-warning" label="Pending" />
-        <Legend dot="bg-success" label="Completed" />
-        <Legend dot="bg-danger" label="Cancelled" />
+
+      <div className="flex items-center gap-2">
+        <ModeToggle mode={mode} onChange={onModeChange} />
       </div>
     </div>
   );
 }
 
-function Legend({ dot, label }: { dot: string; label: string }) {
+function ModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: CalendarMode;
+  onChange: (m: CalendarMode) => void;
+}) {
+  const opts: { value: CalendarMode; label: string }[] = [
+    { value: "day", label: "Day" },
+    { value: "week", label: "Week" },
+    { value: "month", label: "Month" },
+  ];
   return (
-    <div className="flex items-center gap-1.5">
-      <span className={cn("size-2 rounded-full", dot)} />
-      <span>{label}</span>
+    <div className="bg-[#F1F4F9] rounded-full p-1 flex items-center gap-1">
+      {opts.map((o) => {
+        const active = mode === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            aria-pressed={active}
+            className={cn(
+              "h-8 px-3 rounded-full text-xs font-semibold transition",
+              active
+                ? "bg-primary-gradient text-white shadow-glow"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
 /* -------------------------------------------------------------------------- */
+/* Day / Week (time-axis grid)                                                */
+/* -------------------------------------------------------------------------- */
 
-function HeaderRow({ days, today }: { days: Date[]; today: Date }) {
+function DayHeaderRow({
+  mode,
+  cursor,
+  today,
+}: {
+  mode: CalendarMode;
+  cursor: Date;
+  today: Date;
+}) {
+  const days = mode === "day" ? [stripTime(cursor)] : buildWeekDays(cursor);
+  const cols = mode === "day" ? "64px 1fr" : "64px repeat(7, minmax(0, 1fr))";
   return (
     <div
       className="grid border-b border-border bg-surface-subtle"
-      style={{ gridTemplateColumns: "64px repeat(7, minmax(0, 1fr))" }}
+      style={{ gridTemplateColumns: cols }}
     >
       <div />
       {days.map((d, i) => {
@@ -203,7 +234,7 @@ function HeaderRow({ days, today }: { days: Date[]; today: Date }) {
             )}
           >
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-              {DAY_SHORT[i]}
+              {DAY_SHORT[mondayIndex(d)]}
             </div>
             <div
               className={cn(
@@ -220,34 +251,38 @@ function HeaderRow({ days, today }: { days: Date[]; today: Date }) {
   );
 }
 
-function Grid({
-  days,
+function TimeGrid({
+  mode,
+  cursor,
   today,
-  byDay,
+  appointments,
   onEdit,
   onNew,
 }: {
-  days: Date[];
+  mode: CalendarMode;
+  cursor: Date;
   today: Date;
-  byDay: Appointment[][];
+  appointments: Appointment[];
   onEdit: (a: Appointment) => void;
   onNew: (when: Date) => void;
 }) {
+  const days = useMemo(
+    () => (mode === "day" ? [stripTime(cursor)] : buildWeekDays(cursor)),
+    [mode, cursor]
+  );
+  const byDay = useMemo(() => bucketByDay(appointments, days), [appointments, days]);
   const hours = useMemo(() => {
     const out: number[] = [];
     for (let h = START_HOUR; h < END_HOUR; h++) out.push(h);
     return out;
   }, []);
-
   const gridHeight = (END_HOUR - START_HOUR) * HOUR_PX;
+  const cols = mode === "day" ? "64px 1fr" : "64px repeat(7, minmax(0, 1fr))";
 
   return (
     <div
       className="grid relative"
-      style={{
-        gridTemplateColumns: "64px repeat(7, minmax(0, 1fr))",
-        height: gridHeight,
-      }}
+      style={{ gridTemplateColumns: cols, height: gridHeight }}
     >
       {/* Time axis */}
       <div className="relative">
@@ -263,20 +298,17 @@ function Grid({
       </div>
 
       {/* Day columns */}
-      {days.map((day, dayIdx) => {
-        const isToday = sameDay(day, today);
-        return (
-          <DayColumn
-            key={dayIdx}
-            day={day}
-            isToday={isToday}
-            appointments={byDay[dayIdx]}
-            onEdit={onEdit}
-            onNew={onNew}
-            hours={hours}
-          />
-        );
-      })}
+      {days.map((day, idx) => (
+        <DayColumn
+          key={day.toISOString()}
+          day={day}
+          isToday={sameDay(day, today)}
+          appointments={byDay[idx]}
+          onEdit={onEdit}
+          onNew={onNew}
+          hours={hours}
+        />
+      ))}
     </div>
   );
 }
@@ -297,13 +329,11 @@ function DayColumn({
   hours: number[];
 }) {
   const handleEmptyClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Don't fire when clicking an event card.
     if ((e.target as HTMLElement).closest("[data-event]")) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
     const totalMinutes = (y / HOUR_PX) * 60;
     const hour = START_HOUR + Math.floor(totalMinutes / 60);
-    // Snap to 30 minutes.
     const minute = Math.floor((totalMinutes % 60) / 30) * 30;
     const slot = new Date(day);
     slot.setHours(hour, minute, 0, 0);
@@ -318,7 +348,6 @@ function DayColumn({
       )}
       onClick={handleEmptyClick}
     >
-      {/* Hour gridlines */}
       {hours.map((h) => (
         <div
           key={h}
@@ -326,10 +355,7 @@ function DayColumn({
           style={{ top: (h - START_HOUR) * HOUR_PX }}
         />
       ))}
-      {/* Now indicator */}
       {isToday && <NowLine />}
-
-      {/* Events */}
       {appointments.map((a) => (
         <EventCard key={a.id} appointment={a} onEdit={onEdit} />
       ))}
@@ -366,15 +392,13 @@ function EventCard({
   const start = new Date(appointment.startsAt);
   const minutesFromStart =
     (start.getHours() - START_HOUR) * 60 + start.getMinutes();
-  // Hide events outside the visible time window — the grid only shows
-  // 7am-8pm. (Clamp so something near the edge still shows.)
   if (minutesFromStart < -appointment.duration) return null;
   if (minutesFromStart >= (END_HOUR - START_HOUR) * 60) return null;
 
   const top = Math.max(0, (minutesFromStart / 60) * HOUR_PX);
   const height = Math.max(
     24,
-    (appointment.duration / 60) * HOUR_PX - 2 // 2px gap so adjacent events don't touch
+    (appointment.duration / 60) * HOUR_PX - 2
   );
 
   return (
@@ -413,27 +437,217 @@ function EventCard({
 }
 
 /* -------------------------------------------------------------------------- */
+/* Month grid                                                                 */
+/* -------------------------------------------------------------------------- */
+
+function MonthGrid({
+  cursor,
+  today,
+  appointments,
+  onEdit,
+  onPickDay,
+}: {
+  cursor: Date;
+  today: Date;
+  appointments: Appointment[];
+  onEdit: (a: Appointment) => void;
+  onPickDay: (d: Date) => void;
+}) {
+  const { days, currentMonth } = useMemo(() => buildMonthGrid(cursor), [cursor]);
+  const byDay = useMemo(
+    () => bucketByDay(appointments, days),
+    [appointments, days]
+  );
+
+  return (
+    <div>
+      <div
+        className="grid border-b border-border bg-surface-subtle"
+        style={{ gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}
+      >
+        {DAY_SHORT.map((d) => (
+          <div
+            key={d}
+            className="px-3 py-2 text-center text-[10px] uppercase tracking-wider text-muted-foreground font-semibold border-l border-border first:border-l-0"
+          >
+            {d}
+          </div>
+        ))}
+      </div>
+
+      <div
+        className="grid"
+        style={{ gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}
+      >
+        {days.map((day, idx) => {
+          const inMonth = day.getMonth() === currentMonth;
+          const isToday = sameDay(day, today);
+          const dayAppts = byDay[idx];
+          const visible = dayAppts.slice(0, 3);
+          const extra = dayAppts.length - visible.length;
+          return (
+            <div
+              key={day.toISOString()}
+              className={cn(
+                "min-h-[110px] border-b border-l border-border/60 p-1.5 transition cursor-pointer",
+                !inMonth && "bg-surface-subtle/40 text-muted-foreground",
+                isToday && "bg-primary/[0.04]",
+                "hover:bg-surface-subtle/80"
+              )}
+              onClick={() => onPickDay(day)}
+            >
+              <div
+                className={cn(
+                  "text-xs font-semibold mb-1 flex items-center justify-between",
+                  isToday && "text-primary"
+                )}
+              >
+                <span
+                  className={cn(
+                    isToday &&
+                      "inline-grid place-items-center size-5 rounded-full bg-primary text-primary-foreground text-[10px]"
+                  )}
+                >
+                  {day.getDate()}
+                </span>
+                {dayAppts.length > 0 && (
+                  <span className="text-[9px] text-muted-foreground">
+                    {dayAppts.length}
+                  </span>
+                )}
+              </div>
+              <div className="space-y-1">
+                {visible.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(a);
+                    }}
+                    className={cn(
+                      "block w-full text-left px-1.5 py-0.5 rounded text-[10px] font-medium truncate ring-focus transition",
+                      "bg-white border",
+                      STATUS_BG[a.status]
+                    )}
+                    title={`${a.time} · ${a.patientName}`}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      <span
+                        className={cn(
+                          "size-1.5 rounded-full",
+                          STATUS_DOT[a.status]
+                        )}
+                      />
+                      <span className="font-semibold">{a.time}</span>
+                      <span className="text-foreground/80 truncate">
+                        {a.patientName}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+                {extra > 0 && (
+                  <div className="text-[10px] text-muted-foreground pl-1">
+                    +{extra} more
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Date helpers                                                               */
 /* -------------------------------------------------------------------------- */
 
 export function startOfWeek(d: Date): Date {
   const out = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  // Monday = 0 in our display order.
   const dow = (out.getDay() + 6) % 7;
   out.setDate(out.getDate() - dow);
   return out;
 }
 
-function buildWeekDays(weekStart: Date): Date[] {
+export function rangeForMode(
+  mode: CalendarMode,
+  cursor: Date
+): { start: Date; end: Date } {
+  if (mode === "day") {
+    const start = stripTime(cursor);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return { start, end };
+  }
+  if (mode === "week") {
+    const start = startOfWeek(cursor);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 7);
+    return { start, end };
+  }
+  // month — fetch the visible grid (covers prev/next month spillover).
+  const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+  const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+  const start = startOfWeek(first);
+  const end = startOfWeek(last);
+  end.setDate(end.getDate() + 7);
+  return { start, end };
+}
+
+function buildWeekDays(cursor: Date): Date[] {
+  const start = startOfWeek(cursor);
   return Array.from({ length: 7 }).map((_, i) => {
-    const d = new Date(weekStart);
+    const d = new Date(start);
     d.setDate(d.getDate() + i);
     return d;
   });
 }
 
+function buildMonthGrid(cursor: Date): { days: Date[]; currentMonth: number } {
+  const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+  const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+  const start = startOfWeek(first);
+  const end = startOfWeek(last);
+  end.setDate(end.getDate() + 7);
+  const days: Date[] = [];
+  const cursor2 = new Date(start);
+  while (cursor2 < end) {
+    days.push(new Date(cursor2));
+    cursor2.setDate(cursor2.getDate() + 1);
+  }
+  return { days, currentMonth: cursor.getMonth() };
+}
+
+function bucketByDay(
+  appointments: Appointment[],
+  days: Date[]
+): Appointment[][] {
+  const buckets: Appointment[][] = days.map(() => []);
+  const dayKey = (d: Date) =>
+    `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  const indexByKey = new Map(days.map((d, i) => [dayKey(d), i]));
+  for (const a of appointments) {
+    const start = new Date(a.startsAt);
+    const idx = indexByKey.get(dayKey(start));
+    if (idx !== undefined) buckets[idx].push(a);
+  }
+  for (const b of buckets) {
+    b.sort((x, y) => +new Date(x.startsAt) - +new Date(y.startsAt));
+  }
+  return buckets;
+}
+
+function shift(d: Date, mode: CalendarMode, delta: number): Date {
+  const out = new Date(d);
+  if (mode === "day") out.setDate(out.getDate() + delta);
+  else if (mode === "week") out.setDate(out.getDate() + delta * 7);
+  else out.setMonth(out.getMonth() + delta);
+  return out;
+}
+
 function mondayIndex(d: Date): number {
-  // 0 = Mon … 6 = Sun
   return (d.getDay() + 6) % 7;
 }
 
@@ -455,11 +669,31 @@ function formatHour(h: number): string {
   return h < 12 ? `${h} AM` : `${h - 12} PM`;
 }
 
-function formatRange(start: Date, end: Date): string {
+function visibleRangeLabel(mode: CalendarMode, cursor: Date): string {
+  if (mode === "day") {
+    return stripTime(cursor).toLocaleDateString(undefined, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+  if (mode === "month") {
+    return cursor.toLocaleDateString(undefined, {
+      month: "long",
+      year: "numeric",
+    });
+  }
+  const start = startOfWeek(cursor);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
   const sameMonth = start.getMonth() === end.getMonth();
   const sameYear = start.getFullYear() === end.getFullYear();
   if (sameMonth) {
-    return `${start.toLocaleDateString(undefined, { month: "long", day: "numeric" })} – ${end.getDate()}, ${end.getFullYear()}`;
+    return `${start.toLocaleDateString(undefined, {
+      month: "long",
+      day: "numeric",
+    })} – ${end.getDate()}, ${end.getFullYear()}`;
   }
   if (sameYear) {
     return `${start.toLocaleDateString(undefined, {
@@ -472,5 +706,3 @@ function formatRange(start: Date, end: Date): string {
   }
   return `${start.toLocaleDateString()} – ${end.toLocaleDateString()}`;
 }
-
-void DAY_FULL;
