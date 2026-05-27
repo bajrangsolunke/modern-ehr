@@ -2,8 +2,10 @@ import { useMemo, useState } from "react";
 import { Search, Send } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/lib/toast";
-import { useMessagesStore } from "../store";
+import { usePatients } from "@/features/patients/hooks/use-patients";
+import { useUsers } from "@/features/users/hooks/use-users";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useComposeBroadcast } from "../hooks/use-messages";
 import type { Audience } from "../types";
 import { cn } from "@/lib/utils";
 
@@ -15,31 +17,54 @@ interface Props {
   defaultAudience: Audience;
 }
 
+interface Recipient {
+  id: string;
+  name: string;
+  hint?: string;
+}
+
 export function ComposeMessageModal({ open, onOpenChange, defaultAudience }: Props) {
-  const participants = useMessagesStore((s) => s.participants);
-  const compose = useMessagesStore((s) => s.composeBroadcast);
+  const compose = useComposeBroadcast();
 
   const [audience] = useState<Audience>(defaultAudience);
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query, 200);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [body, setBody] = useState("");
   const [urgent, setUrgent] = useState(false);
 
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return participants
-      .filter((p) => p.audience === audience)
-      .filter((p) =>
-        q ? p.name.toLowerCase().includes(q) || (p.email ?? "").toLowerCase().includes(q) : true
-      );
-  }, [participants, audience, query]);
+  const patientsQuery = usePatients(
+    audience === "patient"
+      ? { q: debouncedQuery || undefined, page: 1, page_size: 30 }
+      : { page: 1, page_size: 1 }
+  );
+  const usersQuery = useUsers(
+    audience === "clinician"
+      ? { q: debouncedQuery || undefined, page: 1, page_size: 30, is_active: true }
+      : { page: 1, page_size: 1 }
+  );
 
-  const allSelected = visible.length > 0 && visible.every((p) => selected.has(p.id));
+  const recipients: Recipient[] = useMemo(() => {
+    if (audience === "patient") {
+      return (patientsQuery.data?.items ?? []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        hint: p.mrn ? `MRN ${p.mrn}` : undefined,
+      }));
+    }
+    return (usersQuery.data?.items ?? []).map((u) => ({
+      id: u.id,
+      name: u.fullName,
+      hint: u.specialty ?? u.role,
+    }));
+  }, [audience, patientsQuery.data, usersQuery.data]);
+
+  const allSelected = recipients.length > 0 && recipients.every((p) => selected.has(p.id));
   const toggleAll = () => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (allSelected) visible.forEach((p) => next.delete(p.id));
-      else visible.forEach((p) => next.add(p.id));
+      if (allSelected) recipients.forEach((p) => next.delete(p.id));
+      else recipients.forEach((p) => next.add(p.id));
       return next;
     });
   };
@@ -51,18 +76,20 @@ export function ComposeMessageModal({ open, onOpenChange, defaultAudience }: Pro
       return next;
     });
 
-  const canSend = selected.size > 0 && body.trim().length > 0 && body.length <= MAX_LEN;
+  const canSend =
+    selected.size > 0 &&
+    body.trim().length > 0 &&
+    body.length <= MAX_LEN &&
+    !compose.isPending;
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!canSend) return;
-    compose({
+    await compose.mutateAsync({
+      audience,
       recipientIds: Array.from(selected),
       body: body.trim(),
       urgent,
     });
-    toast.success(
-      `Message sent to ${selected.size} recipient${selected.size === 1 ? "" : "s"}`
-    );
     resetAndClose();
   };
 
@@ -86,13 +113,13 @@ export function ComposeMessageModal({ open, onOpenChange, defaultAudience }: Pro
             Cancel
           </Button>
           <Button onClick={handleSend} disabled={!canSend}>
-            <Send className="size-3.5" /> Send Message
+            <Send className="size-3.5" />
+            {compose.isPending ? "Sending…" : "Send Message"}
           </Button>
         </div>
       }
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Recipients column */}
         <section className="flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-bold">Recipients</h3>
@@ -120,21 +147,30 @@ export function ComposeMessageModal({ open, onOpenChange, defaultAudience }: Pro
               <span className="text-sm font-medium">Select All</span>
             </label>
             <ul className="max-h-72 overflow-y-auto divide-y divide-border">
-              {visible.length === 0 && (
+              {recipients.length === 0 && (
                 <li className="px-3 py-6 text-center text-xs text-muted-foreground">
-                  No matches.
+                  {patientsQuery.isLoading || usersQuery.isLoading
+                    ? "Loading…"
+                    : "No matches."}
                 </li>
               )}
-              {visible.map((p) => (
-                <li key={p.id}>
-                  <label className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-surface-subtle">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(p.id)}
-                      onChange={() => toggle(p.id)}
-                      className="size-4 rounded border-border"
-                    />
-                    <span className="text-sm truncate">{p.name}</span>
+              {recipients.map((r) => (
+                <li key={r.id}>
+                  <label className="flex items-center justify-between gap-2 px-3 py-2 cursor-pointer hover:bg-surface-subtle">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(r.id)}
+                        onChange={() => toggle(r.id)}
+                        className="size-4 rounded border-border"
+                      />
+                      <span className="text-sm truncate">{r.name}</span>
+                    </div>
+                    {r.hint && (
+                      <span className="text-[11px] text-muted-foreground shrink-0">
+                        {r.hint}
+                      </span>
+                    )}
                   </label>
                 </li>
               ))}
@@ -142,7 +178,6 @@ export function ComposeMessageModal({ open, onOpenChange, defaultAudience }: Pro
           </div>
         </section>
 
-        {/* Content column */}
         <section className="flex flex-col">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-bold">Message Content</h3>

@@ -15,6 +15,11 @@ from app.models.ai_insight import AiInsight
 from app.models.document_chunk import DocumentChunk
 from app.models.alert import AlertSeverity, PatientAlert
 from app.models.availability import UserAvailability
+from app.models.conversation import (
+    Conversation,
+    ConversationParticipant,
+    Message,
+)
 
 __all__ = [
     "User",
@@ -41,4 +46,7 @@ __all__ = [
     "PatientAlert",
     "AlertSeverity",
     "UserAvailability",
+    "Conversation",
+    "ConversationParticipant",
+    "Message",
 ]
