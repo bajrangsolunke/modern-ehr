@@ -31,7 +31,7 @@ import { UserAvatar } from "@/components/ui/avatar";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { SortableTh, TABLE_ROW_BG } from "@/components/ui/sortable-th";
 import { SummaryTile } from "@/components/ui/summary-tile";
-import { Pagination } from "@/components/ui/pagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
 import { UserDrawer } from "@/features/users/components/UserDrawer";
 import { UserCardGrid } from "@/features/users/components/UserCardGrid";
 import {
@@ -58,7 +58,10 @@ const ROLES_IN_ORDER: Role[] = ["provider", "staff", "admin"];
 type ViewMode = "table" | "cards";
 
 export function UsersPage() {
-  const [filters, setFilters] = useState<UserFilters>({ page: 1, page_size: 20 });
+  const [filters, setFilters] = useState<UserFilters>({
+    page: 1,
+    page_size: DEFAULT_PAGE_SIZE,
+  });
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<AppUser | null>(null);
@@ -187,6 +190,10 @@ export function UsersPage() {
             total={data.total}
             shown={data.items.length}
             noun="user"
+            pageSize={filters.page_size}
+            onPageSizeChange={(size) =>
+              setFilters((prev) => ({ ...prev, page_size: size, page: 1 }))
+            }
             onChange={(p) => setFilters((prev) => ({ ...prev, page: p }))}
           />
         </>

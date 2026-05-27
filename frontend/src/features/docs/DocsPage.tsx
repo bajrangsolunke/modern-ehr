@@ -26,7 +26,7 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SummaryTile } from "@/components/ui/summary-tile";
-import { Pagination } from "@/components/ui/pagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { DocumentUploadModal } from "@/features/docs/components/DocumentUploadModal";
 import { DocumentDetailsModal } from "@/features/docs/components/DocumentDetailsModal";
@@ -57,6 +57,7 @@ export function DocsPage() {
   const [category, setCategory] = useState<DocCategory | undefined>();
   const [scope, setScope] = useState<"all" | "mine">("all");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [viewing, setViewing] = useState<Document | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Document | null>(null);
@@ -68,9 +69,9 @@ export function DocsPage() {
       patient_id: searchParams.get("patient_id") ?? undefined,
       uploaded_by: scope === "mine" ? user?.email : undefined,
       page,
-      page_size: 24,
+      page_size: pageSize,
     }),
-    [debouncedQuery, category, scope, user?.email, page, searchParams]
+    [debouncedQuery, category, scope, user?.email, page, pageSize, searchParams]
   );
 
   const { data, isLoading, isError, error, refetch, isFetching } =
@@ -191,6 +192,11 @@ export function DocsPage() {
             total={data.total}
             shown={data.items.length}
             noun="document"
+            pageSize={pageSize}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
             onChange={setPage}
           />
         </>

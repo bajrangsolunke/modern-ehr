@@ -1,7 +1,5 @@
 import { useState } from "react";
 import {
-  ChevronLeft,
-  ChevronRight,
   Download,
   LayoutGrid,
   Plus,
@@ -13,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
 import { PatientTable } from "@/features/patients/components/PatientTable";
 import { PatientCardGrid } from "@/features/patients/components/PatientCardGrid";
 import { PatientDrawer } from "@/features/patients/components/PatientDrawer";
@@ -27,7 +26,7 @@ import type { PatientFilters } from "@/features/patients/api/patients-api";
 
 const DEFAULT_FILTERS: PatientFilters = {
   page: 1,
-  page_size: 20,
+  page_size: DEFAULT_PAGE_SIZE,
   sort_by: "created_at",
   sort_dir: "desc",
 };
@@ -126,33 +125,18 @@ export function PatientsPage() {
             <PatientCardGrid data={data.items} />
           )}
 
-          <div className="flex items-center justify-between mt-6 text-sm text-muted-foreground">
-            <span>
-              Showing {data.items.length} of {data.total}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                size="icon"
-                className="size-9 rounded-full"
-                onClick={() => setPage(Math.max(1, (filters.page ?? 1) - 1))}
-                disabled={data.page <= 1}
-              >
-                <ChevronLeft className="size-3.5" />
-              </Button>
-              <span className="px-3 py-1 rounded-full bg-white border border-border text-xs">
-                Page <strong className="text-foreground">{data.page}</strong> of {data.pages}
-              </span>
-              <Button
-                size="icon"
-                className="size-9 rounded-full"
-                onClick={() => setPage(Math.min(data.pages, (filters.page ?? 1) + 1))}
-                disabled={data.page >= data.pages}
-              >
-                <ChevronRight className="size-3.5" />
-              </Button>
-            </div>
-          </div>
+          <Pagination
+            page={data.page}
+            pages={data.pages}
+            total={data.total}
+            shown={data.items.length}
+            noun="patient"
+            pageSize={filters.page_size}
+            onPageSizeChange={(size) =>
+              setFilters((prev) => ({ ...prev, page_size: size, page: 1 }))
+            }
+            onChange={setPage}
+          />
         </>
       )}
 
