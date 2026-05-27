@@ -5,8 +5,19 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatDate(value: string | Date, opts?: Intl.DateTimeFormatOptions) {
+/**
+ * Format a date for display. Falls back to an em-dash for empty,
+ * null, undefined, or otherwise-unparseable values — Intl will throw
+ * "Invalid time value" on bad input, which used to crash whole
+ * tables when a patient's procedureDate was an empty string.
+ */
+export function formatDate(
+  value: string | Date | null | undefined,
+  opts?: Intl.DateTimeFormatOptions
+) {
+  if (value === null || value === undefined || value === "") return "—";
   const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "—";
   return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
     month: "short",
@@ -15,8 +26,10 @@ export function formatDate(value: string | Date, opts?: Intl.DateTimeFormatOptio
   }).format(d);
 }
 
-export function formatTime(value: string | Date) {
+export function formatTime(value: string | Date | null | undefined) {
+  if (value === null || value === undefined || value === "") return "—";
   const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "—";
   return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
