@@ -27,6 +27,11 @@ from app.models.task import (
     TaskPriority,
     TaskStatus,
 )
+from app.models.form_request import (
+    FormRequest,
+    FormRequestStatus,
+    FormType,
+)
 
 __all__ = [
     "User",
@@ -61,4 +66,7 @@ __all__ = [
     "TaskCategory",
     "TaskPriority",
     "TaskStatus",
+    "FormRequest",
+    "FormRequestStatus",
+    "FormType",
 ]

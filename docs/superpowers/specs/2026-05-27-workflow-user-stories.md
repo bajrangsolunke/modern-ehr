@@ -396,6 +396,95 @@ the right pane shows a centered "Pick a conversation" hint with a
 
 ---
 
+## 6.65. Form requests (forms workflow)
+
+The Docs module pivots from "upload arbitrary files" to a structured
+forms workflow. The catalog is now a fixed six: **Consent, Intake,
+ROI (Release of Information), Insurance, Discharge, Referral**.
+Providers request a form from a patient ("client"); the request shows
+up on the patient's chart and as an auto-generated task; whoever fills
+the form (staff helping the patient, or the patient themselves)
+submits it; the provider then approves (Completed) or rejects
+(Denied). Completed forms render as a printable preview and can be
+downloaded.
+
+### US-FORM-1 — Form catalog
+**Actor**: provider, staff, or admin.
+Acceptance: only the six form types exist in the system —
+`consent`, `intake`, `roi`, `insurance`, `discharge`, `referral`.
+Each has a fixed field set on the backend (Pydantic-validated) so
+the saved data is queryable. No free-form file uploads through the
+forms surface.
+
+### US-FORM-2 — Request a form from a client
+**Actor**: provider, admin (gated by `require_roles`).
+Acceptance: "+ Request form" opens a modal with a patient picker
+(searchable, defaults to current patient when opened from the
+profile), a form-type selector (the six types), optional notes (free
+text — context for whoever fills it), and an optional due date. On
+submit, a `FormRequest` row is created with `status = "pending"`,
+audited, and an auto-task is created (category = `document`,
+assignee = unassigned, title = `Complete {form_type} form for
+{patient_name}`). A "form.request" WS event is broadcast so any open
+Tasks/Forms pages refresh.
+
+### US-FORM-3 — Patient surfaces the request
+**Actor**: provider, staff helping the patient, or the patient
+themselves (when a portal exists).
+Acceptance: the patient profile's Documents tab lists open form
+requests at the top of the tab, before the doc grid. Each row shows
+form type · status · due date · "Fill out" CTA. The Forms page
+filters by status default = `pending` so requests don't get buried.
+
+### US-FORM-4 — Fill a form
+Acceptance: clicking "Fill out" opens a modal with the fields for
+that form type:
+- **Consent**: procedure name, procedure date, patient/guardian
+  signature (typed), consent checkbox, signed date.
+- **Intake**: chief complaint, current meds, allergies, past medical
+  history, family history, visit date.
+- **ROI**: party receiving info, relationship, info categories
+  checkboxes (medical records / billing / labs / imaging / notes),
+  valid until, signature, signed date.
+- **Insurance**: provider, policy #, group #, subscriber name +
+  DOB, relationship to patient, effective date.
+- **Discharge**: discharge diagnosis, discharge date, instructions,
+  follow-up, meds, restrictions.
+- **Referral**: referring-to provider, specialty, reason, urgency
+  (routine/urgent/stat), relevant history, date.
+
+On save, status flips to `submitted`, `submitted_at` +
+`submitted_by_user_id` are recorded, and the linked auto-task is
+moved to `in_progress`.
+
+### US-FORM-5 — Review (approve or deny)
+**Actor**: provider or admin only.
+Acceptance: the form-detail modal renders the submitted data
+read-only, with footer buttons **Mark Completed** and **Mark
+Denied**. Mark Denied opens an inline text field for the reason
+(stored in `review_notes`). Both transitions record `reviewed_at` +
+`reviewed_by_user_id` and audit; the linked task is closed
+(completed / cancelled accordingly).
+
+### US-FORM-6 — Preview + download a completed form
+Acceptance: a completed form opens in a printable preview view —
+clean typography, no app chrome, fields rendered as labeled rows.
+A "Download" button triggers the browser's native print-to-PDF (no
+server-side PDF generation for the first ship). The preview is
+read-only; the only way to change a completed form is to re-request.
+
+### US-FORM-7 — Status workflow + badges
+Acceptance: status badges read `Pending` / `Submitted` /
+`Completed` / `Denied` with matching colorways. The Forms page
+header shows count tiles for each status.
+
+### US-FORM-8 — Filter, search, paginate
+Acceptance: search by patient name / form-type label /
+notes. Filter chips for status and form type. Same pagination
+component as the rest of the app (10/25/50/100, sticky bottom).
+
+---
+
 ## 6.7. Reports
 
 ### US-RPT-1 — Reports section with sidebar

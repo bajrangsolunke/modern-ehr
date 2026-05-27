@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     auth,
     availability,
     documents,
+    form_requests,
     health,
     labs,
     medications,
@@ -34,6 +35,7 @@ api_router.include_router(vitals.router)
 api_router.include_router(alerts.router)
 api_router.include_router(labs.router)
 api_router.include_router(documents.router)
+api_router.include_router(form_requests.router)
 api_router.include_router(notifications.router)
 api_router.include_router(analytics.router)
 api_router.include_router(ai.router)

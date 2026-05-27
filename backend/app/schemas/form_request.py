@@ -1,0 +1,178 @@
+"""
+Pydantic schemas for the forms workflow. The on-disk payload is a
+flexible JSONB column, but every write path validates against one of
+the six per-type schemas below so the data stays queryable.
+"""
+from datetime import date, datetime
+from typing import Annotated, Any, Literal, Union
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+FormTypeLiteral = Literal[
+    "consent", "intake", "roi", "insurance", "discharge", "referral"
+]
+FormStatusLiteral = Literal["pending", "submitted", "completed", "denied"]
+
+
+# ---------------------------------------------------------------- payloads
+
+
+class ConsentFormPayload(BaseModel):
+    form_type: Literal["consent"] = "consent"
+    procedure_name: str = Field(min_length=1, max_length=255)
+    procedure_date: date | None = None
+    patient_signature: str = Field(min_length=1, max_length=255)
+    guardian_name: str | None = Field(default=None, max_length=255)
+    consent_acknowledged: bool
+    signed_date: date
+
+
+class IntakeFormPayload(BaseModel):
+    form_type: Literal["intake"] = "intake"
+    chief_complaint: str = Field(min_length=1, max_length=2000)
+    current_medications: str | None = Field(default=None, max_length=2000)
+    allergies: str | None = Field(default=None, max_length=2000)
+    past_medical_history: str | None = Field(default=None, max_length=4000)
+    family_history: str | None = Field(default=None, max_length=2000)
+    visit_date: date
+
+
+RoiCategory = Literal[
+    "medical_records",
+    "billing",
+    "lab_results",
+    "imaging",
+    "clinical_notes",
+    "discharge_summaries",
+]
+
+
+class RoiFormPayload(BaseModel):
+    form_type: Literal["roi"] = "roi"
+    releasing_to: str = Field(min_length=1, max_length=255)
+    relationship: str = Field(min_length=1, max_length=128)
+    info_categories: list[RoiCategory] = Field(min_length=1)
+    valid_until: date
+    patient_signature: str = Field(min_length=1, max_length=255)
+    signed_date: date
+
+
+class InsuranceFormPayload(BaseModel):
+    form_type: Literal["insurance"] = "insurance"
+    provider: str = Field(min_length=1, max_length=255)
+    policy_number: str = Field(min_length=1, max_length=128)
+    group_number: str | None = Field(default=None, max_length=128)
+    subscriber_name: str = Field(min_length=1, max_length=255)
+    subscriber_dob: date
+    relationship_to_patient: str = Field(min_length=1, max_length=128)
+    effective_date: date
+
+
+class DischargeFormPayload(BaseModel):
+    form_type: Literal["discharge"] = "discharge"
+    discharge_diagnosis: str = Field(min_length=1, max_length=2000)
+    discharge_date: date
+    instructions: str = Field(min_length=1, max_length=4000)
+    follow_up: str | None = Field(default=None, max_length=2000)
+    medications_at_discharge: str | None = Field(default=None, max_length=2000)
+    restrictions: str | None = Field(default=None, max_length=2000)
+
+
+ReferralUrgency = Literal["routine", "urgent", "stat"]
+
+
+class ReferralFormPayload(BaseModel):
+    form_type: Literal["referral"] = "referral"
+    referring_to_provider: str = Field(min_length=1, max_length=255)
+    specialty: str = Field(min_length=1, max_length=128)
+    reason: str = Field(min_length=1, max_length=2000)
+    urgency: ReferralUrgency = "routine"
+    relevant_history: str | None = Field(default=None, max_length=2000)
+    referral_date: date
+
+
+FormPayload = Annotated[
+    Union[
+        ConsentFormPayload,
+        IntakeFormPayload,
+        RoiFormPayload,
+        InsuranceFormPayload,
+        DischargeFormPayload,
+        ReferralFormPayload,
+    ],
+    Field(discriminator="form_type"),
+]
+
+
+def validate_payload(form_type: str, data: dict[str, Any]) -> dict[str, Any]:
+    """Validate (and round-trip) a payload against the right schema for
+    its form_type. Returns the JSON-safe dict to persist."""
+    incoming = {**data, "form_type": form_type}
+    cls_by_type: dict[str, type[BaseModel]] = {
+        "consent": ConsentFormPayload,
+        "intake": IntakeFormPayload,
+        "roi": RoiFormPayload,
+        "insurance": InsuranceFormPayload,
+        "discharge": DischargeFormPayload,
+        "referral": ReferralFormPayload,
+    }
+    cls = cls_by_type.get(form_type)
+    if cls is None:
+        raise ValueError(f"Unknown form_type {form_type!r}")
+    return cls.model_validate(incoming).model_dump(mode="json")
+
+
+# ---------------------------------------------------------------- API I/O
+
+
+class FormRequestOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    patient_id: UUID
+    patient_name: str | None = None
+    patient_mrn: str | None = None
+    form_type: FormTypeLiteral
+    status: FormStatusLiteral
+
+    requested_by_user_id: UUID | None = None
+    requested_by_name: str | None = None
+    notes: str | None = None
+    due_date: date | None = None
+
+    data: dict[str, Any] | None = None
+    submitted_at: datetime | None = None
+    submitted_by_user_id: UUID | None = None
+    submitted_by_name: str | None = None
+
+    reviewed_at: datetime | None = None
+    reviewed_by_user_id: UUID | None = None
+    reviewed_by_name: str | None = None
+    review_notes: str | None = None
+
+    task_id: UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class FormRequestCreate(BaseModel):
+    patient_id: UUID
+    form_type: FormTypeLiteral
+    notes: str | None = Field(default=None, max_length=2000)
+    due_date: date | None = None
+
+
+class FormRequestSubmit(BaseModel):
+    """Submit the filled form. The data shape is validated server-side
+    against the matching per-type schema based on the request's
+    form_type — that means the client only needs to send `data` and
+    we'll reject anything that doesn't fit."""
+
+    data: dict[str, Any]
+
+
+class FormRequestReview(BaseModel):
+    decision: Literal["completed", "denied"]
+    review_notes: str | None = Field(default=None, max_length=2000)
