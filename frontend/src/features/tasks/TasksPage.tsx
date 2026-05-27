@@ -24,6 +24,7 @@ import {
   useUpdateTask,
 } from "./hooks/use-tasks";
 import { TaskDrawer } from "./components/TaskDrawer";
+import { TaskDetailsModal } from "./components/TaskDetailsModal";
 import {
   CATEGORIES,
   CATEGORY_LABEL,
@@ -61,6 +62,7 @@ export function TasksPage() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
+  const [viewing, setViewing] = useState<Task | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
 
   const filters = useMemo(
@@ -91,6 +93,15 @@ export function TasksPage() {
     setEditing(t);
     setDrawerOpen(true);
   };
+  const openView = (t: Task) => setViewing(t);
+
+  // Re-resolve the viewed task from the live list cache so optimistic
+  // status / priority flips show up inside the modal without a refetch.
+  // Falls back to the snapshot if the task isn't on the current page.
+  const liveViewing = useMemo(() => {
+    if (!viewing) return null;
+    return data?.items.find((t) => t.id === viewing.id) ?? viewing;
+  }, [viewing, data]);
 
   return (
     <>
@@ -158,7 +169,8 @@ export function TasksPage() {
           ) : (
             <TaskTable
               items={data.items}
-              onOpen={openEdit}
+              onView={openView}
+              onEdit={openEdit}
               onStatusChange={(t, next) =>
                 update.mutate({ id: t.id, input: { status: next } })
               }
@@ -182,6 +194,21 @@ export function TasksPage() {
           />
         </>
       )}
+
+      <TaskDetailsModal
+        open={Boolean(viewing)}
+        onOpenChange={(open) => !open && setViewing(null)}
+        task={liveViewing}
+        onEdit={(t) => {
+          setViewing(null);
+          openEdit(t);
+        }}
+        onDelete={(t) => {
+          setViewing(null);
+          setPendingDelete(t);
+        }}
+        canModify={canModify}
+      />
 
       <TaskDrawer
         open={drawerOpen}
@@ -254,13 +281,17 @@ function ScopeTabs({
 
 function TaskTable({
   items,
-  onOpen,
+  onView,
+  onEdit,
   onStatusChange,
   onDelete,
   canModify,
 }: {
   items: Task[];
-  onOpen: (t: Task) => void;
+  /** Clicking the title (or row) opens the read-focused view modal. */
+  onView: (t: Task) => void;
+  /** Kebab → Edit opens the drawer directly. */
+  onEdit: (t: Task) => void;
   onStatusChange: (t: Task, next: TaskStatus) => void;
   onDelete: (t: Task) => void;
   canModify: boolean;
@@ -294,7 +325,7 @@ function TaskTable({
                 <td className="px-3 py-3 align-top max-w-[280px]">
                   <button
                     type="button"
-                    onClick={() => onOpen(t)}
+                    onClick={() => onView(t)}
                     className="text-left ring-focus"
                   >
                     <div className="text-sm font-semibold text-primary truncate hover:underline">
@@ -358,7 +389,8 @@ function TaskTable({
                   {canModify && (
                     <RowMenu
                       task={t}
-                      onOpen={() => onOpen(t)}
+                      onView={() => onView(t)}
+                      onEdit={() => onEdit(t)}
                       onStatusChange={(next) => onStatusChange(t, next)}
                       onDelete={() => onDelete(t)}
                     />
@@ -375,12 +407,14 @@ function TaskTable({
 
 function RowMenu({
   task,
-  onOpen,
+  onView,
+  onEdit,
   onStatusChange,
   onDelete,
 }: {
   task: Task;
-  onOpen: () => void;
+  onView: () => void;
+  onEdit: () => void;
   onStatusChange: (next: TaskStatus) => void;
   onDelete: () => void;
 }) {
@@ -401,7 +435,8 @@ function RowMenu({
           sideOffset={4}
           className="z-50 min-w-[180px] rounded-2xl bg-white shadow-elev border border-border p-1 animate-fade-in"
         >
-          <Item label="Edit" onSelect={onOpen} />
+          <Item label="View details" onSelect={onView} />
+          <Item label="Edit" onSelect={onEdit} />
           <DropdownMenu.Separator className="h-px bg-border my-1" />
           <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
             Move to
