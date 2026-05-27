@@ -36,7 +36,7 @@ import {
 import { useUsers } from "@/features/users/hooks/use-users";
 import { useAuthStore } from "@/stores/auth-store";
 import {
-  selectTypingUsers,
+  selectTypingMap,
   useTypingStore,
 } from "./stores/typing-store";
 import { messagesApi } from "./api/messages-api";
@@ -236,18 +236,24 @@ export function MessagesPage() {
 
   // Resolve typing user IDs → display names. Falls back to "Someone"
   // when we don't have the user in the participants projection yet.
-  const typingUserIds = useTypingStore((s) =>
-    selectTypingUsers(s, activeConversationId)
+  // The selector returns the stable map slice — deriving the (possibly
+  // empty) array via useMemo keeps useSyncExternalStore happy.
+  const typingMap = useTypingStore((s) =>
+    selectTypingMap(s, activeConversationId)
   );
   const typingNames = useMemo(() => {
-    if (!detail || !currentUser) return [];
-    return typingUserIds
+    if (!typingMap || !detail || !currentUser) return [];
+    const now = Date.now();
+    const liveIds = Object.entries(typingMap)
+      .filter(([, expires]) => expires > now)
+      .map(([uid]) => uid);
+    return liveIds
       .filter((uid) => uid !== currentUser.id)
       .map((uid) => {
         const p = detail.participants.find((x) => x.id === uid);
         return p?.name ?? "Someone";
       });
-  }, [typingUserIds, detail, currentUser]);
+  }, [typingMap, detail, currentUser]);
 
   const pingTyping = () => {
     if (activeConversationId) {

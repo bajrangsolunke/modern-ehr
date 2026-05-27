@@ -60,15 +60,13 @@ if (typeof window !== "undefined") {
   }, 1_000);
 }
 
-export function selectTypingUsers(
+/** Stable slice selector — the map reference only changes when the
+ *  store mutates, so this is safe to pass to `useTypingStore`.
+ *  Convert to an array via `useMemo` at the call site. */
+export function selectTypingMap(
   state: TypingState,
   conversationId: string | null
-): string[] {
-  if (!conversationId) return [];
-  const users = state.conversations[conversationId];
-  if (!users) return [];
-  const now = Date.now();
-  return Object.entries(users)
-    .filter(([, expires]) => expires > now)
-    .map(([uid]) => uid);
+): Record<string, number> | null {
+  if (!conversationId) return null;
+  return state.conversations[conversationId] ?? null;
 }

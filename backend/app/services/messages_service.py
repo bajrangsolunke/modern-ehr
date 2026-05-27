@@ -472,7 +472,7 @@ class MessagesService:
             participants_out = [
                 ParticipantOut(
                     id=u.id,
-                    name=f"{u.first_name} {u.last_name}".strip() or u.email,
+                    name=u.full_name or u.email,
                     email=u.email,
                     role=str(u.role.value) if u.role else None,
                     specialty=u.specialty,
