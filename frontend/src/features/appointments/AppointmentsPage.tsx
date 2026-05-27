@@ -346,7 +346,7 @@ function Toolbar({
   const [open, setOpen] = useState(false);
   return (
     <Card className="mb-3">
-      <CardContent className="p-2 sm:p-3 flex flex-wrap items-center gap-2">
+      <CardContent className="p-2 sm:p-3 flex items-center gap-2">
         <Input
           placeholder="Search patient name or MRN…"
           icon={<Search className="size-4" />}
@@ -356,7 +356,10 @@ function Toolbar({
         />
         <Popover.Root open={open} onOpenChange={setOpen}>
           <Popover.Trigger asChild>
-            <Button variant="secondary" className="h-10 rounded-full px-4 relative">
+            <Button
+              variant="secondary"
+              className="h-10 rounded-full px-4 relative ml-auto shrink-0"
+            >
               <Filter className="size-4" />
               Filters
               {activeFilterCount > 0 && (
