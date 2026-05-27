@@ -1,5 +1,5 @@
 import { Bell, ChevronDown, LogOut, Settings, User as UserIcon } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Popover from "@radix-ui/react-popover";
 import { UserAvatar } from "@/components/ui/avatar";
@@ -30,6 +30,7 @@ const navItems: NavItem[] = [
 export function Topbar() {
   const user = useAuthStore((s) => s.user) ?? mockUser;
   const logout = useLogout();
+  const navigate = useNavigate();
   const visibleNav = navItems.filter(
     (item) => !item.roles || item.roles.includes(user.role)
   );
@@ -108,6 +109,7 @@ export function Topbar() {
             size="icon"
             className="size-10 rounded-full bg-[#F1F4F9] hover:bg-[#E6EBF2] text-slate-700"
             aria-label="Settings"
+            onClick={() => navigate("/settings")}
           >
             <Settings className="size-[18px]" />
           </Button>
@@ -135,11 +137,17 @@ export function Topbar() {
                 align="end"
                 className="z-50 w-56 rounded-2xl bg-white shadow-elev border border-border p-1.5 animate-fade-in"
               >
-                <DropdownMenu.Item className="flex items-center gap-2 px-3 py-2 text-sm rounded-xl hover:bg-secondary cursor-pointer outline-none">
+                <DropdownMenu.Item
+                  onSelect={() => navigate("/settings")}
+                  className="flex items-center gap-2 px-3 py-2 text-sm rounded-xl hover:bg-secondary cursor-pointer outline-none"
+                >
                   <UserIcon className="size-4 text-muted-foreground" />
                   Profile
                 </DropdownMenu.Item>
-                <DropdownMenu.Item className="flex items-center gap-2 px-3 py-2 text-sm rounded-xl hover:bg-secondary cursor-pointer outline-none">
+                <DropdownMenu.Item
+                  onSelect={() => navigate("/settings?tab=security")}
+                  className="flex items-center gap-2 px-3 py-2 text-sm rounded-xl hover:bg-secondary cursor-pointer outline-none"
+                >
                   <Settings className="size-4 text-muted-foreground" />
                   Settings
                 </DropdownMenu.Item>

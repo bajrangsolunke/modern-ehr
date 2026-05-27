@@ -1,10 +1,18 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
 from app.api.deps import CurrentUser, DbSession
+from app.core.security import hash_password, verify_password
 from app.schemas.common import Token
-from app.schemas.user import LoginRequest, UserCreate, UserOut
+from app.schemas.user import (
+    LoginRequest,
+    PasswordChange,
+    SelfUpdate,
+    UserCreate,
+    UserOut,
+)
+from app.services.audit_service import AuditService
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -78,3 +86,52 @@ async def refresh(payload: RefreshRequest, db: DbSession) -> Token:
 @router.get("/me", response_model=UserOut)
 async def me(current: CurrentUser) -> UserOut:
     return UserOut.model_validate(current)
+
+
+@router.patch("/me", response_model=UserOut)
+async def update_me(
+    payload: SelfUpdate,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
+) -> UserOut:
+    """Let a user update their own profile bits (name, specialty, avatar)."""
+    changes = payload.model_dump(exclude_unset=True)
+    for k, v in changes.items():
+        setattr(current, k, v)
+    await db.flush()
+    await db.refresh(current)
+    await AuditService(db).record_request(
+        request,
+        user_id=current.id,
+        action="user.self_update",
+        resource_type="user",
+        resource_id=str(current.id),
+        payload=changes,
+    )
+    return UserOut.model_validate(current)
+
+
+@router.post("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    payload: PasswordChange,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
+) -> None:
+    """Change the signed-in user's password (requires current password)."""
+    if not verify_password(payload.current_password, current.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+    current.hashed_password = hash_password(payload.new_password)
+    await db.flush()
+    await AuditService(db).record_request(
+        request,
+        user_id=current.id,
+        action="user.password_change",
+        resource_type="user",
+        resource_id=str(current.id),
+        payload={"password": "<rotated>"},
+    )

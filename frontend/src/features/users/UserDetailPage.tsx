@@ -34,6 +34,8 @@ import {
   useUserStats,
 } from "@/features/users/hooks/use-users";
 import { usePatients } from "@/features/patients/hooks/use-patients";
+import { useAvailability } from "@/features/settings/hooks/use-availability";
+import { AvailabilityEditor } from "@/features/settings/components/AvailabilityEditor";
 import type { Role } from "@/types";
 import { cn, formatDate, formatTime } from "@/lib/utils";
 
@@ -62,8 +64,20 @@ export function UserDetailPage() {
     page: 1,
     page_size: 5,
   });
+  const { data: availability } = useAvailability(userId);
   const reactivate = useReactivateUser();
   const deactivate = useDeactivateUser();
+
+  const weeklyHours = availability
+    ? availability
+        .filter((s) => s.isActive)
+        .reduce((sum, s) => {
+          const [sh, sm] = s.startTime.split(":").map(Number);
+          const [eh, em] = s.endTime.split(":").map(Number);
+          return sum + Math.max(0, eh * 60 + em - (sh * 60 + sm));
+        }, 0) / 60
+    : null;
+  const isProvider = user?.role === "provider";
 
   return (
     <>
@@ -193,9 +207,19 @@ export function UserDetailPage() {
               tone="success"
             />
             <StatTile
-              label="Availability"
-              value="—"
-              hint="Scheduling lands next"
+              label="Weekly hours"
+              value={
+                weeklyHours === null
+                  ? "—"
+                  : weeklyHours === 0
+                  ? "0"
+                  : `${weeklyHours.toFixed(1)}`
+              }
+              hint={
+                isProvider
+                  ? `${availability?.filter((s) => s.isActive).length ?? 0} active slots`
+                  : "Providers only"
+              }
               tone="muted"
             />
           </div>
@@ -308,6 +332,13 @@ export function UserDetailPage() {
               </CardContent>
             </Card>
           </div>
+
+          {isProvider && (
+            <AvailabilityEditor
+              userId={user.id}
+              description="Hours this provider is available for appointments. Admins can edit on their behalf."
+            />
+          )}
         </div>
       )}
 

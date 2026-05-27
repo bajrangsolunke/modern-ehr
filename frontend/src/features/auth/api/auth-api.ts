@@ -48,6 +48,25 @@ function toBackendDto(user: User): BackendUserDto {
   };
 }
 
+export interface SelfUpdateInput {
+  full_name?: string;
+  specialty?: string | null;
+  avatar_url?: string | null;
+}
+
+export interface PasswordChangeInput {
+  current_password: string;
+  new_password: string;
+}
+
+function stripUndefined<T extends object>(obj: T): Partial<T> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) out[k] = v;
+  }
+  return out as Partial<T>;
+}
+
 export const authApi = {
   login: (payload: LoginPayload) =>
     api.post<TokenResponse>("/auth/login/json", payload, { skipAuth: true }),
@@ -58,4 +77,12 @@ export const authApi = {
     });
     return mapUser(dto);
   },
+
+  updateMe: async (input: SelfUpdateInput): Promise<User> => {
+    const dto = await api.patch<BackendUserDto>("/auth/me", stripUndefined(input));
+    return mapUser(dto);
+  },
+
+  changePassword: (input: PasswordChangeInput): Promise<void> =>
+    api.post("/auth/me/password", input),
 };

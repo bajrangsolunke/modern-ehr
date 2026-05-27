@@ -47,3 +47,20 @@ class UserOut(UserBase):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+class SelfUpdate(BaseModel):
+    """
+    What a non-admin user can change about their own account.
+    Email and role are intentionally absent — those route through
+    admin user management.
+    """
+
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    specialty: str | None = Field(default=None, max_length=255)
+    avatar_url: str | None = Field(default=None, max_length=2_000_000)
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=128)

@@ -14,6 +14,7 @@ from app.models.notification import Notification
 from app.models.ai_insight import AiInsight
 from app.models.document_chunk import DocumentChunk
 from app.models.alert import AlertSeverity, PatientAlert
+from app.models.availability import UserAvailability
 
 __all__ = [
     "User",
@@ -39,4 +40,5 @@ __all__ = [
     "DocumentChunk",
     "PatientAlert",
     "AlertSeverity",
+    "UserAvailability",
 ]

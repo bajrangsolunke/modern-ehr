@@ -9,6 +9,7 @@ export const ROUTES = {
   appointments: "/appointments",
   docs: "/docs",
   users: "/users",
+  settings: "/settings",
   mobile: "/mobile",
 } as const;
 

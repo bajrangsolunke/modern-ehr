@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormField } from "@/components/ui/form";
 import { useForm, zodResolver, z, mapApiError } from "@/lib/form";
+import { PortraitUploader } from "@/features/patients/components/PortraitUploader";
 import {
   useCreateUser,
   useUpdateUser,
@@ -18,6 +19,7 @@ const baseShape = {
   email: z.string().email("Invalid email"),
   role: z.enum(roles),
   specialty: z.string().max(255).optional().or(z.literal("")),
+  avatar_url: z.string().optional().or(z.literal("")),
 };
 
 const createSchema = z.object({
@@ -62,6 +64,7 @@ export function UserDrawer({ open, onOpenChange, user }: Props) {
     role: "provider" as Role,
     specialty: "",
     password: "",
+    avatar_url: "",
   };
   const valuesFromUser = user
     ? {
@@ -70,6 +73,7 @@ export function UserDrawer({ open, onOpenChange, user }: Props) {
         role: user.role,
         specialty: user.specialty ?? "",
         password: "",
+        avatar_url: user.avatarUrl ?? "",
       }
     : blank;
 
@@ -78,12 +82,16 @@ export function UserDrawer({ open, onOpenChange, user }: Props) {
     handleSubmit,
     setError,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<CreateValues | UpdateValues>({
     resolver: zodResolver(isEdit ? updateSchema : createSchema) as never,
     defaultValues: blank,
     values: valuesFromUser,
   });
+
+  const avatarUrl = watch("avatar_url");
+  const fullNameValue = watch("full_name");
 
   const role = watch("role");
 
@@ -94,6 +102,7 @@ export function UserDrawer({ open, onOpenChange, user }: Props) {
           full_name: values.full_name,
           role: values.role,
           specialty: values.specialty || null,
+          avatar_url: values.avatar_url || null,
           ...(values.password ? { password: values.password } : {}),
         });
       } else {
@@ -102,6 +111,7 @@ export function UserDrawer({ open, onOpenChange, user }: Props) {
           full_name: values.full_name,
           role: values.role,
           specialty: values.specialty || null,
+          avatar_url: values.avatar_url || null,
           password: (values as CreateValues).password,
         });
       }
@@ -126,6 +136,24 @@ export function UserDrawer({ open, onOpenChange, user }: Props) {
       size="lg"
     >
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
+        <div className="flex items-start gap-5">
+          <PortraitUploader
+            name={fullNameValue || "New user"}
+            src={avatarUrl || undefined}
+            onChange={(dataUrl) =>
+              setValue("avatar_url", dataUrl, { shouldDirty: true })
+            }
+          />
+          <div className="flex-1 min-w-0 self-center">
+            <div className="text-sm font-semibold">Profile photo</div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Optional. Tap the camera to upload. The photo is resized to
+              passport size so the chart stays light.
+            </p>
+          </div>
+        </div>
+        <input type="hidden" {...register("avatar_url")} />
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
           <FormField
             label="Full name"
