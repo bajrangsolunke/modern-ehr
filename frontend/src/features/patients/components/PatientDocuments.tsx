@@ -4,7 +4,14 @@
  * User story US-DOCS-6 (docs/superpowers/specs/2026-05-27-workflow-user-stories.md).
  */
 import { useMemo, useState } from "react";
-import { FileText, Files, Image as ImageIcon, Plus } from "lucide-react";
+import {
+  FileText,
+  Files,
+  Image as ImageIcon,
+  LayoutGrid,
+  List as ListIcon,
+  Plus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -26,6 +33,8 @@ import { useAuthStore } from "@/stores/auth-store";
 import type { Document } from "@/features/docs/api/docs-api";
 import { cn, formatBytes, formatDate } from "@/lib/utils";
 
+type ViewMode = "list" | "cards";
+
 interface Props {
   patientId: string;
 }
@@ -41,6 +50,7 @@ export function PatientDocuments({ patientId }: Props) {
   const [viewing, setViewing] = useState<Document | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Document | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [view, setView] = useState<ViewMode>("list");
 
   const docs = data ?? [];
 
@@ -69,11 +79,14 @@ export function PatientDocuments({ patientId }: Props) {
               : `${docs.length} on file · consent, labs, imaging, and more.`}
           </p>
         </div>
-        {canWrite && (
-          <Button className="h-9" onClick={() => setUploadOpen(true)}>
-            <Plus className="size-3.5" /> Upload
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <ViewToggle mode={view} onChange={setView} />
+          {canWrite && (
+            <Button className="h-9" onClick={() => setUploadOpen(true)}>
+              <Plus className="size-3.5" /> Upload
+            </Button>
+          )}
+        </div>
       </div>
 
       {categoriesPresent.length > 1 && (
@@ -96,7 +109,7 @@ export function PatientDocuments({ patientId }: Props) {
         </div>
       )}
 
-      {isLoading && <GridSkeleton />}
+      {isLoading && (view === "list" ? <ListSkeleton /> : <GridSkeleton />)}
 
       {isError && !isLoading && (
         <ErrorBanner
@@ -114,6 +127,8 @@ export function PatientDocuments({ patientId }: Props) {
               canUpload={canWrite}
               onUpload={() => setUploadOpen(true)}
             />
+          ) : view === "list" ? (
+            <DocumentList items={visible} onOpen={setViewing} />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {visible.map((d) => (
@@ -156,6 +171,55 @@ export function PatientDocuments({ patientId }: Props) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* List view                                                                  */
+/* -------------------------------------------------------------------------- */
+
+function DocumentList({
+  items,
+  onOpen,
+}: {
+  items: Document[];
+  onOpen: (d: Document) => void;
+}) {
+  return (
+    <Card className="overflow-hidden">
+      <ul className="divide-y divide-border">
+        {items.map((d) => (
+          <li key={d.id}>
+            <button
+              type="button"
+              onClick={() => onOpen(d)}
+              className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-surface-subtle transition ring-focus"
+            >
+              <Glyph mime={d.mimeType} />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold truncate">{d.name}</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                  {humanMime(d.mimeType)} · {formatBytes(d.sizeBytes)}
+                  {d.uploadedBy && ` · ${d.uploadedBy}`}
+                </div>
+              </div>
+              <Badge
+                variant={CATEGORY_TONE[d.category as never] ?? "neutral"}
+                size="sm"
+                className="shrink-0"
+              >
+                {categoryLabel(d.category)}
+              </Badge>
+              <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums w-20 text-right">
+                {formatDate(d.createdAt)}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Card view                                                                  */
+/* -------------------------------------------------------------------------- */
 
 function DocumentCard({
   doc,
@@ -197,6 +261,10 @@ function DocumentCard({
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/* Shared bits                                                                */
+/* -------------------------------------------------------------------------- */
+
 function Glyph({ mime }: { mime: string }) {
   const isImage = mime.startsWith("image/");
   return (
@@ -223,6 +291,60 @@ function humanMime(mime: string): string {
   return mime;
 }
 
+function ViewToggle({
+  mode,
+  onChange,
+}: {
+  mode: ViewMode;
+  onChange: (m: ViewMode) => void;
+}) {
+  return (
+    <div className="bg-[#F1F4F9] rounded-full p-1 flex items-center gap-1">
+      <ViewToggleButton
+        active={mode === "list"}
+        onClick={() => onChange("list")}
+        label="List view"
+        icon={<ListIcon className="size-3.5" />}
+      />
+      <ViewToggleButton
+        active={mode === "cards"}
+        onClick={() => onChange("cards")}
+        label="Card view"
+        icon={<LayoutGrid className="size-3.5" />}
+      />
+    </div>
+  );
+}
+
+function ViewToggleButton({
+  active,
+  onClick,
+  label,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={active}
+      className={cn(
+        "size-8 grid place-items-center rounded-full transition",
+        active
+          ? "bg-primary-gradient text-white shadow-glow"
+          : "text-muted-foreground hover:text-foreground"
+      )}
+    >
+      {icon}
+    </button>
+  );
+}
+
 function GridSkeleton() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -230,6 +352,18 @@ function GridSkeleton() {
         <Skeleton key={i} className="h-[120px] rounded-2xl" />
       ))}
     </div>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <Card className="overflow-hidden">
+      <div className="divide-y divide-border">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-[60px] rounded-none" />
+        ))}
+      </div>
+    </Card>
   );
 }
 
