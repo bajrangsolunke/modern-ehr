@@ -178,6 +178,29 @@ export const docsApi = {
   },
 
   /**
+   * Fetch the document's bytes with auth and return an object URL.
+   * Callers must revoke the URL when the preview unmounts.
+   */
+  fetchBlobUrl: async (id: string): Promise<string> => {
+    const token = localStorage.getItem(STORAGE_KEYS.accessToken);
+    const res = await fetch(`${env.API_BASE_URL}/documents/${id}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (!res.ok) {
+      let detail = res.statusText || "Preview failed";
+      try {
+        const json = await res.json();
+        if (json?.detail) detail = String(json.detail);
+      } catch {
+        /* ignore */
+      }
+      throw new ApiError(res.status, detail);
+    }
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  },
+
+  /**
    * Authenticated blob download. Fetches the binary, drops it through
    * a hidden anchor so the browser saves with the original name.
    */

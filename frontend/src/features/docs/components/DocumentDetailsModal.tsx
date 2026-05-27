@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
   Download,
+  ExternalLink,
   FileText,
   Image,
   Loader2,
@@ -20,7 +22,7 @@ import {
   CATEGORY_TONE,
   categoryLabel,
 } from "@/features/docs/categories";
-import type { Document } from "@/features/docs/api/docs-api";
+import { docsApi, type Document } from "@/features/docs/api/docs-api";
 import { cn, formatBytes, formatDate, formatTime } from "@/lib/utils";
 
 interface Props {
@@ -156,44 +158,15 @@ export function DocumentDetailsModal({
 function PreviewBody({ doc }: { doc: Document }) {
   const isText = doc.mimeType.startsWith("text/") && doc.hasPreview;
   const isImage = doc.mimeType.startsWith("image/");
-  // Pull text preview only when relevant.
-  const preview = useDocumentPreview(isText ? doc.id : undefined, isText);
+  const isPdf = doc.mimeType === "application/pdf";
 
-  if (isText) {
-    return (
-      <section>
-        <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-          Preview
-        </h4>
-        <div className="rounded-2xl border border-border bg-white p-3 max-h-[260px] overflow-y-auto">
-          {preview.isLoading && (
-            <div className="text-xs text-muted-foreground inline-flex items-center gap-2">
-              <Loader2 className="size-3 animate-spin" /> Loading preview…
-            </div>
-          )}
-          {preview.isError && (
-            <div className="text-xs text-muted-foreground">
-              Couldn't load a preview — try downloading instead.
-            </div>
-          )}
-          {preview.data && (
-            <pre className="text-xs whitespace-pre-wrap font-mono leading-relaxed">
-              {preview.data.text}
-            </pre>
-          )}
-        </div>
-      </section>
-    );
-  }
+  if (isText) return <TextPreview docId={doc.id} />;
+  if (isImage || isPdf) return <BlobPreview doc={doc} isPdf={isPdf} />;
 
   return (
     <section className="rounded-2xl border border-dashed border-border bg-surface-subtle p-6 text-center">
       <div className="size-10 rounded-2xl bg-white grid place-items-center mx-auto mb-2 text-muted-foreground">
-        {isImage ? (
-          <Image className="size-5" aria-label="Image" />
-        ) : (
-          <FileText className="size-5" />
-        )}
+        <FileText className="size-5" />
       </div>
       <div className="text-sm font-semibold">
         No inline preview for this file type.
@@ -202,6 +175,124 @@ function PreviewBody({ doc }: { doc: Document }) {
         Download the file to view it in its native viewer.
       </p>
     </section>
+  );
+}
+
+function TextPreview({ docId }: { docId: string }) {
+  const preview = useDocumentPreview(docId, true);
+  return (
+    <section>
+      <PreviewHeader />
+      <div className="rounded-2xl border border-border bg-white p-3 max-h-[320px] overflow-y-auto">
+        {preview.isLoading && (
+          <div className="text-xs text-muted-foreground inline-flex items-center gap-2">
+            <Loader2 className="size-3 animate-spin" /> Loading preview…
+          </div>
+        )}
+        {preview.isError && (
+          <div className="text-xs text-muted-foreground">
+            Couldn't load a preview — try downloading instead.
+          </div>
+        )}
+        {preview.data && (
+          <pre className="text-xs whitespace-pre-wrap font-mono leading-relaxed">
+            {preview.data.text}
+          </pre>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function BlobPreview({ doc, isPdf }: { doc: Document; isPdf: boolean }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let created: string | null = null;
+
+    setUrl(null);
+    setError(null);
+
+    docsApi
+      .fetchBlobUrl(doc.id)
+      .then((u) => {
+        if (cancelled) {
+          URL.revokeObjectURL(u);
+          return;
+        }
+        created = u;
+        setUrl(u);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Couldn't load preview");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [doc.id]);
+
+  if (error) {
+    return (
+      <section className="rounded-2xl border border-dashed border-border bg-surface-subtle p-6 text-center">
+        <div className="text-sm font-semibold">Couldn't load preview</div>
+        <p className="text-xs text-muted-foreground mt-1">{error}</p>
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-2">
+        <PreviewHeader />
+        {url && (
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[11px] font-semibold text-primary inline-flex items-center gap-1 hover:gap-1.5 transition-all"
+          >
+            Open in new tab <ExternalLink className="size-3" />
+          </a>
+        )}
+      </div>
+      <div className="rounded-2xl border border-border bg-surface-subtle overflow-hidden">
+        {!url ? (
+          <div className="h-[420px] grid place-items-center text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="size-3 animate-spin" /> Loading preview…
+            </span>
+          </div>
+        ) : isPdf ? (
+          <iframe
+            src={url}
+            title={doc.name}
+            className="w-full h-[60vh] min-h-[420px] bg-white"
+          />
+        ) : (
+          <div className="bg-white p-2 grid place-items-center">
+            <img
+              src={url}
+              alt={doc.name}
+              className="max-h-[60vh] max-w-full object-contain rounded-xl"
+            />
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function PreviewHeader() {
+  return (
+    <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+      Preview
+    </h4>
   );
 }
 
