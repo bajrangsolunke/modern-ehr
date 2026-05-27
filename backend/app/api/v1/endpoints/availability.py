@@ -56,6 +56,21 @@ async def _list_for_user(db, user_id: UUID) -> list[AvailabilityOut]:
 
 
 @router.post(
+    "/me",
+    response_model=AvailabilityOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_for_me(
+    payload: AvailabilityCreate,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
+) -> AvailabilityOut:
+    """Self-service create — saves a slot under the signed-in user."""
+    return await _create_for(db, request, current, current.id, payload)
+
+
+@router.post(
     "/user/{user_id}",
     response_model=AvailabilityOut,
     status_code=status.HTTP_201_CREATED,
@@ -72,7 +87,16 @@ async def create_for_user(
     target = await db.get(User, user_id)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
+    return await _create_for(db, request, current, user_id, payload)
 
+
+async def _create_for(
+    db,
+    request: Request,
+    current: User,
+    user_id: UUID,
+    payload: AvailabilityCreate,
+) -> AvailabilityOut:
     slot = UserAvailability(user_id=user_id, **payload.model_dump())
     db.add(slot)
     await db.flush()

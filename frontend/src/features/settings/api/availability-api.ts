@@ -64,10 +64,12 @@ export const availabilityApi = {
     userId: string,
     input: AvailabilityInput
   ): Promise<AvailabilitySlot> => {
-    const dto = await api.post<BackendSlot>(
-      `/availability/user/${userId}`,
-      input
-    );
+    // "me" is a logical id used by the editor when a user manages
+    // their own schedule. The backend exposes a matching POST /me
+    // endpoint that scopes the create to the signed-in user.
+    const path =
+      userId === "me" ? "/availability/me" : `/availability/user/${userId}`;
+    const dto = await api.post<BackendSlot>(path, input);
     return mapSlot(dto);
   },
   update: async (
