@@ -126,6 +126,8 @@ function ConversationRowItem({
             size="md"
           />
           <div className="min-w-0 flex-1">
+            {/* Top row: name + condition badge on the left, time on the
+                right. Standard messaging layout. */}
             <div className="flex items-center justify-between gap-2 mb-0.5">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-sm font-semibold truncate">
@@ -142,21 +144,27 @@ function ConversationRowItem({
                   </span>
                 )}
               </div>
+              {conv && (
+                <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                  {formatLastTime(conv.lastMessageAt)}
+                </span>
+              )}
+            </div>
+            {/* Bottom row: last-message preview on the left, unread
+                badge on the right. Drafts show specialty/role. */}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground line-clamp-1 min-w-0 flex-1">
+                {conv?.lastMessage ||
+                  (participant.specialty ??
+                    participant.role ??
+                    "Start a conversation")}
+              </p>
               {conv && conv.unread > 0 && (
                 <span className="shrink-0 inline-grid place-items-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
                   {conv.unread}
                 </span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground line-clamp-1">
-              {conv?.lastMessage ||
-                (participant.specialty ??
-                  participant.role ??
-                  "Start a conversation")}
-            </p>
-            <p className="text-[11px] text-muted-foreground tabular-nums mt-1">
-              {conv ? formatLastTime(conv.lastMessageAt) : participant.email ?? ""}
-            </p>
           </div>
         </div>
       </button>
@@ -177,9 +185,25 @@ function formatLastTime(iso: string): string {
     d.getFullYear() === now.getFullYear() &&
     d.getMonth() === now.getMonth() &&
     d.getDate() === now.getDate();
-  if (sameDay) return `Today, ${formatTime(iso)}`;
-  const dd = String(d.getMonth() + 1).padStart(2, "0");
-  const mm = String(d.getDate()).padStart(2, "0");
-  const yy = d.getFullYear();
-  return `${dd}/${mm}/${yy}, ${formatTime(iso)}`;
+  if (sameDay) return formatTime(iso);
+
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
+  const isYesterday =
+    d.getFullYear() === y.getFullYear() &&
+    d.getMonth() === y.getMonth() &&
+    d.getDate() === y.getDate();
+  if (isYesterday) return "Yesterday";
+
+  // Within the last week → weekday short name.
+  const dayDiff = Math.round((now.getTime() - d.getTime()) / 86_400_000);
+  if (dayDiff < 7) {
+    return d.toLocaleDateString("en-US", { weekday: "short" });
+  }
+
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: d.getFullYear() === now.getFullYear() ? undefined : "2-digit",
+  });
 }
