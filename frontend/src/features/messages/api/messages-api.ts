@@ -217,4 +217,12 @@ export const messagesApi = {
 
   pingTyping: (conversationId: string): Promise<void> =>
     api.post(`/messages/conversations/${conversationId}/typing`, {}),
+
+  suggestReply: async (conversationId: string): Promise<string> => {
+    const data = await api.post<{ suggestion: string }>(
+      `/messages/conversations/${conversationId}/suggest-reply`,
+      {}
+    );
+    return data.suggestion;
+  },
 };

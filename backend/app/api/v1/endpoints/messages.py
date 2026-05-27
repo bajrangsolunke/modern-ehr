@@ -6,7 +6,9 @@ write fans out via MessagesService._broadcast_message).
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
+from pydantic import BaseModel
 
+from app.ai.suggest_reply import SuggestReplyService
 from app.api.deps import CurrentUser, DbSession
 from app.schemas.conversation import (
     Audience,
@@ -20,6 +22,10 @@ from app.schemas.conversation import (
 )
 from app.services.audit_service import AuditService
 from app.services.messages_service import MessagesService
+
+
+class SuggestReplyOut(BaseModel):
+    suggestion: str
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
@@ -180,6 +186,24 @@ async def ping_typing(
     """Throwaway endpoint — broadcasts a transient "typing" event to
     other participants over the existing WS channel. No DB writes."""
     await MessagesService(db).ping_typing(conversation_id, viewer_id=current.id)
+
+
+@router.post(
+    "/conversations/{conversation_id}/suggest-reply",
+    response_model=SuggestReplyOut,
+)
+async def suggest_reply(
+    conversation_id: UUID,
+    db: DbSession,
+    current: CurrentUser,
+) -> SuggestReplyOut:
+    """LLM-drafted reply using the thread's recent messages + (for
+    patient threads) a slim chart context. Hits the stub fallback when
+    OPENAI_API_KEY isn't configured so the button is always functional."""
+    svc = MessagesService(db)
+    conv = await svc.get_conversation(conversation_id, viewer_id=current.id)
+    suggestion = await SuggestReplyService(db).suggest(conv)
+    return SuggestReplyOut(suggestion=suggestion)
 
 
 # Silence unused import warning in some IDEs; HTTPException is re-exported

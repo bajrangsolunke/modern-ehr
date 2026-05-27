@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Paperclip, Send } from "lucide-react";
+import { Loader2, Paperclip, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,10 @@ interface Props {
   /** Called at most once per ~2s while the user is typing — drives
    *  the "X is typing…" indicator on the other side. */
   onTyping?: () => void;
+  /** When provided, renders a "Suggest reply" button that calls this
+   *  to fetch an LLM-drafted reply, then inserts it into the composer
+   *  for the user to edit before sending. */
+  onSuggest?: () => Promise<string>;
 }
 
 const TYPING_THROTTLE_MS = 2_000;
@@ -29,13 +33,39 @@ const QUICK_REPLIES = [
   "Lab results look normal — no follow-up needed.",
 ];
 
-export function MessageComposer({ onSend, busy, onTyping }: Props) {
+export function MessageComposer({ onSend, busy, onTyping, onSuggest }: Props) {
   const [value, setValue] = useState("");
+  const [suggesting, setSuggesting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const lastTypingAtRef = useRef<number>(0);
 
   const trimmed = value.trim();
   const canSend = trimmed.length > 0 && !busy;
+
+  const handleSuggest = async () => {
+    if (!onSuggest || suggesting) return;
+    setSuggesting(true);
+    try {
+      const suggestion = await onSuggest();
+      if (suggestion) {
+        setValue(suggestion);
+        // Defer focus so it lands after React commits the new value.
+        requestAnimationFrame(() => {
+          const el = textareaRef.current;
+          if (el) {
+            el.focus();
+            el.setSelectionRange(suggestion.length, suggestion.length);
+          }
+        });
+      }
+    } catch (err) {
+      toast.error("Couldn't generate a suggestion", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setSuggesting(false);
+    }
+  };
 
   // Reset throttle when the conversation changes so the next keystroke
   // pings immediately.
@@ -68,7 +98,26 @@ export function MessageComposer({ onSend, busy, onTyping }: Props) {
 
   return (
     <div className="border-t border-border bg-white">
-      <div className="px-3 sm:px-4 pt-2 pb-1 flex flex-wrap gap-1.5">
+      <div className="px-3 sm:px-4 pt-2 pb-1 flex flex-wrap items-center gap-1.5">
+        {onSuggest && (
+          <button
+            type="button"
+            onClick={handleSuggest}
+            disabled={suggesting || busy}
+            className={cn(
+              "text-[11px] px-2.5 py-1 rounded-full border inline-flex items-center gap-1 transition ring-focus",
+              "bg-primary/10 border-primary/30 text-primary hover:bg-primary/15",
+              "disabled:opacity-60 disabled:cursor-wait"
+            )}
+          >
+            {suggesting ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : (
+              <Sparkles className="size-3" />
+            )}
+            {suggesting ? "Drafting…" : "Suggest reply"}
+          </button>
+        )}
         {QUICK_REPLIES.map((q) => (
           <button
             key={q}

@@ -308,6 +308,11 @@ export function MessagesPage() {
                   onSend={handleSendActive}
                   busy={sendMessage.isPending || compose.isPending}
                   onTyping={activeConversationId ? pingTyping : undefined}
+                  onSuggest={
+                    activeConversationId
+                      ? () => messagesApi.suggestReply(activeConversationId)
+                      : undefined
+                  }
                 />
               </>
             ) : (
