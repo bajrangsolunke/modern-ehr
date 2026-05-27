@@ -97,10 +97,10 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       boxShadow: {
-        soft: "0 1px 2px rgba(17, 24, 39, 0.04), 0 2px 8px rgba(17, 24, 39, 0.04)",
-        card: "0 1px 2px rgba(17, 24, 39, 0.04), 0 4px 16px rgba(17, 24, 39, 0.04)",
-        elev: "0 6px 24px rgba(17, 24, 39, 0.08), 0 2px 6px rgba(17, 24, 39, 0.04)",
-        glow: "0 8px 32px rgba(79, 140, 255, 0.18)",
+        soft: "0 1px 2px rgba(15, 23, 42, 0.06), 0 2px 8px rgba(15, 23, 42, 0.08)",
+        card: "0 1px 3px rgba(15, 23, 42, 0.08), 0 6px 18px rgba(15, 23, 42, 0.08)",
+        elev: "0 8px 28px rgba(15, 23, 42, 0.14), 0 2px 8px rgba(15, 23, 42, 0.08)",
+        glow: "0 8px 32px rgba(79, 140, 255, 0.22)",
       },
       backgroundImage: {
         "primary-gradient":
