@@ -16,12 +16,11 @@
  * the provider's current schedule).
  */
 import { useMemo, useState } from "react";
-import { ChevronDown, Clock, Loader2, Search, UserCheck } from "lucide-react";
+import { ChevronDown, Clock, Loader2, Search } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormField } from "@/components/ui/form";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/ui/avatar";
 import { useForm, zodResolver, z, mapApiError } from "@/lib/form";
@@ -647,19 +646,20 @@ function SlotGrid({
   loading,
   selected,
   onSelect,
-  singleProvider,
 }: {
   grouped: GroupedSlots;
   loading: boolean;
   selected: { startsAt: string; physicianId: string } | null;
   onSelect: (s: { startsAt: string; physicianId: string }) => void;
-  singleProvider: boolean;
+  /* singleProvider arg retained on the type signature out of habit,
+   * but the tile no longer shows provider info — keep it tight. */
+  singleProvider?: boolean;
 }) {
   if (loading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <Skeleton key={i} className="h-12 rounded-xl" />
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <Skeleton key={i} className="h-10 rounded-xl" />
         ))}
       </div>
     );
@@ -679,15 +679,13 @@ function SlotGrid({
   }
 
   return (
-    <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+    <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1">
       {grouped.map((group) => (
         <div key={group.hour}>
           <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 px-1">
-            {group.hour < 12
-              ? `${group.hour === 0 ? 12 : group.hour}:00 AM`
-              : `${group.hour === 12 ? 12 : group.hour - 12}:00 PM`}
+            {formatHourLabel(group.hour)}
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
             {group.slots.map((s) => {
               const isSelected =
                 selected?.startsAt === s.startsAt &&
@@ -696,6 +694,11 @@ function SlotGrid({
                 <button
                   key={`${s.physicianId}-${s.startsAt}`}
                   type="button"
+                  // Provider + load context lives in the tooltip so the
+                  // tile itself stays a single-line time picker. Six per
+                  // row on lg means a typical 9-5 schedule fits without
+                  // scrolling.
+                  title={`${s.time} · ${s.physicianName} · ${loadLabel(s.load)} load`}
                   onClick={() =>
                     onSelect({
                       startsAt: s.startsAt,
@@ -703,20 +706,13 @@ function SlotGrid({
                     })
                   }
                   className={cn(
-                    "rounded-xl border bg-white px-3 py-2 text-left transition ring-focus",
+                    "h-10 rounded-xl border bg-white text-sm font-semibold transition ring-focus text-center",
                     isSelected
-                      ? "border-primary ring-2 ring-primary/30 bg-primary/5"
-                      : "border-border hover:border-foreground/30"
+                      ? "border-primary ring-2 ring-primary/30 bg-primary/5 text-primary"
+                      : "border-border text-foreground hover:border-foreground/30"
                   )}
                 >
-                  <div className="text-sm font-semibold">{s.time}</div>
-                  {!singleProvider && (
-                    <div className="text-[11px] text-muted-foreground truncate mt-0.5 flex items-center gap-1">
-                      <UserCheck className="size-3 shrink-0" />
-                      {s.physicianName}
-                    </div>
-                  )}
-                  <LoadChip load={s.load} />
+                  {s.time}
                 </button>
               );
             })}
@@ -727,15 +723,16 @@ function SlotGrid({
   );
 }
 
-function LoadChip({ load }: { load: number }) {
-  const tone =
-    load <= 2 ? "success" : load <= 5 ? "warning" : ("danger" as const);
-  const label = load <= 2 ? "Light" : load <= 5 ? "Busy" : "Heavy";
-  return (
-    <Badge variant={tone} size="sm" className="mt-1 text-[10px]">
-      {label}
-    </Badge>
-  );
+function loadLabel(load: number): "Light" | "Busy" | "Heavy" {
+  if (load <= 2) return "Light";
+  if (load <= 5) return "Busy";
+  return "Heavy";
+}
+
+function formatHourLabel(hour: number): string {
+  if (hour === 0) return "12:00 AM";
+  if (hour === 12) return "12:00 PM";
+  return hour < 12 ? `${hour}:00 AM` : `${hour - 12}:00 PM`;
 }
 
 /* -------------------------------------------------------------------------- */
