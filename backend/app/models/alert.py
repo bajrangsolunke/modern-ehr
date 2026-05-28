@@ -20,6 +20,16 @@ class AlertSeverity(str, enum.Enum):
     info = "info"
 
 
+class AlertSource(str, enum.Enum):
+    """Where the alert came from. `manual` is the default (clinician-entered);
+    `ai` flags rows produced by AI inference (intake red flags, etc.);
+    `system` is reserved for deterministic rule output (future use)."""
+
+    manual = "manual"
+    ai = "ai"
+    system = "system"
+
+
 class PatientAlert(Base, UUIDMixin, TimestampMixin):
     """
     Patient-scoped clinical alert (e.g. blood thinner, DNR, falls risk).
@@ -36,6 +46,12 @@ class PatientAlert(Base, UUIDMixin, TimestampMixin):
         Enum(AlertSeverity, name="alert_severity"),
         default=AlertSeverity.info,
         nullable=False,
+    )
+    source: Mapped[AlertSource] = mapped_column(
+        Enum(AlertSource, name="alert_source"),
+        default=AlertSource.manual,
+        nullable=False,
+        index=True,
     )
     label: Mapped[str] = mapped_column(String(128), nullable=False)
     detail: Mapped[str | None] = mapped_column(Text)
