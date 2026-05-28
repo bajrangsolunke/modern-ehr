@@ -37,6 +37,10 @@ async def list_tasks(
     task_status: TaskStatusLiteral | None = Query(None, alias="status"),
     priority: TaskPriorityLiteral | None = None,
     category: TaskCategoryLiteral | None = None,
+    patient_id: UUID | None = Query(
+        None,
+        description="Scope the list to one patient (used by the patient chart care-plan checklist).",
+    ),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
 ) -> Page[TaskOut]:
@@ -53,6 +57,7 @@ async def list_tasks(
         status=TaskStatus(task_status) if task_status else None,
         priority=TaskPriority(priority) if priority else None,
         category=TaskCategory(category) if category else None,
+        patient_id=patient_id,
         page=page,
         page_size=page_size,
         restrict_to_viewer=restrict_to_viewer,

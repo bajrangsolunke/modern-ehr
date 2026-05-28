@@ -84,6 +84,9 @@ export interface TaskFilters {
   status?: TaskStatus;
   priority?: TaskPriority;
   category?: TaskCategory;
+  /** Scope the list to a single patient. Used by the patient-chart
+   *  care-plan checklist. */
+  patient_id?: string;
   page?: number;
   page_size?: number;
 }

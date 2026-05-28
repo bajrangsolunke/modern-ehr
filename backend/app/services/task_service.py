@@ -38,6 +38,7 @@ class TaskService:
         status: TaskStatus | None = None,
         priority: TaskPriority | None = None,
         category: TaskCategory | None = None,
+        patient_id: UUID | None = None,
         page: int = 1,
         page_size: int = 10,
         restrict_to_viewer: bool = False,
@@ -98,6 +99,9 @@ class TaskService:
         if category is not None:
             stmt = stmt.where(Task.category == category)
             count_stmt = count_stmt.where(Task.category == category)
+        if patient_id is not None:
+            stmt = stmt.where(Task.patient_id == patient_id)
+            count_stmt = count_stmt.where(Task.patient_id == patient_id)
 
         total = (await self.db.execute(count_stmt)).scalar_one()
         stmt = (

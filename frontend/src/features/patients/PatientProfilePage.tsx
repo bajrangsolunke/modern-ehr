@@ -128,7 +128,7 @@ export function PatientProfilePage() {
             <TabsContent value="vitals" className="mt-0">
               <div className="grid grid-cols-1 gap-4">
                 <Vitals patientId={patient.id} />
-                <Labs />
+                <Labs patientId={patient.id} />
                 <LabReports patientId={patient.id} />
               </div>
             </TabsContent>
@@ -155,7 +155,7 @@ export function PatientProfilePage() {
             <TabsContent value="care-plan" className="mt-0">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
                 <div className="lg:col-span-8">
-                  <ChecklistCard />
+                  <ChecklistCard patientId={patient.id} />
                 </div>
                 <div className="lg:col-span-4 space-y-4">
                   <Timeline patientId={patient.id} />
