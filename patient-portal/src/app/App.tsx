@@ -1,3 +1,10 @@
+import { Providers } from "./providers";
+import { AppRouter } from "./router";
+
 export function App() {
-  return <div className="p-8">Patient portal — scaffold OK</div>;
+  return (
+    <Providers>
+      <AppRouter />
+    </Providers>
+  );
 }
