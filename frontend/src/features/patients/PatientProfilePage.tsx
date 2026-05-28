@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PatientDrawer } from "@/features/patients/components/PatientDrawer";
 import { ProfileSkeleton } from "@/features/patients/components/ProfileSkeleton";
 import { AlertsStrip } from "@/features/patients/components/AlertsStrip";
+import { PatientAiSummary } from "./components/PatientAiSummary";
 import { PatientHeader } from "@/features/patients/components/PatientHeader";
 import { KeyClinicalOverview } from "@/features/patients/components/KeyClinicalOverview";
 import { PatientForms } from "@/features/forms/components/PatientForms";
@@ -100,6 +101,7 @@ export function PatientProfilePage() {
               onEdit={() => setEditOpen(true)}
               onRemove={() => setConfirmingDelete(true)}
             />
+            <PatientAiSummary patientId={patient.id} />
             <AlertsStrip patientId={patient.id} />
           </div>
 
