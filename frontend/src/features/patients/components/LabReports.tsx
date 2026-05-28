@@ -5,7 +5,7 @@
  * pill-row table as Patients/Tasks/Forms for visual consistency.
  */
 import { useMemo, useState } from "react";
-import { FileText, Image as ImageIcon, Plus, Trash2 } from "lucide-react";
+import { FileText, Image as ImageIcon, Plus, Sparkles, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SortableTh, TABLE_ROW_BG } from "@/components/ui/sortable-th";
 import { DocumentUploadModal } from "@/features/docs/components/DocumentUploadModal";
 import { DocumentDetailsModal } from "@/features/docs/components/DocumentDetailsModal";
+import { LabExtractionReviewModal } from "./LabExtractionReviewModal";
 import {
   useDeleteDocument,
   usePatientDocuments,
@@ -38,6 +39,11 @@ export function LabReports({ patientId }: Props) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [viewing, setViewing] = useState<Document | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Document | null>(null);
+  const [extracting, setExtracting] = useState<{
+    open: boolean;
+    documentId: string;
+    documentName: string;
+  }>({ open: false, documentId: "", documentName: "" });
 
   // Show only lab-category documents — other categories live in the
   // Forms surface or chat attachments.
@@ -149,6 +155,24 @@ export function LabReports({ patientId }: Props) {
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-end gap-1">
+                            {canWrite && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-3 rounded-full bg-white hover:bg-primary/10 text-primary gap-1.5"
+                                aria-label="Extract lab values with AI"
+                                onClick={() =>
+                                  setExtracting({
+                                    open: true,
+                                    documentId: d.id,
+                                    documentName: d.name,
+                                  })
+                                }
+                              >
+                                <Sparkles className="size-3" />
+                                Extract with AI
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -209,6 +233,16 @@ export function LabReports({ patientId }: Props) {
           await remove.mutateAsync(pendingDelete.id);
           setPendingDelete(null);
         }}
+      />
+
+      <LabExtractionReviewModal
+        open={extracting.open}
+        onOpenChange={(open) =>
+          setExtracting((prev) => ({ ...prev, open }))
+        }
+        documentId={extracting.documentId}
+        documentName={extracting.documentName}
+        patientId={patientId}
       />
     </>
   );

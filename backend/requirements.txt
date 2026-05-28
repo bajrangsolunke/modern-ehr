@@ -27,3 +27,4 @@ websockets>=14.1
 slowapi>=0.1.9
 sse-starlette>=2.1.0
 reportlab>=4.2.0
+pypdf>=4.0

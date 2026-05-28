@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, UUIDMixin
 
 if TYPE_CHECKING:
+    from app.models.document import Document
     from app.models.patient import Patient
 
 
@@ -28,5 +29,12 @@ class LabResult(Base, UUIDMixin):
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # FK → documents.id. Populated when the value was AI-extracted from
+    # an uploaded lab-report PDF; NULL for manual entries.
+    source_document_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="SET NULL"),
+        index=True,
+    )
 
     patient: Mapped[Patient] = relationship(back_populates="labs")
+    source_document: Mapped[Document | None] = relationship()

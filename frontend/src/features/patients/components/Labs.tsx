@@ -5,7 +5,7 @@
  * Documents tab.
  */
 import { useMemo } from "react";
-import { ChevronRight, FlaskConical, Loader2, ScanLine } from "lucide-react";
+import { ChevronRight, FlaskConical, Loader2, ScanLine, Sparkles } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Card,
@@ -14,6 +14,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Empty } from "@/components/ui/empty";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { useLabResults } from "../hooks/use-lab-results";
@@ -110,7 +115,24 @@ export function Labs({ patientId }: Props) {
               <tbody className="divide-y divide-border">
                 {labs.map((l) => (
                   <tr key={l.id} className="hover:bg-surface-subtle/70">
-                    <td className="px-3 py-2 font-medium">{l.name}</td>
+                    <td className="px-3 py-2 font-medium">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="truncate">{l.name}</span>
+                        {l.sourceDocumentName && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary font-medium cursor-default">
+                                <Sparkles className="size-2.5" />
+                                AI
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Extracted from {l.sourceDocumentName}
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-3 py-2">
                       {l.value}{" "}
                       {l.unit && (
