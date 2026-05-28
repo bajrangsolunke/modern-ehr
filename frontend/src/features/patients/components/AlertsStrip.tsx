@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertOctagon, AlertTriangle, Info, Loader2, Plus, X } from "lucide-react";
+import { AlertOctagon, AlertTriangle, Info, Loader2, Plus, Sparkles, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -93,7 +93,13 @@ export function AlertsStrip({ patientId }: Props) {
                 >
                   <Icon className={cn("size-3.5", m.text)} />
                 </span>
-                <div className="flex items-baseline gap-1.5 leading-tight">
+                <div className="flex items-center gap-1.5 leading-tight">
+                  {a.source === "ai" && (
+                    <Sparkles
+                      className="size-3 text-primary shrink-0"
+                      aria-label="AI-generated alert"
+                    />
+                  )}
                   <span className="text-[13px] font-semibold">{a.label}</span>
                   {a.detail && (
                     <span className="text-[12px] text-muted-foreground">
