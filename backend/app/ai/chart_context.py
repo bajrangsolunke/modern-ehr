@@ -1,8 +1,13 @@
 """Aggregator service for the patient-chart AI panel.
 
 Returns summary + risk_score (each cache-aware) + a count of
-unresolved AI-source alerts. One round-trip from the frontend; both
-LLM calls fan out in parallel inside `get()`."""
+unresolved AI-source alerts. One round-trip from the frontend.
+
+NOTE on concurrency: although the implementation uses `asyncio.gather`,
+all three coroutines share the same AsyncSession and therefore serialize
+on the underlying DB connection. The shape is set up for future
+parallelism (separate sessions per coroutine), but for v1 we accept
+serial execution — the cache-hit path is already sub-100ms."""
 from __future__ import annotations
 
 import asyncio

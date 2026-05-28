@@ -8,27 +8,13 @@ import { Button } from "@/components/ui/button";
 import { AiTag } from "@/components/ui/ai-tag";
 import { cn } from "@/lib/utils";
 import { useChartAi, useRegenerateRisk } from "../hooks/use-chart-ai";
-import type { RiskLevel } from "../api/ai-api";
+import { RISK_LEVEL_TONE, RISK_LEVEL_LABEL } from "./risk-utils";
 
 interface Props {
   patientId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-export const RISK_LEVEL_TONE: Record<RiskLevel, string> = {
-  low: "bg-success/10 text-success",
-  moderate: "bg-warning/10 text-warning",
-  high: "bg-danger/10 text-danger",
-  critical: "bg-danger/15 text-danger",
-};
-
-const RISK_LEVEL_LABEL: Record<RiskLevel, string> = {
-  low: "Low",
-  moderate: "Moderate",
-  high: "High",
-  critical: "Critical",
-};
 
 export function PatientRiskDrawer({ patientId, open, onOpenChange }: Props) {
   const { data } = useChartAi(patientId);

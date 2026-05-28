@@ -5,20 +5,14 @@
  */
 import { useState } from "react";
 import { useChartAi } from "../hooks/use-chart-ai";
-import { PatientRiskDrawer, RISK_LEVEL_TONE } from "./PatientRiskDrawer";
+import { PatientRiskDrawer } from "./PatientRiskDrawer";
+import { RISK_LEVEL_TONE, RISK_LEVEL_LABEL } from "./risk-utils";
 import { cn } from "@/lib/utils";
 import { Sparkles } from "lucide-react";
 
 interface Props {
   patientId: string;
 }
-
-const LEVEL_LABEL = {
-  low: "Low",
-  moderate: "Moderate",
-  high: "High",
-  critical: "Critical",
-} as const;
 
 export function PatientRiskChip({ patientId }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -44,7 +38,7 @@ export function PatientRiskChip({ patientId }: Props) {
         title="Click for drivers + recommended actions"
       >
         <Sparkles className="size-3" />
-        Risk {r.riskScore} · {LEVEL_LABEL[r.riskLevel]}
+        Risk {r.riskScore} · {RISK_LEVEL_LABEL[r.riskLevel]}
       </button>
       <PatientRiskDrawer
         patientId={patientId}

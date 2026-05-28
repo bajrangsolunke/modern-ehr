@@ -80,10 +80,23 @@ async def chart_context(
     force: bool = Query(False, description="Bypass cache and recompute both"),
 ) -> AiChartContextResponse:
     """One-shot AI panel data for the patient chart — summary + risk +
-    AI alert count. Both LLM calls run in parallel."""
+    AI alert count. Cache-hit responses are sub-100ms; cache-miss runs
+    serially against the shared DB session (see ChartContextService)."""
     pid = UUID(patient_id)
     res = await ChartContextService(db).get(pid, force=force)
     audit = AuditService(db)
+    await audit.record_request(
+        request,
+        user_id=current.id,
+        action="ai.chart_context",
+        resource_type="patient",
+        resource_id=str(pid),
+        payload={
+            "summary_cached": res.summary.cached,
+            "risk_cached": res.risk.cached,
+            "ai_alerts_count": res.ai_alerts_count,
+        },
+    )
     await audit.record_request(
         request,
         user_id=current.id,
@@ -128,10 +141,20 @@ async def scribe(payload: ScribeRequest, current: CurrentUser) -> dict:
 async def intake_summary(
     form_id: UUID,
     payload: AiIntakeSummaryRequest,
+    request: Request,
     db: DbSession,
-    current: CurrentUser,  # noqa: ARG001
+    current: CurrentUser,
 ) -> AiIntakeSummaryResponse:
-    return await SummaryService(db).summarize_intake_form(form_id, payload.style)
+    res = await SummaryService(db).summarize_intake_form(form_id, payload.style)
+    await AuditService(db).record_request(
+        request,
+        user_id=current.id,
+        action="ai.intake_summary",
+        resource_type="form_request",
+        resource_id=str(form_id),
+        payload={"model": res.model, "style": payload.style},
+    )
+    return res
 
 
 @router.get("/provider")

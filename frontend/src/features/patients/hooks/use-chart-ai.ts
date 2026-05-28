@@ -20,6 +20,7 @@ export function useChartAi(patientId: string | undefined) {
     enabled: Boolean(patientId),
     staleTime: 0,
     gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
     retry: 1,
   });
 }
