@@ -1,7 +1,9 @@
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query, Request
+from pydantic import BaseModel
 
+from app.ai.chart_context import ChartContextService
 from app.ai.llm import llm_client
 from app.ai.rag import RagService
 from app.ai.risk import RiskService
@@ -9,6 +11,7 @@ from app.ai.scribe import ScribeService
 from app.ai.summary import SummaryService
 from app.api.deps import CurrentUser, DbSession
 from app.schemas.ai import (
+    AiChartContextResponse,
     AiIntakeSummaryRequest,
     AiIntakeSummaryResponse,
     AiQuestionRequest,
@@ -17,25 +20,87 @@ from app.schemas.ai import (
     AiSummaryRequest,
     AiSummaryResponse,
 )
-from pydantic import BaseModel
+from app.services.audit_service import AuditService
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 
 @router.post("/summary", response_model=AiSummaryResponse)
 async def patient_summary(
-    payload: AiSummaryRequest, db: DbSession, current: CurrentUser
+    payload: AiSummaryRequest,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
+    force: bool = Query(False, description="Bypass cache and recompute"),
 ) -> AiSummaryResponse:
-    return await SummaryService(db).for_patient(payload.patient_id, payload.style)
+    res = await SummaryService(db).for_patient(
+        payload.patient_id, payload.style, force=force
+    )
+    await AuditService(db).record_request(
+        request,
+        user_id=current.id,
+        action="ai.summary",
+        resource_type="patient",
+        resource_id=str(payload.patient_id),
+        payload={"model": res.model, "cached": res.cached},
+    )
+    return res
 
 
 @router.get("/risk/{patient_id}", response_model=AiRiskScoreResponse)
 async def patient_risk(
-    patient_id: str, db: DbSession, current: CurrentUser
+    patient_id: str,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
+    force: bool = Query(False, description="Bypass cache and recompute"),
 ) -> AiRiskScoreResponse:
-    from uuid import UUID
+    pid = UUID(patient_id)
+    res = await RiskService(db).score(pid, force=force)
+    await AuditService(db).record_request(
+        request,
+        user_id=current.id,
+        action="ai.risk",
+        resource_type="patient",
+        resource_id=str(pid),
+        payload={"model": res.model, "cached": res.cached},
+    )
+    return res
 
-    return await RiskService(db).score(UUID(patient_id))
+
+@router.get(
+    "/chart-context/{patient_id}",
+    response_model=AiChartContextResponse,
+)
+async def chart_context(
+    patient_id: str,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
+    force: bool = Query(False, description="Bypass cache and recompute both"),
+) -> AiChartContextResponse:
+    """One-shot AI panel data for the patient chart — summary + risk +
+    AI alert count. Both LLM calls run in parallel."""
+    pid = UUID(patient_id)
+    res = await ChartContextService(db).get(pid, force=force)
+    audit = AuditService(db)
+    await audit.record_request(
+        request,
+        user_id=current.id,
+        action="ai.summary",
+        resource_type="patient",
+        resource_id=str(pid),
+        payload={"model": res.summary.model, "cached": res.summary.cached},
+    )
+    await audit.record_request(
+        request,
+        user_id=current.id,
+        action="ai.risk",
+        resource_type="patient",
+        resource_id=str(pid),
+        payload={"model": res.risk.model, "cached": res.risk.cached},
+    )
+    return res
 
 
 @router.post("/ask", response_model=AiQuestionResponse)
@@ -64,22 +129,13 @@ async def intake_summary(
     form_id: UUID,
     payload: AiIntakeSummaryRequest,
     db: DbSession,
-    current: CurrentUser,  # noqa: ARG001 — auth gate
+    current: CurrentUser,  # noqa: ARG001
 ) -> AiIntakeSummaryResponse:
-    """Run an LLM summary on a submitted intake form.
-
-    The form must have status `submitted`, `completed`, or `denied`
-    (i.e. have a payload). Returns a clinician-ready summary with
-    red flags and follow-up questions.
-    """
     return await SummaryService(db).summarize_intake_form(form_id, payload.style)
 
 
 @router.get("/provider")
 async def provider_info(current: CurrentUser) -> dict:  # noqa: ARG001
-    """Tiny health/debug endpoint — confirms which AI provider is
-    active without leaking the API key. Useful while flipping between
-    Groq / Ollama / OpenAI during development."""
     return {
         "provider": llm_client.provider,
         "chat_model": llm_client.chat_model,
