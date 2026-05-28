@@ -59,6 +59,14 @@ class TaskStatus(str, enum.Enum):
     cancelled = "cancelled"
 
 
+class TaskType(str, enum.Enum):
+    """Which queue the task belongs to. Drives the admin's split
+    between "Tasks for Patients" and "Tasks for My Users"."""
+
+    user = "user"
+    patient = "patient"
+
+
 class Task(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "tasks"
 
@@ -80,6 +88,17 @@ class Task(Base, UUIDMixin, TimestampMixin):
     status: Mapped[TaskStatus] = mapped_column(
         Enum(TaskStatus, name="task_status"),
         default=TaskStatus.new,
+        nullable=False,
+        index=True,
+    )
+
+    # Explicit queue partition. `patient` tasks are pinned to a
+    # patient as the primary subject (no user assignee). `user`
+    # tasks are team/individual work and may optionally reference a
+    # patient as "Related to" without leaving the user queue.
+    task_type: Mapped[TaskType] = mapped_column(
+        Enum(TaskType, name="task_type"),
+        default=TaskType.user,
         nullable=False,
         index=True,
     )
