@@ -16,6 +16,7 @@ class AiSummaryResponse(BaseModel):
     confidence: float
     model: str
     generated_at: datetime
+    cached: bool = False
 
 
 class AiRiskScoreResponse(BaseModel):
@@ -26,6 +27,7 @@ class AiRiskScoreResponse(BaseModel):
     recommended_actions: list[str]
     model: str
     generated_at: datetime
+    cached: bool = False
 
 
 class AiInsightOut(BaseModel):
