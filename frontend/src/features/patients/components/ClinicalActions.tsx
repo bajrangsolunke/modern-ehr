@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CalendarPlus, FilePlus, MessageSquarePlus, PenSquare, Stethoscope } from "lucide-react";
+import { CalendarPlus, FilePlus, MessageSquarePlus, Mic, PenSquare, Stethoscope } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
@@ -28,6 +28,11 @@ export function ClinicalActions({ patientId, onGoToTab }: Props) {
         onGoToTab
           ? onGoToTab("notes")
           : toast.info("Open the Clinical notes tab to add a SOAP note."),
+    },
+    {
+      label: "Start ambient scribe",
+      icon: Mic,
+      onClick: () => navigate(`/patients/${patientId}/scribe`),
     },
     {
       label: "Order test",

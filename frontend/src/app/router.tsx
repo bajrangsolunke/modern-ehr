@@ -58,6 +58,9 @@ const FormEditorPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import("@/features/settings").then((m) => ({ default: m.SettingsPage }))
 );
+const ScribePage = lazy(() =>
+  import("@/features/scribe").then((m) => ({ default: m.ScribePage }))
+);
 
 function PageFallback() {
   return (
@@ -89,6 +92,7 @@ export function AppRouter() {
             />
             <Route path="/patients/:patientId" element={<PatientProfilePage />} />
             <Route path="/patients/:patientId/edit" element={<EditRedirect />} />
+            <Route path="/patients/:patientId/scribe" element={<ScribePage />} />
             <Route path={ROUTES.messages} element={<MessagesPage />} />
             <Route path={ROUTES.reports} element={<ReportsLayout />}>
               <Route
