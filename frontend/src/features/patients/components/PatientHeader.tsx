@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
 import { PortraitUploader } from "@/features/patients/components/PortraitUploader";
 import { PatientRiskChip } from "./PatientRiskChip";
+import { AlertsStrip } from "./AlertsStrip";
 import { useUpdatePatient } from "@/features/patients/hooks/use-update-patient";
 import { usePortalInvite } from "@/features/patients/hooks/use-portal-invite";
 import { toast } from "@/lib/toast";
@@ -148,6 +149,13 @@ export function PatientHeader({ patient, onEdit, onRemove }: Props) {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Alerts strip lives inside the patient card so important
+            allergies / DNR / AI red flags are always visible alongside
+            the meta-data, no matter which chart tab is active. */}
+        <div className="mt-5 pt-4 border-t border-border">
+          <AlertsStrip patientId={patient.id} />
         </div>
       </CardContent>
     </Card>

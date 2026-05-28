@@ -2,9 +2,10 @@
  * Appointments management page. User stories US-APPT-1..US-APPT-4
  * in docs/superpowers/specs/2026-05-27-workflow-user-stories.md.
  */
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
+  ArrowLeft,
   CalendarCheck2,
   CalendarDays,
   CalendarPlus,
@@ -51,6 +52,7 @@ import {
 } from "@/features/appointments/hooks/use-appointments";
 import { useAuthStore } from "@/stores/auth-store";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { usePatient } from "@/features/patients/hooks/use-patient";
 import type { Appointment, AppointmentStatus } from "@/types";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -121,6 +123,30 @@ export function AppointmentsPage() {
   const [viewing, setViewing] = useState<Appointment | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Appointment | null>(null);
 
+  // Deep-link support: arriving from a patient chart with
+  // /appointments?new=1&patientId=X&fromPatient=1 auto-opens the create
+  // modal pre-selected for that patient, and surfaces a "Back to chart"
+  // breadcrumb so the user can return.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const presetPatientId = searchParams.get("patientId") ?? undefined;
+  const cameFromPatient = searchParams.get("fromPatient") === "1";
+  const { data: presetPatient } = usePatient(
+    cameFromPatient ? presetPatientId : undefined
+  );
+
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setEditing(null);
+      setDrawerOpen(true);
+      // Consume the `new` param so closing + reopening the modal manually
+      // doesn't re-trigger this effect.
+      const next = new URLSearchParams(searchParams);
+      next.delete("new");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // rangeFor() calls `new Date()` for the "upcoming" preset, which
   // shifts by milliseconds. Memoize to prevent the React Query key
   // changing on every render → refetch loop → 429.
@@ -172,6 +198,15 @@ export function AppointmentsPage() {
 
   return (
     <>
+      {cameFromPatient && presetPatient && (
+        <Link
+          to={`/patients/${presetPatient.id}`}
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition mb-2"
+        >
+          <ArrowLeft className="size-3" />
+          Back to {presetPatient.name}
+        </Link>
+      )}
       <PageHeader
         title="Appointments"
         right={
@@ -290,6 +325,7 @@ export function AppointmentsPage() {
           if (!open) setEditing(null);
         }}
         appointment={editing ?? undefined}
+        defaultPatientId={editing ? undefined : presetPatientId}
       />
 
       <ConfirmDialog

@@ -1,16 +1,14 @@
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PatientDrawer } from "@/features/patients/components/PatientDrawer";
 import { ProfileSkeleton } from "@/features/patients/components/ProfileSkeleton";
-import { AlertsStrip } from "@/features/patients/components/AlertsStrip";
-import { PatientAiSummary } from "./components/PatientAiSummary";
 import { PatientHeader } from "@/features/patients/components/PatientHeader";
 import { KeyClinicalOverview } from "@/features/patients/components/KeyClinicalOverview";
 import { PatientForms } from "@/features/forms/components/PatientForms";
+import { PatientDocuments } from "@/features/patients/components/PatientDocuments";
 import { ChecklistCard } from "@/features/patients/components/Checklist";
 import { Timeline } from "@/features/patients/components/Timeline";
 import { Vitals } from "@/features/patients/components/Vitals";
@@ -22,27 +20,28 @@ import { LabReports } from "@/features/patients/components/LabReports";
 import { ClinicalActions } from "@/features/patients/components/ClinicalActions";
 import { useDeletePatient } from "@/features/patients/hooks/use-delete-patient";
 import { usePatient } from "@/features/patients/hooks/use-patient";
-import { soapNotes } from "@/mocks";
 
 /**
  * Tab-based patient profile. URL syncs ?tab= so links are shareable.
- * Patient header + alerts strip stay visible across tabs.
+ * Patient header (with alerts strip mounted inside the card) stays
+ * visible across tabs.
  *
  * Layout reasoning:
  * - Overview lands first because most profile opens are quick reads, not
  *   deep dives.
- * - Clinical notes, Vitals & labs, Medications, Documents, Care plan are
- *   the deep tabs — each maps to a discrete task ("write SOAP", "log
- *   vitals", "review labs", "upload consent", "case planning"), so
- *   separating them removes scroll fatigue from the old one-big-page
- *   layout.
+ * - Clinical notes, Vitals & labs, Medications, Forms, Documents, Care
+ *   plan are the deep tabs — each maps to a discrete task ("write SOAP",
+ *   "log vitals", "review labs", "intake / consent", "upload PDF", "case
+ *   planning"), so separating them removes scroll fatigue from the old
+ *   one-big-page layout.
  */
 const TABS = [
   { value: "overview", label: "Overview" },
   { value: "notes", label: "Clinical notes" },
   { value: "vitals", label: "Vitals & Labs" },
   { value: "medications", label: "Medications" },
-  { value: "documents", label: "Forms" },
+  { value: "forms", label: "Forms" },
+  { value: "documents", label: "Documents" },
   { value: "care-plan", label: "Care plan" },
 ] as const;
 
@@ -68,19 +67,6 @@ export function PatientProfilePage() {
 
   return (
     <>
-      <PageHeader
-        title="Patient information"
-        back
-        onBack={() => navigate(-1)}
-        right={
-          patient && (
-            <span className="text-xs text-muted-foreground">
-              MRN {patient.mrn}
-            </span>
-          )
-        }
-      />
-
       {isLoading && <ProfileSkeleton />}
 
       {isError && !isLoading && (
@@ -94,16 +80,12 @@ export function PatientProfilePage() {
 
       {!isLoading && !isError && patient && (
         <div className="space-y-4">
-          {/* Patient header + alerts strip — always visible above the tabs */}
-          <div className="space-y-4">
-            <PatientHeader
-              patient={patient}
-              onEdit={() => setEditOpen(true)}
-              onRemove={() => setConfirmingDelete(true)}
-            />
-            <PatientAiSummary patientId={patient.id} />
-            <AlertsStrip patientId={patient.id} />
-          </div>
+          {/* Patient header card — alerts strip lives inside the card now. */}
+          <PatientHeader
+            patient={patient}
+            onEdit={() => setEditOpen(true)}
+            onRemove={() => setConfirmingDelete(true)}
+          />
 
           <Tabs value={activeTab} onValueChange={setTab} className="space-y-4">
             <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
@@ -119,16 +101,11 @@ export function PatientProfilePage() {
             <TabsContent value="overview" className="mt-0">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
                 <div className="lg:col-span-8 space-y-4">
-                  <AiSummary
-                    summary={
-                      soapNotes[0].aiSummary ??
-                      "AI summary unavailable — please regenerate."
-                    }
-                  />
+                  <AiSummary patientId={patient.id} onOpenSoap={() => setTab("notes")} />
                   <KeyClinicalOverview onEdit={() => setEditOpen(true)} />
                 </div>
                 <div className="lg:col-span-4 space-y-4">
-                  <ClinicalActions onGoToTab={setTab} />
+                  <ClinicalActions patientId={patient.id} onGoToTab={setTab} />
                   <Timeline />
                 </div>
               </div>
@@ -140,7 +117,7 @@ export function PatientProfilePage() {
                   <SoapNotesCard patientId={patient.id} />
                 </div>
                 <div className="lg:col-span-4 space-y-4">
-                  <ClinicalActions onGoToTab={setTab} />
+                  <ClinicalActions patientId={patient.id} onGoToTab={setTab} />
                 </div>
               </div>
             </TabsContent>
@@ -159,13 +136,17 @@ export function PatientProfilePage() {
                   <MedicationsCard patientId={patient.id} />
                 </div>
                 <div className="lg:col-span-4 space-y-4">
-                  <ClinicalActions onGoToTab={setTab} />
+                  <ClinicalActions patientId={patient.id} onGoToTab={setTab} />
                 </div>
               </div>
             </TabsContent>
 
-            <TabsContent value="documents" className="mt-0">
+            <TabsContent value="forms" className="mt-0">
               <PatientForms patientId={patient.id} />
+            </TabsContent>
+
+            <TabsContent value="documents" className="mt-0">
+              <PatientDocuments patientId={patient.id} />
             </TabsContent>
 
             <TabsContent value="care-plan" className="mt-0">
