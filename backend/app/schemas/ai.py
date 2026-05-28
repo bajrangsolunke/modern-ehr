@@ -81,3 +81,12 @@ class AiIntakeSummaryResponse(BaseModel):
     confidence: float
     model: str
     generated_at: datetime
+
+
+class AiChartContextResponse(BaseModel):
+    """One-shot aggregator for the patient-chart AI panel — summary +
+    risk + count of unresolved AI alerts."""
+
+    summary: AiSummaryResponse
+    risk: AiRiskScoreResponse
+    ai_alerts_count: int
