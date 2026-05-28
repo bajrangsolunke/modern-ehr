@@ -10,11 +10,18 @@ from app.schemas.patient_auth import PatientMeOut
 from app.schemas.patient_dashboard import DashboardOut
 from app.schemas.patient_portal_appointments import PatientAppointmentListOut
 from app.schemas.patient_portal_documents import PatientDocumentListOut
+from app.schemas.patient_portal_messages import (
+    ConversationDetailOut,
+    ConversationListOut,
+    MessageOut,
+    SendMessageIn,
+)
 from app.schemas.patient_portal_notifications import PatientNotificationListOut
 from app.schemas.patient_portal_tasks import PatientTaskListOut
 from app.services.patient_appointments_service import PatientAppointmentsService
 from app.services.patient_dashboard_service import PatientDashboardService
 from app.services.patient_documents_service import PatientDocumentsService
+from app.services.patient_messages_service import PatientMessagesService
 from app.services.patient_notifications_service import PatientNotificationsService
 from app.services.patient_tasks_service import PatientTasksService
 
@@ -68,6 +75,38 @@ async def my_tasks(
     db: DbSession, current: CurrentPatient
 ) -> PatientTaskListOut:
     return await PatientTasksService(db).list_for_patient(current.id)
+
+
+@router.get("/me/conversations", response_model=ConversationListOut)
+async def my_conversations(
+    db: DbSession, current: CurrentPatient
+) -> ConversationListOut:
+    return await PatientMessagesService(db).list_for_patient(current.id)
+
+
+@router.get(
+    "/me/conversations/{conv_id}", response_model=ConversationDetailOut
+)
+async def my_conversation_detail(
+    conv_id: UUID, db: DbSession, current: CurrentPatient
+) -> ConversationDetailOut:
+    return await PatientMessagesService(db).get_detail(conv_id, current.id)
+
+
+@router.post(
+    "/me/conversations/{conv_id}/messages",
+    response_model=MessageOut,
+    status_code=201,
+)
+async def send_my_message(
+    conv_id: UUID,
+    payload: SendMessageIn,
+    db: DbSession,
+    current: CurrentPatient,
+) -> MessageOut:
+    return await PatientMessagesService(db).send_message(
+        conv_id, current.id, payload.body
+    )
 
 
 @router.get("/me/documents/{doc_id}/download")
