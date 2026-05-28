@@ -22,12 +22,12 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 const CATEGORY_TONE: Record<
   string,
-  "info" | "success" | "warning" | "neutral" | "primary"
+  "info" | "success" | "warning" | "neutral" | "default"
 > = {
   consent: "warning",
   imaging: "info",
   lab: "success",
-  insurance: "primary",
+  insurance: "default",
   referral: "info",
   discharge: "neutral",
   general: "neutral",

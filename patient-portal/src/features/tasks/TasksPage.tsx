@@ -149,7 +149,7 @@ export function TasksPage() {
         title="Mark this task complete?"
         description="Your care team will see that you've finished it."
         confirmLabel="Mark complete"
-        confirmLoading={complete.isPending}
+        busy={complete.isPending}
         onConfirm={() => {
           if (!confirmTaskId) return;
           complete.mutate(confirmTaskId, {
