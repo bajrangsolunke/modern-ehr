@@ -12,12 +12,14 @@ import {
 import { ConversationList } from "./components/ConversationList";
 import { MessageThread } from "./components/MessageThread";
 import { MessageComposer } from "./components/MessageComposer";
+import { AiSuggestions } from "./components/AiSuggestions";
 
 export function MessagesPage() {
   const list = useConversations();
   const [activeId, setActiveId] = useState<string | null>(null);
   const detail = useConversation(activeId);
   const send = useSendMessage(activeId);
+  const [composerSeed, setComposerSeed] = useState<string | undefined>();
 
   // Auto-select the first conversation once the list loads.
   useEffect(() => {
@@ -25,6 +27,12 @@ export function MessagesPage() {
       setActiveId(list.data.items[0].id);
     }
   }, [list.data, activeId]);
+
+  // Reset the composer seed when switching threads — old suggestion
+  // shouldn't haunt a new conversation.
+  useEffect(() => {
+    setComposerSeed(undefined);
+  }, [activeId]);
 
   return (
     <>
@@ -93,8 +101,13 @@ export function MessagesPage() {
                     <div className="flex-1 overflow-y-auto px-5 py-4 bg-secondary/30">
                       <MessageThread messages={detail.data.messages} />
                     </div>
+                    <AiSuggestions
+                      conversationId={activeId}
+                      onPick={(text) => setComposerSeed(text)}
+                    />
                     <MessageComposer
                       pending={send.isPending}
+                      seed={composerSeed}
                       onSend={(body) => send.mutateAsync(body).then(() => undefined)}
                     />
                   </>

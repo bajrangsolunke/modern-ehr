@@ -22,6 +22,7 @@ from app.schemas.patient_portal_tasks import (
     PatientTaskListOut,
     SubmitFormIn,
 )
+from app.services.patient_ai_service import PatientAIService
 from app.services.patient_appointments_service import PatientAppointmentsService
 from app.services.patient_dashboard_service import PatientDashboardService
 from app.services.patient_documents_service import PatientDocumentsService
@@ -137,6 +138,16 @@ async def send_my_message(
     return await PatientMessagesService(db).send_message(
         conv_id, current.id, payload.body
     )
+
+
+@router.post("/me/conversations/{conv_id}/ai-suggest")
+async def my_ai_suggest_replies(
+    conv_id: UUID, db: DbSession, current: CurrentPatient
+) -> dict[str, list[str]]:
+    suggestions = await PatientAIService(db).suggest_replies(
+        conv_id, current.id
+    )
+    return {"suggestions": suggestions}
 
 
 @router.get("/me/documents/{doc_id}/download")

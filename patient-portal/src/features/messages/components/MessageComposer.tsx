@@ -1,15 +1,20 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Props {
   disabled?: boolean;
   pending?: boolean;
+  seed?: string;
   onSend: (body: string) => Promise<void> | void;
 }
 
-export function MessageComposer({ disabled, pending, onSend }: Props) {
+export function MessageComposer({ disabled, pending, seed, onSend }: Props) {
   const [body, setBody] = useState("");
+
+  useEffect(() => {
+    if (seed) setBody(seed);
+  }, [seed]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
