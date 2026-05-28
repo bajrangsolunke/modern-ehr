@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.alert import AlertSeverity
+from app.models.alert import AlertSeverity, AlertSource
 
 
 class AlertBase(BaseModel):
@@ -28,6 +28,7 @@ class AlertOut(AlertBase):
 
     id: UUID
     patient_id: UUID
+    source: AlertSource = AlertSource.manual
     resolved: bool
     created_by_id: UUID | None
     created_at: datetime
