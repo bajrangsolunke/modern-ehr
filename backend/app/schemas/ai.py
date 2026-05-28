@@ -53,3 +53,29 @@ class AiQuestionResponse(BaseModel):
     citations: list[dict]
     model: str
     generated_at: datetime
+
+
+class AiIntakeSummaryRequest(BaseModel):
+    """Optional knobs for the intake-form summarizer. The form_id comes
+    from the URL path."""
+
+    style: str = Field(
+        "clinical",
+        description="One of: clinical (provider-facing), patient-friendly, brief",
+    )
+
+
+class AiIntakeSummaryResponse(BaseModel):
+    form_id: UUID
+    patient_id: UUID
+    summary: str
+    """2–3 sentence overview a clinician can read at a glance."""
+    bullets: list[str]
+    """Short bullet list of clinically-relevant facts."""
+    red_flags: list[str]
+    """Allergies, anticoag, contraindications, urgent issues to flag up front."""
+    follow_ups: list[str]
+    """Things the clinician should ask the patient about during the visit."""
+    confidence: float
+    model: str
+    generated_at: datetime

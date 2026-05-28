@@ -19,10 +19,6 @@ TaskCategoryLiteral = Literal[
 TaskPriorityLiteral = Literal["low", "medium", "high"]
 TaskStatusLiteral = Literal["new", "in_progress", "completed", "cancelled"]
 TaskScopeLiteral = Literal["all", "mine", "assigned"]
-TaskTypeLiteral = Literal["user", "patient"]
-# audience is the URL-facing alias for task_type, kept distinct so
-# the filter param ("all" passes through unchanged) stays separate
-# from the persisted enum.
 TaskAudienceLiteral = Literal["all", "patients", "users"]
 
 
@@ -37,7 +33,6 @@ class TaskOut(BaseModel):
     category: TaskCategoryLiteral
     priority: TaskPriorityLiteral
     status: TaskStatusLiteral
-    task_type: TaskTypeLiteral
 
     created_by_user_id: UUID | None = None
     created_by_name: str | None = None
@@ -59,7 +54,6 @@ class TaskCreate(BaseModel):
     description: str | None = None
     category: TaskCategoryLiteral = "other"
     priority: TaskPriorityLiteral = "medium"
-    task_type: TaskTypeLiteral = "user"
     assigned_to_user_id: UUID | None = None
     patient_id: UUID | None = None
     due_date: date | None = None
@@ -71,7 +65,6 @@ class TaskUpdate(BaseModel):
     category: TaskCategoryLiteral | None = None
     priority: TaskPriorityLiteral | None = None
     status: TaskStatusLiteral | None = None
-    task_type: TaskTypeLiteral | None = None
     assigned_to_user_id: UUID | None = None
     patient_id: UUID | None = None
     due_date: date | None = None

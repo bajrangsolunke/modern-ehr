@@ -19,3 +19,5 @@ dist/
 
 # Docker
 *.pid
+patient-portal/dist/
+patient-portal/*.tsbuildinfo

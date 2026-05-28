@@ -8,7 +8,7 @@ export function MobilePage() {
     <>
       <PageHeader
         title="Mobile Companion"
-        subtitle="Padmavat for Patients · iOS / Android preview"
+        subtitle="Modern-EHR for Patients · iOS / Android preview"
         right={<Badge variant="default">v1.0 preview</Badge>}
       />
 

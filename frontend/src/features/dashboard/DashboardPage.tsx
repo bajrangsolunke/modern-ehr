@@ -18,7 +18,8 @@ import {
   StackedBars,
 } from "@/features/dashboard/components/MiniCharts";
 import { UpcomingAppointments } from "@/features/dashboard/components/UpcomingAppointments";
-import { AppointmentRequests } from "@/features/dashboard/components/AppointmentRequests";
+import { RequestedTasks } from "@/features/dashboard/components/RequestedTasks";
+import { MessagesNotificationCard } from "@/features/dashboard/components/MessagesNotificationCard";
 import { useAuthStore } from "@/stores/auth-store";
 
 function useGreetingName() {
@@ -133,8 +134,9 @@ export function DashboardPage() {
         <div className="xl:col-span-2">
           <UpcomingAppointments />
         </div>
-        <div className="xl:col-span-1">
-          <AppointmentRequests />
+        <div className="xl:col-span-1 space-y-4 lg:space-y-5">
+          <RequestedTasks />
+          <MessagesNotificationCard />
         </div>
       </div>
     </>

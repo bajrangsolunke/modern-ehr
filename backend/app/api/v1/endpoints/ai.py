@@ -1,11 +1,16 @@
+from uuid import UUID
+
 from fastapi import APIRouter
 
+from app.ai.llm import llm_client
 from app.ai.rag import RagService
 from app.ai.risk import RiskService
 from app.ai.scribe import ScribeService
 from app.ai.summary import SummaryService
 from app.api.deps import CurrentUser, DbSession
 from app.schemas.ai import (
+    AiIntakeSummaryRequest,
+    AiIntakeSummaryResponse,
     AiQuestionRequest,
     AiQuestionResponse,
     AiRiskScoreResponse,
@@ -49,3 +54,34 @@ class ScribeRequest(BaseModel):
 @router.post("/scribe")
 async def scribe(payload: ScribeRequest, current: CurrentUser) -> dict:
     return await ScribeService().transcript_to_soap(payload.transcript)
+
+
+@router.post(
+    "/intake-summary/{form_id}",
+    response_model=AiIntakeSummaryResponse,
+)
+async def intake_summary(
+    form_id: UUID,
+    payload: AiIntakeSummaryRequest,
+    db: DbSession,
+    current: CurrentUser,  # noqa: ARG001 — auth gate
+) -> AiIntakeSummaryResponse:
+    """Run an LLM summary on a submitted intake form.
+
+    The form must have status `submitted`, `completed`, or `denied`
+    (i.e. have a payload). Returns a clinician-ready summary with
+    red flags and follow-up questions.
+    """
+    return await SummaryService(db).summarize_intake_form(form_id, payload.style)
+
+
+@router.get("/provider")
+async def provider_info(current: CurrentUser) -> dict:  # noqa: ARG001
+    """Tiny health/debug endpoint — confirms which AI provider is
+    active without leaking the API key. Useful while flipping between
+    Groq / Ollama / OpenAI during development."""
+    return {
+        "provider": llm_client.provider,
+        "chat_model": llm_client.chat_model,
+        "enabled": llm_client.enabled,
+    }

@@ -1,5 +1,5 @@
 /**
- * Typed fetch wrapper for the Padmavat backend.
+ * Typed fetch wrapper for the Modern-EHR backend.
  * - Attaches the access token from the auth store
  * - On 401, attempts a single refresh + retry; if that also fails, logs out
  * - On connectivity failure, returns demoFallback() if provided and DEMO_FALLBACK

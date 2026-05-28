@@ -33,7 +33,25 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
 
+    # LLM provider selection. One of: openai | groq | ollama | stub.
+    # `stub` (or any unconfigured provider) returns deterministic
+    # placeholder text so dev/CI keep working without a real key.
+    LLM_PROVIDER: Literal["openai", "groq", "ollama", "stub", ""] = ""
+    # Optional model overrides — leave blank to use the provider's default
+    # (gpt-4o-mini / llama-3.3-70b-versatile / llama3.2:3b).
+    LLM_MODEL_CHAT: str = ""
+    LLM_MODEL_EMBED: str = ""
+
+    # Provider credentials. Only the one matching LLM_PROVIDER is used at
+    # runtime, but keeping all three lets us flip providers without
+    # touching code.
     OPENAI_API_KEY: str = "sk-replace-me"
+    GROQ_API_KEY: str = "gsk-replace-me"
+    OLLAMA_BASE_URL: str = "http://localhost:11434/v1"
+
+    # Legacy aliases — kept so existing code referencing
+    # settings.OPENAI_MODEL_CHAT keeps working. New code should read
+    # llm_client.chat_model instead.
     OPENAI_MODEL_CHAT: str = "gpt-4o-mini"
     OPENAI_MODEL_EMBED: str = "text-embedding-3-small"
 

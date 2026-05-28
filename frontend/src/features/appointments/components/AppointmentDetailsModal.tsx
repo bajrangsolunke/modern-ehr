@@ -216,7 +216,7 @@ export function AppointmentDetailsModal({
         {/* Quick meta */}
         <div className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
           <Clock className="size-3" />
-          Created via Padmavat · ID {a.id.slice(0, 8)}
+          Created via Modern-EHR · ID {a.id.slice(0, 8)}
         </div>
       </div>
     </Modal>

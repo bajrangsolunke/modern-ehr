@@ -10,11 +10,15 @@ import {
 import { QUERY_KEYS } from "@/config/constants";
 import { toast } from "@/lib/toast";
 
-export function useUsers(filters: UserFilters) {
+export function useUsers(
+  filters: UserFilters,
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: QUERY_KEYS.users.list(filters),
     queryFn: () => usersApi.list(filters),
     staleTime: 30_000,
+    enabled: options?.enabled ?? true,
   });
 }
 

@@ -10,6 +10,7 @@ from app.api.deps import CurrentUser, DbSession
 from app.models.task import TaskCategory, TaskPriority, TaskStatus
 from app.schemas.common import Page
 from app.schemas.task import (
+    TaskAudienceLiteral,
     TaskCategoryLiteral,
     TaskCreate,
     TaskOut,
@@ -30,6 +31,7 @@ async def list_tasks(
     db: DbSession,
     current: CurrentUser,
     scope: TaskScopeLiteral = "all",
+    audience: TaskAudienceLiteral = "all",
     q: str | None = Query(None, description="Search title + description"),
     task_status: TaskStatusLiteral | None = Query(None, alias="status"),
     priority: TaskPriorityLiteral | None = None,
@@ -40,6 +42,7 @@ async def list_tasks(
     items, total, pages = await TaskService(db).list(
         viewer_id=current.id,
         scope=scope,
+        audience=audience,
         q=q,
         status=TaskStatus(task_status) if task_status else None,
         priority=TaskPriority(priority) if priority else None,

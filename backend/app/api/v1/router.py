@@ -7,6 +7,7 @@ from app.api.v1.endpoints import (
     appointments,
     auth,
     availability,
+    dashboard,
     documents,
     form_requests,
     health,
@@ -45,4 +46,5 @@ api_router.include_router(analytics.router)
 api_router.include_router(ai.router)
 api_router.include_router(messages.router)
 api_router.include_router(tasks.router)
+api_router.include_router(dashboard.router)
 api_router.include_router(ws.router)

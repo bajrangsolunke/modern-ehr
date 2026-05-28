@@ -17,15 +17,20 @@ export function LoginPage() {
                 />
               </svg>
             </div>
-            <div className="font-display text-[22px] font-bold tracking-tight">
-              Padmavat
+            <div className="flex flex-col leading-none">
+              <span className="font-display text-[22px] font-bold tracking-tight">
+                Modern-EHR
+              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary mt-0.5">
+                AI-Native
+              </span>
             </div>
           </div>
 
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Sign in to your Padmavat account to continue.
+              Sign in to your Modern-EHR account to continue.
             </p>
           </div>
 
@@ -50,8 +55,8 @@ export function LoginPage() {
             doctors actually want to use.
           </h2>
           <p className="text-white/80 mt-4 leading-relaxed">
-            Padmavat brings clinical intelligence to your daily practice. Spend
-            less time on paperwork and more time with patients.
+            Modern-EHR brings clinical intelligence to your daily practice.
+            Spend less time on paperwork and more time with patients.
           </p>
         </div>
       </div>

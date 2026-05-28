@@ -12,6 +12,12 @@
  * Each section's "complete" flag lights the sidebar green when its
  * required fields are filled. The data shape is JSON-safe at every
  * point so it round-trips through the JSONB column unchanged.
+ *
+ * Validation: client-side rules mirror the backend Pydantic schema
+ * (intake-validation.ts). Inputs hard-cap typing via maxLength so
+ * users can't even produce most "too long" cases; the validator runs
+ * on save and a backend 422 is mapped back into the same inline error
+ * tree so users always see *which* field failed and why.
  */
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -23,6 +29,16 @@ import { RepeatableList } from "./shared/RepeatableList";
 import { ImageUpload } from "./shared/ImageUpload";
 import { useSubmitForm } from "../hooks/use-forms";
 import type { FormRequest } from "../api/forms-api";
+import {
+  INTAKE_LIMITS,
+  emptyIntakeErrors,
+  validateIntake,
+  hasIntakeErrors,
+  firstSectionWithError,
+  extractBackendErrors,
+  mapBackendErrorsToIntake,
+  type IntakeErrors,
+} from "./intake-validation";
 
 /* -------------------------------------------------------------------------- */
 /* Vocabulary                                                                 */
@@ -63,6 +79,8 @@ const RELATIONS = [
   "Paternal grandparent",
   "Other",
 ];
+
+const TODAY = new Date().toISOString().slice(0, 10);
 
 /* -------------------------------------------------------------------------- */
 /* Default value                                                              */
@@ -178,10 +196,28 @@ export function IntakeFormEditor({ form, onClose }: Props) {
     };
   });
 
+  const [errors, setErrors] = useState<IntakeErrors>(emptyIntakeErrors);
+  const [showErrors, setShowErrors] = useState(false);
+
   const setSection = <K extends keyof IntakeValue>(
     key: K,
     next: IntakeValue[K]
   ) => setValue((cur) => ({ ...cur, [key]: next }));
+
+  // Clear a single demographic/contact/insurance field error when the
+  // user edits that field — keeps the inline message from sticking
+  // after they've fixed it.
+  const clearFieldError = (
+    section: "demographics" | "contact" | "insurance",
+    field: string
+  ) => {
+    setErrors((cur) => {
+      const sectionErrors = cur[section] as Record<string, string | undefined>;
+      if (!(field in sectionErrors)) return cur;
+      const { [field]: _, ...rest } = sectionErrors;
+      return { ...cur, [section]: rest } as IntakeErrors;
+    });
+  };
 
   const sections = useMemo<FormSection[]>(
     () => [
@@ -192,7 +228,11 @@ export function IntakeFormEditor({ form, onClose }: Props) {
         render: () => (
           <DemographicsSection
             value={value.demographics}
-            onChange={(v) => setSection("demographics", v)}
+            errors={showErrors ? errors.demographics : {}}
+            onChange={(v, changedField) => {
+              setSection("demographics", v);
+              if (changedField) clearFieldError("demographics", changedField);
+            }}
           />
         ),
       },
@@ -203,7 +243,11 @@ export function IntakeFormEditor({ form, onClose }: Props) {
         render: () => (
           <ContactSection
             value={value.contact}
-            onChange={(v) => setSection("contact", v)}
+            errors={showErrors ? errors.contact : {}}
+            onChange={(v, changedField) => {
+              setSection("contact", v);
+              if (changedField) clearFieldError("contact", changedField);
+            }}
           />
         ),
       },
@@ -214,7 +258,11 @@ export function IntakeFormEditor({ form, onClose }: Props) {
         render: () => (
           <InsuranceSection
             value={value.insurance}
-            onChange={(v) => setSection("insurance", v)}
+            errors={showErrors ? errors.insurance : {}}
+            onChange={(v, changedField) => {
+              setSection("insurance", v);
+              if (changedField) clearFieldError("insurance", changedField);
+            }}
           />
         ),
       },
@@ -225,6 +273,7 @@ export function IntakeFormEditor({ form, onClose }: Props) {
         render: () => (
           <HealthHistorySection
             value={value.health_history}
+            errors={showErrors ? errors.health_history : emptyIntakeErrors().health_history}
             onChange={(v) => setSection("health_history", v)}
           />
         ),
@@ -236,19 +285,59 @@ export function IntakeFormEditor({ form, onClose }: Props) {
         render: () => (
           <FamilyHealthHistorySection
             value={value.family_health_history}
+            errors={
+              showErrors
+                ? errors.family_health_history
+                : emptyIntakeErrors().family_health_history
+            }
             onChange={(v) => setSection("family_health_history", v)}
           />
         ),
       },
     ],
-    [value]
+    [value, errors, showErrors]
   );
 
   const canSave = isDemographicsComplete(value);
 
   const handleSave = async () => {
-    await submit.mutateAsync({ id: form.id, data: value });
-    onClose();
+    const validation = validateIntake(value);
+    setErrors(validation);
+    if (hasIntakeErrors(validation)) {
+      setShowErrors(true);
+      const sectionId = firstSectionWithError(validation);
+      if (sectionId) {
+        // Defer so the section is mounted before we scroll.
+        requestAnimationFrame(() => {
+          document
+            .getElementById(`section-${sectionId}`)
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
+      return;
+    }
+    try {
+      await submit.mutateAsync({ id: form.id, data: value });
+      onClose();
+    } catch (err) {
+      // Map any backend-side errors we didn't catch into the same
+      // inline tree so the user can see exactly which field failed.
+      const beErrors = extractBackendErrors(err);
+      if (beErrors.length) {
+        setErrors((cur) => mapBackendErrorsToIntake(beErrors, cur));
+        setShowErrors(true);
+        const sectionId = firstSectionWithError(
+          mapBackendErrorsToIntake(beErrors, validation)
+        );
+        if (sectionId) {
+          requestAnimationFrame(() => {
+            document
+              .getElementById(`section-${sectionId}`)
+              ?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        }
+      }
+    }
   };
 
   return (
@@ -270,34 +359,40 @@ export function IntakeFormEditor({ form, onClose }: Props) {
 
 function DemographicsSection({
   value,
+  errors,
   onChange,
 }: {
   value: IntakeValue["demographics"];
-  onChange: (v: IntakeValue["demographics"]) => void;
+  errors: IntakeErrors["demographics"];
+  onChange: (v: IntakeValue["demographics"], changedField?: string) => void;
 }) {
   const set = (k: keyof IntakeValue["demographics"], v: string) =>
-    onChange({ ...value, [k]: v });
+    onChange({ ...value, [k]: v }, k);
+  const L = INTAKE_LIMITS.demographics;
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-      <FormField label="First name" required>
+      <FormField label="First name" required error={errors.first_name}>
         <Input
           value={value.first_name}
+          maxLength={L.first_name}
           onChange={(e) => set("first_name", e.target.value)}
         />
       </FormField>
-      <FormField label="Middle name">
+      <FormField label="Middle name" error={errors.middle_name}>
         <Input
           value={value.middle_name}
+          maxLength={L.middle_name}
           onChange={(e) => set("middle_name", e.target.value)}
         />
       </FormField>
-      <FormField label="Last name" required>
+      <FormField label="Last name" required error={errors.last_name}>
         <Input
           value={value.last_name}
+          maxLength={L.last_name}
           onChange={(e) => set("last_name", e.target.value)}
         />
       </FormField>
-      <FormField label="Suffix">
+      <FormField label="Suffix" error={errors.suffix}>
         <Select value={value.suffix} onChange={(v) => set("suffix", v)}>
           {SUFFIXES.map((s) => (
             <option key={s} value={s}>
@@ -307,13 +402,14 @@ function DemographicsSection({
         </Select>
       </FormField>
 
-      <FormField label="Nickname">
+      <FormField label="Nickname" error={errors.nickname}>
         <Input
           value={value.nickname}
+          maxLength={L.nickname}
           onChange={(e) => set("nickname", e.target.value)}
         />
       </FormField>
-      <FormField label="Gender at birth">
+      <FormField label="Gender at birth" error={errors.gender_at_birth}>
         <Select
           value={value.gender_at_birth}
           onChange={(v) => set("gender_at_birth", v)}
@@ -325,7 +421,7 @@ function DemographicsSection({
           ))}
         </Select>
       </FormField>
-      <FormField label="Current gender">
+      <FormField label="Current gender" error={errors.current_gender}>
         <Select
           value={value.current_gender}
           onChange={(v) => set("current_gender", v)}
@@ -337,7 +433,7 @@ function DemographicsSection({
           ))}
         </Select>
       </FormField>
-      <FormField label="Pronouns">
+      <FormField label="Pronouns" error={errors.pronouns}>
         <Select value={value.pronouns} onChange={(v) => set("pronouns", v)}>
           {PRONOUNS.map((p) => (
             <option key={p} value={p}>
@@ -347,14 +443,15 @@ function DemographicsSection({
         </Select>
       </FormField>
 
-      <FormField label="Date of birth" required>
+      <FormField label="Date of birth" required error={errors.dob}>
         <Input
           type="date"
           value={value.dob}
+          max={TODAY}
           onChange={(e) => set("dob", e.target.value)}
         />
       </FormField>
-      <FormField label="Marital status">
+      <FormField label="Marital status" error={errors.marital_status}>
         <Select
           value={value.marital_status}
           onChange={(v) => set("marital_status", v)}
@@ -366,35 +463,39 @@ function DemographicsSection({
           ))}
         </Select>
       </FormField>
-      <FormField label="Time zone">
+      <FormField label="Time zone" error={errors.time_zone}>
         <Input
           value={value.time_zone}
+          maxLength={L.time_zone}
           onChange={(e) => set("time_zone", e.target.value)}
           placeholder="e.g. America/Los_Angeles"
         />
       </FormField>
-      <FormField label="Preferred language">
+      <FormField label="Preferred language" error={errors.preferred_language}>
         <Input
           value={value.preferred_language}
+          maxLength={L.preferred_language}
           onChange={(e) => set("preferred_language", e.target.value)}
           placeholder="English"
         />
       </FormField>
 
-      <FormField label="Occupation">
+      <FormField label="Occupation" error={errors.occupation}>
         <Input
           value={value.occupation}
+          maxLength={L.occupation}
           onChange={(e) => set("occupation", e.target.value)}
         />
       </FormField>
-      <FormField label="SSN">
+      <FormField label="SSN" error={errors.ssn}>
         <Input
           value={value.ssn}
+          maxLength={L.ssn}
           onChange={(e) => set("ssn", e.target.value)}
           placeholder="123-45-6789"
         />
       </FormField>
-      <FormField label="Race">
+      <FormField label="Race" error={errors.race}>
         <Select value={value.race} onChange={(v) => set("race", v)}>
           {RACES.map((r) => (
             <option key={r} value={r}>
@@ -403,7 +504,7 @@ function DemographicsSection({
           ))}
         </Select>
       </FormField>
-      <FormField label="Ethnicity">
+      <FormField label="Ethnicity" error={errors.ethnicity}>
         <Select value={value.ethnicity} onChange={(v) => set("ethnicity", v)}>
           {ETHNICITY.map((e) => (
             <option key={e} value={e}>
@@ -418,79 +519,92 @@ function DemographicsSection({
 
 function ContactSection({
   value,
+  errors,
   onChange,
 }: {
   value: IntakeValue["contact"];
-  onChange: (v: IntakeValue["contact"]) => void;
+  errors: IntakeErrors["contact"];
+  onChange: (v: IntakeValue["contact"], changedField?: string) => void;
 }) {
   const set = (k: keyof IntakeValue["contact"], v: string) =>
-    onChange({ ...value, [k]: v });
+    onChange({ ...value, [k]: v }, k);
+  const L = INTAKE_LIMITS.contact;
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-      <FormField label="Mobile number">
+      <FormField label="Mobile number" error={errors.mobile_number}>
         <Input
           value={value.mobile_number}
+          maxLength={L.mobile_number}
           onChange={(e) => set("mobile_number", e.target.value)}
         />
       </FormField>
-      <FormField label="Home number">
+      <FormField label="Home number" error={errors.home_number}>
         <Input
           value={value.home_number}
+          maxLength={L.home_number}
           onChange={(e) => set("home_number", e.target.value)}
         />
       </FormField>
-      <FormField label="Email">
+      <FormField label="Email" error={errors.email}>
         <Input
           type="email"
           value={value.email}
+          maxLength={L.email}
           onChange={(e) => set("email", e.target.value)}
         />
       </FormField>
-      <FormField label="Fax number">
+      <FormField label="Fax number" error={errors.fax_number}>
         <Input
           value={value.fax_number}
+          maxLength={L.fax_number}
           onChange={(e) => set("fax_number", e.target.value)}
         />
       </FormField>
 
       <div className="sm:col-span-2 lg:col-span-2">
-        <FormField label="Address line 1">
+        <FormField label="Address line 1" error={errors.address_line_1}>
           <Input
             value={value.address_line_1}
+            maxLength={L.address_line_1}
             onChange={(e) => set("address_line_1", e.target.value)}
           />
         </FormField>
       </div>
       <div className="sm:col-span-2 lg:col-span-2">
-        <FormField label="Address line 2">
+        <FormField label="Address line 2" error={errors.address_line_2}>
           <Input
             value={value.address_line_2}
+            maxLength={L.address_line_2}
             onChange={(e) => set("address_line_2", e.target.value)}
           />
         </FormField>
       </div>
 
-      <FormField label="City">
+      <FormField label="City" error={errors.city}>
         <Input
           value={value.city}
+          maxLength={L.city}
           onChange={(e) => set("city", e.target.value)}
         />
       </FormField>
-      <FormField label="State">
+      <FormField label="State" error={errors.state}>
         <Input
           value={value.state}
+          maxLength={L.state}
           onChange={(e) => set("state", e.target.value)}
         />
       </FormField>
-      <FormField label="Country">
+      <FormField label="Country" error={errors.country}>
         <Input
           value={value.country}
+          maxLength={L.country}
           onChange={(e) => set("country", e.target.value)}
         />
       </FormField>
-      <FormField label="Zip code">
+      <FormField label="Zip code" error={errors.zip_code}>
         <Input
           value={value.zip_code}
+          maxLength={L.zip_code}
           onChange={(e) => set("zip_code", e.target.value)}
         />
       </FormField>
@@ -500,57 +614,65 @@ function ContactSection({
 
 function InsuranceSection({
   value,
+  errors,
   onChange,
 }: {
   value: IntakeValue["insurance"];
-  onChange: (v: IntakeValue["insurance"]) => void;
+  errors: IntakeErrors["insurance"];
+  onChange: (v: IntakeValue["insurance"], changedField?: string) => void;
 }) {
   const set = <K extends keyof IntakeValue["insurance"]>(
     k: K,
     v: IntakeValue["insurance"][K]
-  ) => onChange({ ...value, [k]: v });
+  ) => onChange({ ...value, [k]: v }, k as string);
+  const L = INTAKE_LIMITS.insurance;
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <FormField label="Insurance name">
+        <FormField label="Insurance name" error={errors.insurance_name}>
           <Input
             value={value.insurance_name}
+            maxLength={L.insurance_name}
             onChange={(e) => set("insurance_name", e.target.value)}
           />
         </FormField>
-        <FormField label="Member ID">
+        <FormField label="Member ID" error={errors.member_id}>
           <Input
             value={value.member_id}
+            maxLength={L.member_id}
             onChange={(e) => set("member_id", e.target.value)}
           />
         </FormField>
-        <FormField label="Insurance plan">
+        <FormField label="Insurance plan" error={errors.insurance_plan}>
           <Input
             value={value.insurance_plan}
+            maxLength={L.insurance_plan}
             onChange={(e) => set("insurance_plan", e.target.value)}
           />
         </FormField>
-        <FormField label="Insured group name">
+        <FormField label="Insured group name" error={errors.insured_group_name}>
           <Input
             value={value.insured_group_name}
+            maxLength={L.insured_group_name}
             onChange={(e) => set("insured_group_name", e.target.value)}
           />
         </FormField>
 
-        <FormField label="Group number">
+        <FormField label="Group number" error={errors.group_number}>
           <Input
             value={value.group_number}
+            maxLength={L.group_number}
             onChange={(e) => set("group_number", e.target.value)}
           />
         </FormField>
-        <FormField label="Effective start date">
+        <FormField label="Effective start date" error={errors.effective_start_date}>
           <Input
             type="date"
             value={value.effective_start_date}
             onChange={(e) => set("effective_start_date", e.target.value)}
           />
         </FormField>
-        <FormField label="Effective end date">
+        <FormField label="Effective end date" error={errors.effective_end_date}>
           <Input
             type="date"
             value={value.effective_end_date}
@@ -577,9 +699,11 @@ function InsuranceSection({
 
 function HealthHistorySection({
   value,
+  errors,
   onChange,
 }: {
   value: IntakeValue["health_history"];
+  errors: IntakeErrors["health_history"];
   onChange: (v: IntakeValue["health_history"]) => void;
 }) {
   const toggleIllness = (illness: string) => {
@@ -621,12 +745,18 @@ function HealthHistorySection({
         <Bullet label="List any medical problems that other doctors have diagnosed:" />
         <Textarea
           value={value.diagnosed_problems}
+          maxLength={INTAKE_LIMITS.diagnosed_problems}
           onChange={(e) =>
             onChange({ ...value, diagnosed_problems: e.target.value })
           }
           rows={3}
           className="mt-2"
         />
+        {errors.diagnosed_problems && (
+          <p className="text-xs text-danger leading-tight mt-1">
+            {errors.diagnosed_problems}
+          </p>
+        )}
       </div>
 
       <div>
@@ -636,33 +766,49 @@ function HealthHistorySection({
             items={value.past_surgeries}
             newItem={() => ({ name: "", onset_date: "", hospital: "", note: "" })}
             onChange={(v) => onChange({ ...value, past_surgeries: v })}
-            renderRow={(row, setRow) => (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                <Input
-                  placeholder="Surgery name"
-                  value={row.name}
-                  onChange={(e) => setRow({ ...row, name: e.target.value })}
-                />
-                <Input
-                  type="date"
-                  placeholder="Onset date"
-                  value={row.onset_date}
-                  onChange={(e) =>
-                    setRow({ ...row, onset_date: e.target.value })
-                  }
-                />
-                <Input
-                  placeholder="Hospital name"
-                  value={row.hospital}
-                  onChange={(e) => setRow({ ...row, hospital: e.target.value })}
-                />
-                <Input
-                  placeholder="Note"
-                  value={row.note}
-                  onChange={(e) => setRow({ ...row, note: e.target.value })}
-                />
-              </div>
-            )}
+            renderRow={(row, setRow, idx) => {
+              const rowErr = errors.past_surgeries[idx] ?? {};
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                  <FieldWithError error={rowErr.name}>
+                    <Input
+                      placeholder="Surgery name"
+                      value={row.name}
+                      maxLength={INTAKE_LIMITS.past_surgery.name}
+                      onChange={(e) => setRow({ ...row, name: e.target.value })}
+                    />
+                  </FieldWithError>
+                  <FieldWithError error={rowErr.onset_date}>
+                    <Input
+                      type="date"
+                      placeholder="Onset date"
+                      value={row.onset_date}
+                      onChange={(e) =>
+                        setRow({ ...row, onset_date: e.target.value })
+                      }
+                    />
+                  </FieldWithError>
+                  <FieldWithError error={rowErr.hospital}>
+                    <Input
+                      placeholder="Hospital name"
+                      value={row.hospital}
+                      maxLength={INTAKE_LIMITS.past_surgery.hospital}
+                      onChange={(e) =>
+                        setRow({ ...row, hospital: e.target.value })
+                      }
+                    />
+                  </FieldWithError>
+                  <FieldWithError error={rowErr.note}>
+                    <Input
+                      placeholder="Note"
+                      value={row.note}
+                      maxLength={INTAKE_LIMITS.past_surgery.note}
+                      onChange={(e) => setRow({ ...row, note: e.target.value })}
+                    />
+                  </FieldWithError>
+                </div>
+              );
+            }}
           />
         </div>
       </div>
@@ -678,27 +824,39 @@ function HealthHistorySection({
             items={value.current_medications}
             newItem={() => ({ name: "", frequency: "", note: "" })}
             onChange={(v) => onChange({ ...value, current_medications: v })}
-            renderRow={(row, setRow) => (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <Input
-                  placeholder="Medication name"
-                  value={row.name}
-                  onChange={(e) => setRow({ ...row, name: e.target.value })}
-                />
-                <Input
-                  placeholder="Frequency"
-                  value={row.frequency}
-                  onChange={(e) =>
-                    setRow({ ...row, frequency: e.target.value })
-                  }
-                />
-                <Input
-                  placeholder="Note"
-                  value={row.note}
-                  onChange={(e) => setRow({ ...row, note: e.target.value })}
-                />
-              </div>
-            )}
+            renderRow={(row, setRow, idx) => {
+              const rowErr = errors.current_medications[idx] ?? {};
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <FieldWithError error={rowErr.name}>
+                    <Input
+                      placeholder="Medication name"
+                      value={row.name}
+                      maxLength={INTAKE_LIMITS.current_medication.name}
+                      onChange={(e) => setRow({ ...row, name: e.target.value })}
+                    />
+                  </FieldWithError>
+                  <FieldWithError error={rowErr.frequency}>
+                    <Input
+                      placeholder="Frequency"
+                      value={row.frequency}
+                      maxLength={INTAKE_LIMITS.current_medication.frequency}
+                      onChange={(e) =>
+                        setRow({ ...row, frequency: e.target.value })
+                      }
+                    />
+                  </FieldWithError>
+                  <FieldWithError error={rowErr.note}>
+                    <Input
+                      placeholder="Note"
+                      value={row.note}
+                      maxLength={INTAKE_LIMITS.current_medication.note}
+                      onChange={(e) => setRow({ ...row, note: e.target.value })}
+                    />
+                  </FieldWithError>
+                </div>
+              );
+            }}
           />
         </div>
       </div>
@@ -710,32 +868,43 @@ function HealthHistorySection({
             items={value.allergies}
             newItem={() => ({ type: "", name: "", description: "" })}
             onChange={(v) => onChange({ ...value, allergies: v })}
-            renderRow={(row, setRow) => (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <Select
-                  value={row.type}
-                  onChange={(v) => setRow({ ...row, type: v })}
-                >
-                  {ALLERGY_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t || "Allergy type"}
-                    </option>
-                  ))}
-                </Select>
-                <Input
-                  placeholder="Allergy name"
-                  value={row.name}
-                  onChange={(e) => setRow({ ...row, name: e.target.value })}
-                />
-                <Input
-                  placeholder="Description"
-                  value={row.description}
-                  onChange={(e) =>
-                    setRow({ ...row, description: e.target.value })
-                  }
-                />
-              </div>
-            )}
+            renderRow={(row, setRow, idx) => {
+              const rowErr = errors.allergies[idx] ?? {};
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <FieldWithError error={rowErr.type}>
+                    <Select
+                      value={row.type}
+                      onChange={(v) => setRow({ ...row, type: v })}
+                    >
+                      {ALLERGY_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t || "Allergy type"}
+                        </option>
+                      ))}
+                    </Select>
+                  </FieldWithError>
+                  <FieldWithError error={rowErr.name}>
+                    <Input
+                      placeholder="Allergy name"
+                      value={row.name}
+                      maxLength={INTAKE_LIMITS.allergy.name}
+                      onChange={(e) => setRow({ ...row, name: e.target.value })}
+                    />
+                  </FieldWithError>
+                  <FieldWithError error={rowErr.description}>
+                    <Input
+                      placeholder="Description"
+                      value={row.description}
+                      maxLength={INTAKE_LIMITS.allergy.description}
+                      onChange={(e) =>
+                        setRow({ ...row, description: e.target.value })
+                      }
+                    />
+                  </FieldWithError>
+                </div>
+              );
+            }}
           />
         </div>
       </div>
@@ -745,9 +914,11 @@ function HealthHistorySection({
 
 function FamilyHealthHistorySection({
   value,
+  errors,
   onChange,
 }: {
   value: IntakeValue["family_health_history"];
+  errors: IntakeErrors["family_health_history"];
   onChange: (v: IntakeValue["family_health_history"]) => void;
 }) {
   return (
@@ -763,40 +934,53 @@ function FamilyHealthHistorySection({
             note: "",
           })}
           onChange={(v) => onChange({ ...value, conditions: v })}
-          renderRow={(row, setRow) => (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-              <Input
-                placeholder="Condition name"
-                value={row.condition_name}
-                onChange={(e) =>
-                  setRow({ ...row, condition_name: e.target.value })
-                }
-              />
-              <Select
-                value={row.relation}
-                onChange={(v) => setRow({ ...row, relation: v })}
-              >
-                {RELATIONS.map((r) => (
-                  <option key={r} value={r}>
-                    {r || "Relation with patient"}
-                  </option>
-                ))}
-              </Select>
-              <Input
-                type="date"
-                placeholder="Onset date"
-                value={row.onset_date}
-                onChange={(e) =>
-                  setRow({ ...row, onset_date: e.target.value })
-                }
-              />
-              <Input
-                placeholder="Note"
-                value={row.note}
-                onChange={(e) => setRow({ ...row, note: e.target.value })}
-              />
-            </div>
-          )}
+          renderRow={(row, setRow, idx) => {
+            const rowErr = errors.conditions[idx] ?? {};
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                <FieldWithError error={rowErr.condition_name}>
+                  <Input
+                    placeholder="Condition name"
+                    value={row.condition_name}
+                    maxLength={INTAKE_LIMITS.family_condition.condition_name}
+                    onChange={(e) =>
+                      setRow({ ...row, condition_name: e.target.value })
+                    }
+                  />
+                </FieldWithError>
+                <FieldWithError error={rowErr.relation}>
+                  <Select
+                    value={row.relation}
+                    onChange={(v) => setRow({ ...row, relation: v })}
+                  >
+                    {RELATIONS.map((r) => (
+                      <option key={r} value={r}>
+                        {r || "Relation with patient"}
+                      </option>
+                    ))}
+                  </Select>
+                </FieldWithError>
+                <FieldWithError error={rowErr.onset_date}>
+                  <Input
+                    type="date"
+                    placeholder="Onset date"
+                    value={row.onset_date}
+                    onChange={(e) =>
+                      setRow({ ...row, onset_date: e.target.value })
+                    }
+                  />
+                </FieldWithError>
+                <FieldWithError error={rowErr.note}>
+                  <Input
+                    placeholder="Note"
+                    value={row.note}
+                    maxLength={INTAKE_LIMITS.family_condition.note}
+                    onChange={(e) => setRow({ ...row, note: e.target.value })}
+                  />
+                </FieldWithError>
+              </div>
+            );
+          }}
         />
       </div>
     </div>
@@ -810,6 +994,24 @@ function Bullet({ label }: { label: string }) {
     <div className="flex items-baseline gap-1.5">
       <span className="size-1.5 rounded-full bg-foreground inline-block" />
       <span className="text-sm font-medium">{label}</span>
+    </div>
+  );
+}
+
+/** Tiny wrapper for repeatable-row inputs: renders the input plus a
+ *  red helper line if there's an error. We don't use FormField here
+ *  because rows have no per-cell labels — only the placeholder. */
+function FieldWithError({
+  error,
+  children,
+}: {
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1">
+      {children}
+      {error && <p className="text-xs text-danger leading-tight">{error}</p>}
     </div>
   );
 }

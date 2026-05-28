@@ -33,15 +33,16 @@ export function ComposeMessageModal({ open, onOpenChange, defaultAudience }: Pro
   const [body, setBody] = useState("");
   const [urgent, setUrgent] = useState(false);
 
+  // Only fetch the audience the user is composing for — the other
+  // query is skipped entirely via { enabled: false } instead of firing
+  // a wasteful page_size:1 placeholder.
   const patientsQuery = usePatients(
-    audience === "patient"
-      ? { q: debouncedQuery || undefined, page: 1, page_size: 30 }
-      : { page: 1, page_size: 1 }
+    { q: debouncedQuery || undefined, page: 1, page_size: 30 },
+    { enabled: open && audience === "patient" }
   );
   const usersQuery = useUsers(
-    audience === "clinician"
-      ? { q: debouncedQuery || undefined, page: 1, page_size: 30, is_active: true }
-      : { page: 1, page_size: 1 }
+    { q: debouncedQuery || undefined, page: 1, page_size: 30, is_active: true },
+    { enabled: open && audience === "clinician" }
   );
 
   const recipients: Recipient[] = useMemo(() => {

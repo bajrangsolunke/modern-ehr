@@ -8,7 +8,10 @@ import { QUERY_KEYS, PAGE_SIZE } from "@/config/constants";
 import { patients as mockPatients } from "@/mocks";
 import type { Patient } from "@/types";
 
-export function usePatients(filters: PatientFilters) {
+export function usePatients(
+  filters: PatientFilters,
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: QUERY_KEYS.patients.list(filters),
     queryFn: () => {
@@ -21,6 +24,7 @@ export function usePatients(filters: PatientFilters) {
     },
     placeholderData: keepPreviousData,
     staleTime: 30_000,
+    enabled: options?.enabled ?? true,
   });
 }
 

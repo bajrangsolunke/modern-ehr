@@ -16,7 +16,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.patient import Patient
-from app.models.task import Task, TaskCategory, TaskPriority, TaskStatus, TaskType
+from app.models.task import Task, TaskCategory, TaskPriority, TaskStatus
 from app.models.user import User
 from app.schemas.task import TaskCreate, TaskOut, TaskUpdate
 
@@ -63,14 +63,36 @@ class TaskService:
                 ),
             )
 
-        # Audience maps 1:1 onto the persisted task_type enum — no
-        # more inferring from FK presence.
+        # Audience partitions the queue by who *owns* the task — the
+        # patient (no user assignee) vs a user (with or without a linked
+        # patient as "related to"). A task assigned to a user but
+        # referencing a patient stays in the user queue; the patient
+        # link only shows in the Related To column.
         if audience == "patients":
-            stmt = stmt.where(Task.task_type == TaskType.patient)
-            count_stmt = count_stmt.where(Task.task_type == TaskType.patient)
+            stmt = stmt.where(
+                Task.patient_id.is_not(None),
+                Task.assigned_to_user_id.is_(None),
+            )
+            count_stmt = count_stmt.where(
+                Task.patient_id.is_not(None),
+                Task.assigned_to_user_id.is_(None),
+            )
         elif audience == "users":
-            stmt = stmt.where(Task.task_type == TaskType.user)
-            count_stmt = count_stmt.where(Task.task_type == TaskType.user)
+            # Everything that isn't a pure patient-owned task — i.e.
+            # assigned to a user, OR unassigned (team queue), OR linked
+            # to a patient *with* a user assignee.
+            stmt = stmt.where(
+                or_(
+                    Task.patient_id.is_(None),
+                    Task.assigned_to_user_id.is_not(None),
+                )
+            )
+            count_stmt = count_stmt.where(
+                or_(
+                    Task.patient_id.is_(None),
+                    Task.assigned_to_user_id.is_not(None),
+                )
+            )
 
         if q:
             like = f"%{q.strip()}%"
@@ -129,7 +151,6 @@ class TaskService:
             category=TaskCategory(payload.category),
             priority=TaskPriority(payload.priority),
             status=TaskStatus.new,
-            task_type=TaskType(payload.task_type),
             created_by_user_id=viewer_id,
             assigned_to_user_id=payload.assigned_to_user_id,
             patient_id=payload.patient_id,
@@ -157,8 +178,6 @@ class TaskService:
                 task.category = TaskCategory(v)
             elif k == "priority" and v is not None:
                 task.priority = TaskPriority(v)
-            elif k == "task_type" and v is not None:
-                task.task_type = TaskType(v)
             elif k == "status" and v is not None:
                 new_status = TaskStatus(v)
                 if (
@@ -212,7 +231,6 @@ class TaskService:
             category=task.category.value,
             priority=task.priority.value,
             status=task.status.value,
-            task_type=task.task_type.value,
             created_by_user_id=task.created_by_user_id,
             created_by_name=creator_name,
             assigned_to_user_id=task.assigned_to_user_id,

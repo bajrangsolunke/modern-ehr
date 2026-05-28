@@ -1,9 +1,9 @@
 {
-  "name": "padmavat-ehr-frontend",
+  "name": "modern-ehr-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Padmavat — AI-native EHR/EMR platform frontend",
+  "description": "Modern-EHR — AI-Native EHR/EMR platform frontend",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -22,7 +22,7 @@ import {
   STATUSES,
   STATUS_LABEL,
 } from "../utils";
-import type { Task, TaskAudience, TaskCategory, TaskType } from "../api/tasks-api";
+import type { Task, TaskAudience, TaskCategory } from "../api/tasks-api";
 import { cn } from "@/lib/utils";
 
 const categoryEnum = z.enum([
@@ -61,11 +61,9 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   /** Pass an existing task to switch into edit mode. */
   task?: Task;
-  /** Drives which fields are shown. `patients` shows a required
-   *  patient picker labelled "Assigned to Patient" and submits
-   *  task_type:"patient". Anything else uses the user-assignee
-   *  form with an optional "Related to" patient picker and submits
-   *  task_type:"user". */
+  /** Drives which assignee field is shown — patients-mode replaces
+   *  the user picker with a patient picker labelled "Assigned to
+   *  Patient" and ensures the saved task lands in the patients table. */
   audience?: TaskAudience;
 }
 
@@ -135,7 +133,6 @@ export function TaskDrawer({ open, onOpenChange, task, audience = "users" }: Pro
       ? null
       : values.assigned_to_user_id || null;
     const patientId = values.patient_id || null;
-    const taskType: TaskType = isPatientMode ? "patient" : "user";
 
     if (isEdit && task) {
       await update.mutateAsync({
@@ -146,7 +143,6 @@ export function TaskDrawer({ open, onOpenChange, task, audience = "users" }: Pro
           category: values.category,
           priority: values.priority,
           status: values.status,
-          task_type: taskType,
           assigned_to_user_id: assignedToUserId,
           patient_id: patientId,
           due_date: values.due_date || null,
@@ -158,7 +154,6 @@ export function TaskDrawer({ open, onOpenChange, task, audience = "users" }: Pro
         description: values.description || null,
         category: values.category,
         priority: values.priority,
-        task_type: taskType,
         assigned_to_user_id: assignedToUserId,
         patient_id: patientId,
         due_date: values.due_date || null,

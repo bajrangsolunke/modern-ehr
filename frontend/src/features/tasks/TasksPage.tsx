@@ -3,6 +3,7 @@
  * (docs/superpowers/specs/2026-05-27-workflow-user-stories.md).
  */
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ChevronDown, Filter, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -35,10 +36,10 @@ import {
   STATUSES,
   STATUS_LABEL,
   STATUS_TONE,
-  taskIdLabel,
 } from "./utils";
 import type {
   Task,
+  TaskAudience,
   TaskCategory,
   TaskPriority,
   TaskScope,
@@ -46,12 +47,29 @@ import type {
 } from "./api/tasks-api";
 import { cn, formatDate } from "@/lib/utils";
 
+/** Read `?audience=` once and clamp to the legal set. Anything else
+ *  (including missing) means the team queue — what the page was before
+ *  the admin split. */
+function parseAudience(raw: string | null): TaskAudience {
+  if (raw === "patients" || raw === "users" || raw === "all") return raw;
+  return "users";
+}
+
+const AUDIENCE_TITLE: Record<TaskAudience, string> = {
+  all: "Tasks",
+  patients: "Tasks · For Patients",
+  users: "Tasks · For My Users",
+};
+
 export function TasksPage() {
   const currentUser = useAuthStore((s) => s.user);
   const canModify =
     currentUser?.role === "provider" ||
     currentUser?.role === "admin" ||
     currentUser?.role === "staff";
+
+  const [searchParams] = useSearchParams();
+  const audience = parseAudience(searchParams.get("audience"));
 
   const [scope, setScope] = useState<TaskScope>("all");
   const [query, setQuery] = useState("");
@@ -69,6 +87,7 @@ export function TasksPage() {
   const filters = useMemo(
     () => ({
       scope,
+      audience,
       q: debouncedQuery || undefined,
       status,
       priority,
@@ -76,7 +95,7 @@ export function TasksPage() {
       page,
       page_size: pageSize,
     }),
-    [scope, debouncedQuery, status, priority, category, page, pageSize]
+    [scope, audience, debouncedQuery, status, priority, category, page, pageSize]
   );
 
   const { data, isLoading, isError, error, refetch, isFetching } =
@@ -107,9 +126,16 @@ export function TasksPage() {
   return (
     <>
       <PageHeader
-        title="Tasks"
+        title={AUDIENCE_TITLE[audience]}
         right={
           <>
+            <ScopeTabs
+              scope={scope}
+              onChange={(s) => {
+                setScope(s);
+                setPage(1);
+              }}
+            />
             <HeaderSearch value={query} onChange={setQuery} />
             <StatusDropdown value={status} onChange={setStatus} />
             <FilterPopover
@@ -142,14 +168,6 @@ export function TasksPage() {
             )}
           </>
         }
-      />
-
-      <ScopeTabs
-        scope={scope}
-        onChange={(s) => {
-          setScope(s);
-          setPage(1);
-        }}
       />
 
       {isLoading && <TableSkeleton rows={8} cols={10} />}
@@ -218,6 +236,7 @@ export function TasksPage() {
           if (!open) setEditing(null);
         }}
         task={editing ?? undefined}
+        audience={audience}
       />
 
       <ConfirmDialog
@@ -255,7 +274,7 @@ function ScopeTabs({
     { value: "assigned", label: "Assigned" },
   ];
   return (
-    <div className="inline-flex items-center gap-1 bg-white border border-border rounded-full p-1 shadow-soft mb-3">
+    <div className="inline-flex items-center gap-1 bg-white border border-border rounded-full p-1 shadow-soft h-10">
       {tabs.map((t) => (
         <button
           key={t.value}
@@ -263,7 +282,7 @@ function ScopeTabs({
           onClick={() => onChange(t.value)}
           aria-pressed={scope === t.value}
           className={cn(
-            "h-8 px-4 rounded-full text-sm font-medium transition",
+            "h-8 px-3 rounded-full text-xs font-medium transition whitespace-nowrap",
             scope === t.value
               ? "bg-primary-gradient text-white shadow-glow"
               : "text-muted-foreground hover:text-foreground"
@@ -306,12 +325,12 @@ function TaskTable({
         >
           <thead>
             <tr className="text-xs text-muted-foreground text-left">
-              <SortableTh first>Task ID</SortableTh>
-              <SortableTh>Task</SortableTh>
+              <SortableTh first>Task</SortableTh>
               <SortableTh>Category</SortableTh>
               <SortableTh>Created By</SortableTh>
               <SortableTh>Created Date</SortableTh>
               <SortableTh>Assigned To</SortableTh>
+              <SortableTh>Related To</SortableTh>
               <SortableTh>Due Date</SortableTh>
               <SortableTh>Priority</SortableTh>
               <SortableTh>Status</SortableTh>
@@ -325,34 +344,17 @@ function TaskTable({
                 className="hover:[&_td]:bg-[#EEF2F8] transition group"
               >
                 <td
-                  className="px-4 py-2 first:rounded-l-full text-primary font-semibold"
+                  className="px-4 py-2 first:rounded-l-full max-w-[280px]"
                   style={{ background: TABLE_ROW_BG }}
                 >
                   <button
                     type="button"
                     onClick={() => onView(t)}
-                    className="hover:underline font-mono tabular-nums"
-                  >
-                    {taskIdLabel(t.id)}
-                  </button>
-                </td>
-                <td
-                  className="px-4 py-2 max-w-[280px]"
-                  style={{ background: TABLE_ROW_BG }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => onView(t)}
-                    className="text-left ring-focus block min-w-0"
+                    className="text-left ring-focus block min-w-0 w-full"
                   >
                     <div className="font-semibold hover:text-primary transition truncate">
                       {t.title}
                     </div>
-                    {t.description && (
-                      <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                        {t.description}
-                      </div>
-                    )}
                   </button>
                 </td>
                 <td
@@ -388,6 +390,18 @@ function TaskTable({
                   >
                     {t.assignedToName ?? "Unassigned"}
                   </span>
+                </td>
+                <td
+                  className="px-4 py-2"
+                  style={{ background: TABLE_ROW_BG }}
+                >
+                  {t.patientName ? (
+                    <span className="text-foreground font-medium">
+                      {t.patientName}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground italic">—</span>
+                  )}
                 </td>
                 <td
                   className="px-4 py-2 text-foreground/80 tabular-nums"
@@ -740,7 +754,7 @@ function EmptyState({
     <div className="rounded-2xl border border-dashed border-border bg-surface-subtle p-12 text-center">
       <div className="text-sm font-semibold">No tasks here yet</div>
       <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
-        Assign a task to a teammate or yourself — it'll appear in the relevant
+        Assign a task to a teammate or yourself — it&apos;ll appear in the relevant
         scope tab.
       </p>
       {canCreate && (

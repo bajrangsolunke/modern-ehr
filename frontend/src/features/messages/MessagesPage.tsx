@@ -64,11 +64,11 @@ export function MessagesPage() {
   const compose = useComposeBroadcast();
   const markRead = useMarkConversationRead();
 
-  // Pull every active staff user — only enabled on the My Users tab.
+  // Pull every active staff user — only fires on the My Users tab; the
+  // patient tab skips the network call entirely via { enabled: false }.
   const usersQuery = useUsers(
-    audience === "clinician"
-      ? { page: 1, page_size: 100, is_active: true }
-      : { page: 1, page_size: 1 }
+    { page: 1, page_size: 100, is_active: true },
+    { enabled: audience === "clinician" }
   );
   const allUsers = audience === "clinician" ? usersQuery.data?.items ?? [] : [];
 

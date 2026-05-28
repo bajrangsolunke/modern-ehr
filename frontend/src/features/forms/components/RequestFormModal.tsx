@@ -178,11 +178,17 @@ function PatientPicker({
   const [query, setQuery] = useState("");
   const debounced = useDebouncedValue(query, 200);
 
-  const { data: results } = usePatients({
-    q: debounced || undefined,
-    page: 1,
-    page_size: 12,
-  });
+  // Only fetch when the dropdown is open, or when a value is set and
+  // we still need to resolve its display name. Avoids hitting the API
+  // every time the parent modal opens.
+  const { data: results } = usePatients(
+    {
+      q: debounced || undefined,
+      page: 1,
+      page_size: 12,
+    },
+    { enabled: open || Boolean(value) }
+  );
 
   const selected = useMemo(
     () => results?.items.find((p) => p.id === value) ?? null,
