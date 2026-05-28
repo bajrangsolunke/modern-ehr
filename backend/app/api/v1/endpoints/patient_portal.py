@@ -5,6 +5,8 @@ from fastapi import APIRouter
 from app.api.deps import CurrentPatient, DbSession
 from app.schemas.patient_auth import PatientMeOut
 from app.schemas.patient_dashboard import DashboardOut
+from app.schemas.patient_portal_appointments import PatientAppointmentListOut
+from app.services.patient_appointments_service import PatientAppointmentsService
 from app.services.patient_dashboard_service import PatientDashboardService
 
 
@@ -29,3 +31,10 @@ async def my_dashboard(
     db: DbSession, current: CurrentPatient
 ) -> DashboardOut:
     return await PatientDashboardService(db).for_patient(current)
+
+
+@router.get("/me/appointments", response_model=PatientAppointmentListOut)
+async def my_appointments(
+    db: DbSession, current: CurrentPatient
+) -> PatientAppointmentListOut:
+    return await PatientAppointmentsService(db).list_for_patient(current.id)
