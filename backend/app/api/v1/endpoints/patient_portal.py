@@ -11,10 +11,12 @@ from app.schemas.patient_dashboard import DashboardOut
 from app.schemas.patient_portal_appointments import PatientAppointmentListOut
 from app.schemas.patient_portal_documents import PatientDocumentListOut
 from app.schemas.patient_portal_notifications import PatientNotificationListOut
+from app.schemas.patient_portal_tasks import PatientTaskListOut
 from app.services.patient_appointments_service import PatientAppointmentsService
 from app.services.patient_dashboard_service import PatientDashboardService
 from app.services.patient_documents_service import PatientDocumentsService
 from app.services.patient_notifications_service import PatientNotificationsService
+from app.services.patient_tasks_service import PatientTasksService
 
 
 router = APIRouter(prefix="/patient-portal", tags=["patient-portal"])
@@ -59,6 +61,13 @@ async def my_notifications(
     db: DbSession, current: CurrentPatient
 ) -> PatientNotificationListOut:
     return await PatientNotificationsService(db).list_for_patient(current.id)
+
+
+@router.get("/me/tasks", response_model=PatientTaskListOut)
+async def my_tasks(
+    db: DbSession, current: CurrentPatient
+) -> PatientTaskListOut:
+    return await PatientTasksService(db).list_for_patient(current.id)
 
 
 @router.get("/me/documents/{doc_id}/download")
