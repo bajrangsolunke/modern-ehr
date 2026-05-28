@@ -1,7 +1,7 @@
 /**
  * Create / edit task drawer — US-TASK-2 + US-TASK-3.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Loader2, Search } from "lucide-react";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import {
   STATUSES,
   STATUS_LABEL,
 } from "../utils";
-import type { Task, TaskCategory } from "../api/tasks-api";
+import type { Task, TaskAudience, TaskCategory, TaskType } from "../api/tasks-api";
 import { cn } from "@/lib/utils";
 
 const categoryEnum = z.enum([
@@ -61,29 +61,44 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   /** Pass an existing task to switch into edit mode. */
   task?: Task;
+  /** Drives which fields are shown. `patients` shows a required
+   *  patient picker labelled "Assigned to Patient" and submits
+   *  task_type:"patient". Anything else uses the user-assignee
+   *  form with an optional "Related to" patient picker and submits
+   *  task_type:"user". */
+  audience?: TaskAudience;
 }
 
-export function TaskDrawer({ open, onOpenChange, task }: Props) {
+export function TaskDrawer({ open, onOpenChange, task, audience = "users" }: Props) {
   const isEdit = Boolean(task);
+  const isPatientMode = audience === "patients";
   const create = useCreateTask();
   const update = useUpdateTask();
 
-  const defaults: FormValues = {
-    title: task?.title ?? "",
-    description: task?.description ?? "",
-    category: (task?.category ?? "other") as TaskCategory,
-    priority: task?.priority ?? "medium",
-    status: task?.status,
-    assigned_to_user_id: task?.assignedToUserId ?? "",
-    patient_id: task?.patientId ?? "",
-    due_date: task?.dueDate ?? "",
-  };
+  // Memoise the defaults so the reset effect below only fires when the
+  // task identity actually changes — recomputing the object every
+  // render would push us into an infinite reset loop.
+  const defaults = useMemo<FormValues>(
+    () => ({
+      title: task?.title ?? "",
+      description: task?.description ?? "",
+      category: (task?.category ?? "other") as TaskCategory,
+      priority: task?.priority ?? "medium",
+      status: task?.status,
+      assigned_to_user_id: task?.assignedToUserId ?? "",
+      patient_id: task?.patientId ?? "",
+      due_date: task?.dueDate ?? "",
+    }),
+    [task]
+  );
 
   const {
     register,
     handleSubmit,
     watch,
     setValue,
+    setError,
+    clearErrors,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
@@ -91,7 +106,37 @@ export function TaskDrawer({ open, onOpenChange, task }: Props) {
     defaultValues: defaults,
   });
 
+  // `useForm` only reads `defaultValues` on the first render — without
+  // this effect, clicking Edit on a second task would leave the first
+  // task's values in the form (the bug users were hitting).
+  useEffect(() => {
+    if (open) reset(defaults);
+  }, [open, defaults, reset]);
+
   const submit = handleSubmit(async (values) => {
+    // Patient-mode tasks pin to a patient with no user assignee;
+    // user-mode tasks pin to a user with no patient. Clearing the
+    // unused field keeps the audience filter on the list endpoint
+    // (patient_id IS NULL vs NOT NULL) honest.
+    if (isPatientMode && !values.patient_id) {
+      setError("patient_id", {
+        type: "manual",
+        message: "Patient is required",
+      });
+      return;
+    }
+    clearErrors("patient_id");
+
+    // Patient mode: pin to patient, drop user assignee → lands in
+    // patient table. User mode: keep both — patient stays as an
+    // optional "Related to" reference and the user assignee keeps the
+    // task in the user table.
+    const assignedToUserId = isPatientMode
+      ? null
+      : values.assigned_to_user_id || null;
+    const patientId = values.patient_id || null;
+    const taskType: TaskType = isPatientMode ? "patient" : "user";
+
     if (isEdit && task) {
       await update.mutateAsync({
         id: task.id,
@@ -101,8 +146,9 @@ export function TaskDrawer({ open, onOpenChange, task }: Props) {
           category: values.category,
           priority: values.priority,
           status: values.status,
-          assigned_to_user_id: values.assigned_to_user_id || null,
-          patient_id: values.patient_id || null,
+          task_type: taskType,
+          assigned_to_user_id: assignedToUserId,
+          patient_id: patientId,
           due_date: values.due_date || null,
         },
       });
@@ -112,8 +158,9 @@ export function TaskDrawer({ open, onOpenChange, task }: Props) {
         description: values.description || null,
         category: values.category,
         priority: values.priority,
-        assigned_to_user_id: values.assigned_to_user_id || null,
-        patient_id: values.patient_id || null,
+        task_type: taskType,
+        assigned_to_user_id: assignedToUserId,
+        patient_id: patientId,
         due_date: values.due_date || null,
       });
     }
@@ -125,11 +172,21 @@ export function TaskDrawer({ open, onOpenChange, task }: Props) {
     <Drawer
       open={open}
       onOpenChange={onOpenChange}
-      title={isEdit ? "Edit task" : "Assign a task"}
+      title={
+        isEdit
+          ? isPatientMode
+            ? "Edit patient task"
+            : "Edit task"
+          : isPatientMode
+            ? "Assign a task to a patient"
+            : "Assign a task"
+      }
       description={
         isEdit
           ? "Update the task details, assignee, or status."
-          : "Create a new task and route it to a teammate."
+          : isPatientMode
+            ? "Create a task pinned to a specific patient."
+            : "Create a new task and route it to a teammate."
       }
       size="lg"
       footer={
@@ -206,44 +263,78 @@ export function TaskDrawer({ open, onOpenChange, task }: Props) {
           </FormField>
         )}
 
-        <FormField
-          label="Assigned to"
-          htmlFor="assigned_to_user_id"
-          hint="Leave unassigned to add to the team's queue."
-          error={errors.assigned_to_user_id?.message}
-        >
-          <AssigneePicker
-            value={watch("assigned_to_user_id") || ""}
-            onChange={(id) =>
-              setValue("assigned_to_user_id", id, { shouldDirty: true })
-            }
-          />
-          <input type="hidden" {...register("assigned_to_user_id")} />
-        </FormField>
+        {isPatientMode ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FormField
+              label="Assigned to Patient"
+              required
+              htmlFor="patient_id"
+              hint="Patient this task belongs to — drives the patient task queue."
+              error={errors.patient_id?.message}
+            >
+              <PatientPicker
+                value={watch("patient_id") || ""}
+                onChange={(id) =>
+                  setValue("patient_id", id, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+              />
+              <input type="hidden" {...register("patient_id")} />
+            </FormField>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <FormField
-            label="Patient (optional)"
-            htmlFor="patient_id"
-            error={errors.patient_id?.message}
-          >
-            <PatientPicker
-              value={watch("patient_id") || ""}
-              onChange={(id) =>
-                setValue("patient_id", id, { shouldDirty: true })
-              }
-            />
-            <input type="hidden" {...register("patient_id")} />
-          </FormField>
+            <FormField
+              label="Due date"
+              htmlFor="due_date"
+              error={errors.due_date?.message}
+            >
+              <Input id="due_date" type="date" {...register("due_date")} />
+            </FormField>
+          </div>
+        ) : (
+          <>
+            <FormField
+              label="Assigned to"
+              htmlFor="assigned_to_user_id"
+              hint="Leave unassigned to add to the team's queue."
+              error={errors.assigned_to_user_id?.message}
+            >
+              <AssigneePicker
+                value={watch("assigned_to_user_id") || ""}
+                onChange={(id) =>
+                  setValue("assigned_to_user_id", id, { shouldDirty: true })
+                }
+              />
+              <input type="hidden" {...register("assigned_to_user_id")} />
+            </FormField>
 
-          <FormField
-            label="Due date"
-            htmlFor="due_date"
-            error={errors.due_date?.message}
-          >
-            <Input id="due_date" type="date" {...register("due_date")} />
-          </FormField>
-        </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormField
+                label="Related to (optional)"
+                htmlFor="patient_id"
+                hint="Link a patient for context — shows in the Related To column."
+                error={errors.patient_id?.message}
+              >
+                <PatientPicker
+                  value={watch("patient_id") || ""}
+                  onChange={(id) =>
+                    setValue("patient_id", id, { shouldDirty: true })
+                  }
+                />
+                <input type="hidden" {...register("patient_id")} />
+              </FormField>
+
+              <FormField
+                label="Due date"
+                htmlFor="due_date"
+                error={errors.due_date?.message}
+              >
+                <Input id="due_date" type="date" {...register("due_date")} />
+              </FormField>
+            </div>
+          </>
+        )}
       </form>
     </Drawer>
   );
@@ -264,12 +355,18 @@ function AssigneePicker({
   const [query, setQuery] = useState("");
   const debounced = useDebouncedValue(query, 200);
 
-  const { data: users } = useUsers({
-    q: debounced || undefined,
-    page: 1,
-    page_size: 20,
-    is_active: true,
-  });
+  // Only fetch when the assignee dropdown is open, or when a value is
+  // set and we still need to resolve the display name. Skips the 20-row
+  // user list every time the parent drawer opens.
+  const { data: users } = useUsers(
+    {
+      q: debounced || undefined,
+      page: 1,
+      page_size: 20,
+      is_active: true,
+    },
+    { enabled: open || Boolean(value) }
+  );
 
   const selected = useMemo(
     () => users?.items.find((u) => u.id === value) ?? null,
