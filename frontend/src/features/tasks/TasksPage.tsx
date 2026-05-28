@@ -55,6 +55,14 @@ function parseAudience(raw: string | null): TaskAudience {
   return "users";
 }
 
+/** Read `?scope=` from the URL so the Topbar's "My Tasks" deep-link
+ *  works. Falls back to "mine" — the default landing view since the
+ *  "All Tasks" tab was removed. */
+function parseScope(raw: string | null): TaskScope {
+  if (raw === "mine" || raw === "assigned" || raw === "all") return raw;
+  return "mine";
+}
+
 const AUDIENCE_TITLE: Record<TaskAudience, string> = {
   all: "Tasks",
   patients: "Tasks · For Patients",
@@ -71,7 +79,11 @@ export function TasksPage() {
   const [searchParams] = useSearchParams();
   const audience = parseAudience(searchParams.get("audience"));
 
-  const [scope, setScope] = useState<TaskScope>("all");
+  // Initial scope follows the URL (?scope=mine|assigned), default mine.
+  // Users can still flip between My Tasks and Assigned via ScopeTabs.
+  const [scope, setScope] = useState<TaskScope>(() =>
+    parseScope(searchParams.get("scope"))
+  );
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, 300);
   const [status, setStatus] = useState<TaskStatus | undefined>();
@@ -269,7 +281,6 @@ function ScopeTabs({
   onChange: (s: TaskScope) => void;
 }) {
   const tabs: { value: TaskScope; label: string }[] = [
-    { value: "all", label: "All Tasks" },
     { value: "mine", label: "My Tasks" },
     { value: "assigned", label: "Assigned" },
   ];
