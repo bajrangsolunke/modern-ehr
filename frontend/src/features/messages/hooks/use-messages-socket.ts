@@ -14,12 +14,32 @@ import { env } from "@/config/env";
 import { STORAGE_KEYS } from "@/config/constants";
 import { messagesQueryKey } from "./use-messages";
 import { useTypingStore } from "../stores/typing-store";
+import {
+  NOTIFICATIONS_KEY,
+  UNREAD_COUNT_KEY,
+} from "@/features/notifications/hooks/use-notifications";
+import type { AppNotification } from "@/features/notifications/api/notifications-api";
+import { toast } from "@/lib/toast";
 
 interface WsEnvelope {
   type: string;
   conversation_id?: string;
   user_id?: string;
+  notification?: BackendNotificationDto;
   [key: string]: unknown;
+}
+
+interface BackendNotificationDto {
+  id: string;
+  kind: AppNotification["kind"];
+  urgency: AppNotification["urgency"];
+  title: string;
+  body: string | null;
+  related_type: string | null;
+  related_id: string | null;
+  link: string | null;
+  created_at: string;
+  is_read: boolean;
 }
 
 export function useMessagesSocket() {
@@ -66,6 +86,11 @@ export function useMessagesSocket() {
                 .getState()
                 .recordTyping(payload.conversation_id, payload.user_id);
             }
+          } else if (
+            payload.type === "notification.created" &&
+            payload.notification
+          ) {
+            handleNotification(payload.notification, qc);
           }
         } catch {
           /* ignore non-JSON frames (e.g. server echoes) */
@@ -80,6 +105,71 @@ export function useMessagesSocket() {
         ws.close();
       };
     };
+
+    function handleNotification(
+      dto: BackendNotificationDto,
+      queryClient: ReturnType<typeof useQueryClient>,
+    ) {
+      // Optimistically prepend to the cached list so the drawer ticks
+      // before the refetch comes back. Refetch still runs to reconcile
+      // any concurrent writes we missed.
+      queryClient.setQueriesData<AppNotification[] | undefined>(
+        { queryKey: NOTIFICATIONS_KEY },
+        (prev) => {
+          if (!prev) return prev;
+          if (prev.some((n) => n.id === dto.id)) return prev;
+          const next: AppNotification = {
+            id: dto.id,
+            userId: "",
+            title: dto.title,
+            body: dto.body,
+            kind: dto.kind,
+            urgency: dto.urgency,
+            relatedType: dto.related_type,
+            relatedId: dto.related_id,
+            link: dto.link,
+            isRead: dto.is_read,
+            createdAt: dto.created_at,
+          };
+          return [next, ...prev];
+        },
+      );
+      queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
+      queryClient.invalidateQueries({ queryKey: UNREAD_COUNT_KEY });
+
+      // High/critical urgency fires an OS-level toast when the tab is
+      // hidden — so a provider on another tab still sees a critical
+      // lab. Skip if the user hasn't granted permission yet (we ask
+      // once on the Topbar bell mount).
+      const wantsOsToast =
+        dto.urgency === "critical" || dto.urgency === "high";
+      if (
+        wantsOsToast &&
+        typeof document !== "undefined" &&
+        document.hidden &&
+        typeof Notification !== "undefined" &&
+        Notification.permission === "granted"
+      ) {
+        try {
+          new Notification(dto.title, {
+            body: dto.body ?? undefined,
+            tag: dto.id,
+          });
+        } catch {
+          /* ignored — some browsers throw if iframed */
+        }
+      }
+
+      // Always pop an in-app toast too — covers the foreground case
+      // and works even without OS permission.
+      const toastFn =
+        dto.urgency === "critical"
+          ? toast.error
+          : dto.urgency === "high"
+            ? toast.warning
+            : toast.info;
+      toastFn(dto.title, { description: dto.body ?? undefined });
+    }
 
     const scheduleReconnect = () => {
       const attempts = reconnectRef.current;

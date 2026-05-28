@@ -12,10 +12,13 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { env } from "@/config/env";
 import { STORAGE_KEYS } from "@/config/constants";
+import { useTypingStore } from "../stores/typing-store";
 
 interface WsEnvelope {
   type: string;
   conversation_id?: string;
+  user_id?: string;
+  sender_kind?: string;
   [key: string]: unknown;
 }
 
@@ -59,6 +62,19 @@ export function useMessagesSocket() {
             // surface new-message events.
             qc.invalidateQueries({ queryKey: ["notifications", "me"] });
             qc.invalidateQueries({ queryKey: ["dashboard", "me"] });
+          } else if (payload.type === "conversation.typing") {
+            // Only record staff-side typing — patient typing fires
+            // for us would be our own echo (the server already skips
+            // sending it back, but defense in depth).
+            if (
+              payload.conversation_id &&
+              payload.user_id &&
+              payload.sender_kind !== "patient"
+            ) {
+              useTypingStore
+                .getState()
+                .recordTyping(payload.conversation_id, payload.user_id);
+            }
           }
         } catch {
           /* ignore non-JSON frames */

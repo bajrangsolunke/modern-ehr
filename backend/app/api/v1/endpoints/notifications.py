@@ -29,3 +29,21 @@ async def mark_read(
 ) -> NotificationOut | None:
     notif = await NotificationService(db).mark_read(notification_id)
     return NotificationOut.model_validate(notif) if notif else None
+
+
+@router.get("/unread-count")
+async def unread_count(
+    db: DbSession, current: CurrentUser
+) -> dict[str, int]:
+    """Hot path for the Topbar bell badge."""
+    return {"count": await NotificationService(db).unread_count(current.id)}
+
+
+@router.post("/read-all")
+async def read_all(
+    db: DbSession, current: CurrentUser
+) -> dict[str, int]:
+    """Mark every unread notification read. Returns the count cleared
+    so the FE can show 'X notifications cleared'."""
+    cleared = await NotificationService(db).mark_all_read(current.id)
+    return {"cleared": cleared}

@@ -1,0 +1,75 @@
+/**
+ * Transient "<staff name> is typing…" tracker for the patient portal.
+ *
+ * Mirrors the provider portal's `useTypingStore` — keyed by
+ * conversationId, holds a Map of userId → expire timestamp. Entries
+ * auto-expire ~4 seconds after the last typing ping; a global
+ * interval prunes the map so consumers don't see stale entries.
+ */
+import { create } from "zustand";
+
+const TYPING_TTL_MS = 4_000;
+
+interface TypingState {
+  /** conversationId → (userId → expiresAt epoch ms) */
+  conversations: Record<string, Record<string, number>>;
+  recordTyping: (conversationId: string, userId: string) => void;
+  prune: () => void;
+}
+
+export const useTypingStore = create<TypingState>((set) => ({
+  conversations: {},
+
+  recordTyping: (conversationId, userId) => {
+    set((state) => {
+      const existing = state.conversations[conversationId] ?? {};
+      return {
+        conversations: {
+          ...state.conversations,
+          [conversationId]: {
+            ...existing,
+            [userId]: Date.now() + TYPING_TTL_MS,
+          },
+        },
+      };
+    });
+  },
+
+  prune: () => {
+    set((state) => {
+      const now = Date.now();
+      let dirty = false;
+      const next: Record<string, Record<string, number>> = {};
+      for (const [convId, users] of Object.entries(state.conversations)) {
+        const liveUsers: Record<string, number> = {};
+        for (const [uid, expires] of Object.entries(users)) {
+          if (expires > now) liveUsers[uid] = expires;
+          else dirty = true;
+        }
+        if (Object.keys(liveUsers).length > 0) next[convId] = liveUsers;
+        else if (convId in state.conversations) dirty = true;
+      }
+      return dirty ? { conversations: next } : state;
+    });
+  },
+}));
+
+if (typeof window !== "undefined") {
+  window.setInterval(() => {
+    useTypingStore.getState().prune();
+  }, 1_000);
+}
+
+/** Selector — returns true when ANY user is currently typing in the
+ *  given conversation. Patient portal doesn't need to resolve names
+ *  (we only show "Care team is typing…"), so a boolean is enough. */
+export function selectAnyoneTyping(
+  state: TypingState,
+  conversationId: string | null,
+): boolean {
+  if (!conversationId) return false;
+  const map = state.conversations[conversationId];
+  if (!map) return false;
+  const now = Date.now();
+  return Object.values(map).some((expires) => expires > now);
+}

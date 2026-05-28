@@ -80,6 +80,10 @@ class ConversationOut(BaseModel):
     unread: int = 0
     patient: PatientSummary | None = None
     participants: list[ParticipantOut] = Field(default_factory=list)
+    # Patient-side read watermark — drives the provider's "patient
+    # has seen this" double-tick on outgoing bubbles. Null until the
+    # patient first opens the thread on the patient portal.
+    patient_last_read_at: datetime | None = None
 
 
 class ConversationDetail(ConversationOut):

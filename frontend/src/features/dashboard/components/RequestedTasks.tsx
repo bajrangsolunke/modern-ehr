@@ -4,13 +4,21 @@
  * "Appoint request" mock card.
  */
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, CheckCircle2, ClipboardList, Loader2 } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  ClipboardList,
+  Loader2,
+  MessageSquare,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { UserAvatar } from "@/components/ui/avatar";
 import { useDashboard } from "../hooks/use-dashboard";
 import { useUpdateTask } from "@/features/tasks/hooks/use-tasks";
 import type {
+  DashboardLatestMessage,
   DashboardTask,
   DashboardTaskPriority,
 } from "../api/dashboard-api";
@@ -37,6 +45,8 @@ export function RequestedTasks() {
 
   const tasks = data?.requestedTasks ?? [];
   const total = data?.requestedTasksTotal ?? 0;
+  const latestMessage = data?.latestMessage ?? null;
+  const unreadMessages = data?.unreadMessagesCount ?? 0;
 
   const markComplete = (taskId: string) => {
     update.mutate({ id: taskId, input: { status: "completed" } });
@@ -90,8 +100,77 @@ export function RequestedTasks() {
               onComplete={() => markComplete(t.id)}
             />
           ))}
+
+        {/* Compact "Latest message" strip — replaces the old standalone
+            messages card. Shows even when there's nothing unread, so
+            the area is never empty as long as the viewer has any
+            conversations at all. */}
+        <LatestMessageStrip
+          message={latestMessage}
+          unread={unreadMessages}
+          onOpen={() =>
+            latestMessage
+              ? navigate(`/messages?conversation=${latestMessage.conversationId}`)
+              : navigate("/messages")
+          }
+        />
       </CardContent>
     </Card>
+  );
+}
+
+function LatestMessageStrip({
+  message,
+  unread,
+  onOpen,
+}: {
+  message: DashboardLatestMessage | null;
+  unread: number;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full flex items-center gap-3 rounded-2xl border-t border-border/60 mt-3 pt-3 px-1 text-left ring-focus group"
+    >
+      {message ? (
+        <UserAvatar name={message.senderName ?? "Patient"} size="sm" />
+      ) : (
+        <span className="size-9 rounded-full bg-primary/10 grid place-items-center text-primary shrink-0">
+          <MessageSquare className="size-4" />
+        </span>
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+            Latest message
+          </span>
+          {unread > 0 && (
+            <span className="inline-grid place-items-center min-w-4 h-4 px-1 rounded-full bg-danger text-white text-[9px] font-bold tabular-nums">
+              {unread > 99 ? "99+" : unread}
+            </span>
+          )}
+        </div>
+        {message ? (
+          <>
+            <div className="text-[13px] font-semibold truncate">
+              {message.senderName ?? "Unknown sender"}
+            </div>
+            <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+              {message.preview || (
+                <span className="italic">(no preview)</span>
+              )}
+            </p>
+          </>
+        ) : (
+          <p className="text-[12px] text-muted-foreground mt-0.5">
+            No messages yet. Open Communication to start one.
+          </p>
+        )}
+      </div>
+      <ArrowRight className="size-3.5 text-muted-foreground shrink-0 group-hover:text-primary transition" />
+    </button>
   );
 }
 

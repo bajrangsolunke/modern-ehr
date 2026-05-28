@@ -132,11 +132,26 @@ class PatientMessagesService:
                     sender_name=name,
                 )
             )
+        # Highest staff `last_read_at` — drives the patient-side
+        # "staff has seen this" double-tick. We take the max so the
+        # patient sees ✓✓ as soon as ANY clinician on the thread has
+        # opened it.
+        staff_read_rows = (
+            await self.db.execute(
+                select(ConversationParticipant.last_read_at).where(
+                    ConversationParticipant.conversation_id == conv.id,
+                    ConversationParticipant.last_read_at.is_not(None),
+                )
+            )
+        ).scalars().all()
+        staff_last_read_at = max(staff_read_rows, default=None)
+
         return ConversationDetailOut(
             id=conv.id,
             title=conv.title,
             participants=await self._participants_names(conv.id),
             messages=messages,
+            staff_last_read_at=staff_last_read_at,
         )
 
     async def send_message(
@@ -155,9 +170,11 @@ class PatientMessagesService:
         await self.db.commit()
         await self.db.refresh(msg)
 
-        # Fan out to every subscriber's WebSocket connection. Patient
-        # conversations are visible to all active staff plus the
-        # patient (keyed by patient UUID for multi-tab consistency).
+        # Fan out ONLY to the actual staff participants of this thread
+        # + the patient themselves. Patient conversations are
+        # per-(staff, patient) now, so the other team members on the
+        # patient's care team have their OWN threads — they don't
+        # receive this WS frame.
         payload = {
             "type": "message.created",
             "conversation_id": str(conv.id),
@@ -165,13 +182,14 @@ class PatientMessagesService:
             "sender_patient_id": str(patient_id),
             "ts": msg.sent_at.isoformat(),
         }
-        subscriber_ids: set[UUID] = {patient_id}
-        staff_rows = (
+        participant_ids = (
             await self.db.execute(
-                select(User.id).where(User.is_active.is_(True))
+                select(ConversationParticipant.user_id).where(
+                    ConversationParticipant.conversation_id == conv.id
+                )
             )
         ).scalars().all()
-        subscriber_ids.update(staff_rows)
+        subscriber_ids: set[UUID] = {patient_id, *participant_ids}
         for sub_id in subscriber_ids:
             await ws_manager.send_to_user(str(sub_id), payload)
 
@@ -184,3 +202,59 @@ class PatientMessagesService:
             sender_kind="patient",
             sender_name=None,
         )
+
+    # ---------------------------------------------------------------- read
+
+    async def mark_read(
+        self, conv_id: UUID, patient_id: UUID, ts: datetime | None = None
+    ) -> None:
+        """Patient just opened the thread → bump `patient_last_read_at`
+        and broadcast `conversation.read` so providers' outgoing
+        bubbles flip to ✓✓."""
+        conv = await self._own_conversation(conv_id, patient_id)
+        when = ts or datetime.now(timezone.utc)
+        conv.patient_last_read_at = when
+        await self.db.commit()
+
+        payload = {
+            "type": "conversation.read",
+            "conversation_id": str(conv.id),
+            "user_id": str(patient_id),
+            "sender_kind": "patient",
+            "last_read_at": when.isoformat(),
+        }
+        # Fan out to participants of THIS thread only — same scope as
+        # send_message. Other staff on the care team don't get this.
+        participant_ids = (
+            await self.db.execute(
+                select(ConversationParticipant.user_id).where(
+                    ConversationParticipant.conversation_id == conv.id
+                )
+            )
+        ).scalars().all()
+        for sub_id in {patient_id, *participant_ids}:
+            await ws_manager.send_to_user(str(sub_id), payload)
+
+    async def ping_typing(self, conv_id: UUID, patient_id: UUID) -> None:
+        """Transient typing indicator. Doesn't write to the DB — just
+        fans out the WS event with `sender_kind: "patient"` so other
+        side can render '<Patient name> is typing'."""
+        conv = await self._own_conversation(conv_id, patient_id)
+        payload = {
+            "type": "conversation.typing",
+            "conversation_id": str(conv.id),
+            "user_id": str(patient_id),
+            "sender_kind": "patient",
+            "ts": datetime.now(timezone.utc).isoformat(),
+        }
+        # Only the participants on this specific thread — not every
+        # active staff user (that's what was leaking conversations).
+        participant_ids = (
+            await self.db.execute(
+                select(ConversationParticipant.user_id).where(
+                    ConversationParticipant.conversation_id == conv.id
+                )
+            )
+        ).scalars().all()
+        for sub_id in participant_ids:
+            await ws_manager.send_to_user(str(sub_id), payload)

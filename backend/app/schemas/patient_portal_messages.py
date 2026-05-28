@@ -35,7 +35,15 @@ class ConversationDetailOut(BaseModel):
     title: str | None = None
     participants: list[str]
     messages: list[MessageOut]
+    # Highest staff `last_read_at` on the thread — patient-side
+    # outgoing bubbles flip to ✓✓ for messages sent at/before this
+    # timestamp. Null when no staff member has opened the thread yet.
+    staff_last_read_at: datetime | None = None
 
 
 class SendMessageIn(BaseModel):
     body: str = Field(min_length=1, max_length=8000)
+
+
+class MarkReadIn(BaseModel):
+    last_read_at: datetime | None = None

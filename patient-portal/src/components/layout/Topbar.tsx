@@ -1,5 +1,4 @@
 import {
-  Bell,
   ChevronDown,
   LogOut,
   Settings,
@@ -7,12 +6,12 @@ import {
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import * as Popover from "@radix-ui/react-popover";
 import { UserAvatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth-store";
 import { ROUTES } from "@/config/constants";
 import { useMessagesSocket } from "@/features/messages/hooks/use-messages-socket";
+import { NotificationsBell } from "@/features/notifications/components/NotificationsBell";
 import { cn } from "@/lib/utils";
 
 interface NavLeaf {
@@ -85,30 +84,8 @@ export function Topbar() {
         </nav>
 
         <div className="flex items-center gap-2 min-w-fit">
-          <Popover.Root>
-            <Popover.Trigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative size-10 rounded-full bg-[#F1F4F9] hover:bg-[#E6EBF2] text-slate-700"
-                aria-label="Notifications"
-              >
-                <Bell className="size-[18px]" />
-              </Button>
-            </Popover.Trigger>
-            <Popover.Portal>
-              <Popover.Content
-                sideOffset={8}
-                align="end"
-                className="z-50 w-80 rounded-2xl bg-white shadow-elev border border-border p-4 animate-fade-in"
-              >
-                <h3 className="font-semibold text-sm mb-2">Notifications</h3>
-                <p className="text-xs text-muted-foreground">
-                  You're all caught up. Real-time notifications coming soon.
-                </p>
-              </Popover.Content>
-            </Popover.Portal>
-          </Popover.Root>
+          <NotificationsBell />
+
 
           <Button
             variant="ghost"

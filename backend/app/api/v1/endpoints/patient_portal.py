@@ -15,6 +15,7 @@ from app.schemas.patient_portal_documents import (
 )
 from app.schemas.patient_portal_forms import PatientFormRequestListOut
 from app.schemas.patient_portal_messages import (
+    MarkReadIn,
     ConversationDetailOut,
     ConversationListOut,
     MessageOut,
@@ -165,6 +166,38 @@ async def send_my_message(
     return await PatientMessagesService(db).send_message(
         conv_id, current.id, payload.body
     )
+
+
+@router.post(
+    "/me/conversations/{conv_id}/read",
+    status_code=204,
+)
+async def mark_my_conversation_read(
+    conv_id: UUID,
+    payload: MarkReadIn,
+    db: DbSession,
+    current: CurrentPatient,
+) -> None:
+    """Patient opened the thread — bumps `patient_last_read_at` and
+    fires a `conversation.read` broadcast so providers' double-tick
+    flips on their outgoing bubbles."""
+    await PatientMessagesService(db).mark_read(
+        conv_id, current.id, payload.last_read_at
+    )
+
+
+@router.post(
+    "/me/conversations/{conv_id}/typing",
+    status_code=204,
+)
+async def ping_my_conversation_typing(
+    conv_id: UUID,
+    db: DbSession,
+    current: CurrentPatient,
+) -> None:
+    """Transient typing ping — broadcasts to every active staff user
+    on the conversation. No DB write."""
+    await PatientMessagesService(db).ping_typing(conv_id, current.id)
 
 
 @router.post("/me/conversations/{conv_id}/ai-suggest")

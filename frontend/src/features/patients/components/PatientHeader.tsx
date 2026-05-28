@@ -1,9 +1,14 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
+  AlertOctagon,
+  AlertTriangle,
   CalendarClock,
   Copy,
+  Info,
   Mail,
   MapPin,
+  MessageSquare,
   MoreHorizontal,
   Pencil,
   Phone,
@@ -15,12 +20,17 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { PortraitUploader } from "@/features/patients/components/PortraitUploader";
 import { PatientRiskChip } from "./PatientRiskChip";
-import { AlertsStrip } from "./AlertsStrip";
+import { AppointmentModal } from "@/features/appointments/components/AppointmentModal";
 import { useUpdatePatient } from "@/features/patients/hooks/use-update-patient";
 import { usePortalInvite } from "@/features/patients/hooks/use-portal-invite";
+import { usePatientAlerts } from "@/features/patients/hooks/use-patient-alerts";
+import type {
+  AlertSeverity,
+  PatientAlert,
+} from "@/features/patients/api/alerts-api";
 import { toast } from "@/lib/toast";
 import type { Patient } from "@/types";
 
@@ -31,9 +41,17 @@ interface Props {
 }
 
 export function PatientHeader({ patient, onEdit, onRemove }: Props) {
+  const navigate = useNavigate();
   const update = useUpdatePatient(patient.id);
   const invite = usePortalInvite();
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+
+  // Highest-severity unresolved alert for the inline chip in the
+  // procedure grid. We deliberately show ONE chip, not the whole
+  // strip — the full list is on the chart's alerts tab.
+  const { data: alerts = [] } = usePatientAlerts(patient.id);
+  const topAlert = pickTopAlert(alerts);
 
   const dobLabel = patient.dob ? formatDate(patient.dob) : "DOB unknown";
   const sexLabel =
@@ -97,10 +115,13 @@ export function PatientHeader({ patient, onEdit, onRemove }: Props) {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <Button size="sm">
-                  <Phone className="size-3.5" /> Call
+                <Button
+                  size="sm"
+                  onClick={() => navigate(`/messages?patient=${patient.id}`)}
+                >
+                  <MessageSquare className="size-3.5" /> Message
                 </Button>
-                <Button size="sm">
+                <Button size="sm" onClick={() => setScheduleOpen(true)}>
                   <CalendarClock className="size-3.5" /> Schedule visit
                 </Button>
                 <Button
@@ -133,7 +154,18 @@ export function PatientHeader({ patient, onEdit, onRemove }: Props) {
                   label="Assigned provider"
                   value={patient.assignedPhysician?.name || "—"}
                 />
-                <ProcKv label="Anesthesiologist" value="Dr. med. Weber" />
+                <ProcKv
+                  label="Alert"
+                  value={
+                    topAlert ? (
+                      <AlertChip alert={topAlert} />
+                    ) : (
+                      <span className="text-muted-foreground font-normal">
+                        —
+                      </span>
+                    )
+                  }
+                />
                 <ProcKv
                   label="ASA classification"
                   value={patient.asa ? `ASA ${patient.asa}` : "—"}
@@ -150,15 +182,13 @@ export function PatientHeader({ patient, onEdit, onRemove }: Props) {
             </div>
           </div>
         </div>
-
-        {/* Alerts strip lives inside the patient card so important
-            allergies / DNR / AI red flags are always visible alongside
-            the meta-data, no matter which chart tab is active. */}
-        <div className="mt-5 pt-4 border-t border-border">
-          <AlertsStrip patientId={patient.id} />
-        </div>
       </CardContent>
     </Card>
+    <AppointmentModal
+      open={scheduleOpen}
+      onOpenChange={setScheduleOpen}
+      defaultPatientId={patient.id}
+    />
     {inviteUrl && (
       <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
         <div className="text-sm font-semibold text-primary mb-1">
@@ -264,5 +294,68 @@ function ProcKv({
       </div>
       <div className="text-sm font-semibold mt-0.5 truncate">{value}</div>
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Alert chip — surfaces the single most-urgent unresolved alert in the
+ * procedure grid. The full strip lived under the header card; we
+ * removed it per design and replaced it with this glance affordance.
+ * -------------------------------------------------------------------------- */
+
+const SEV_ORDER: Record<AlertSeverity, number> = {
+  critical: 0,
+  warning: 1,
+  info: 2,
+};
+
+const SEV_STYLE: Record<
+  AlertSeverity,
+  { icon: typeof AlertOctagon; ring: string; text: string; bg: string }
+> = {
+  critical: {
+    icon: AlertOctagon,
+    ring: "ring-danger/30",
+    text: "text-danger",
+    bg: "bg-danger/10",
+  },
+  warning: {
+    icon: AlertTriangle,
+    ring: "ring-warning/30",
+    text: "text-warning",
+    bg: "bg-warning/10",
+  },
+  info: {
+    icon: Info,
+    ring: "ring-info/30",
+    text: "text-info",
+    bg: "bg-info/10",
+  },
+};
+
+function pickTopAlert(alerts: PatientAlert[]): PatientAlert | null {
+  const unresolved = alerts.filter((a) => !a.resolved);
+  if (unresolved.length === 0) return null;
+  return [...unresolved].sort(
+    (a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity],
+  )[0]!;
+}
+
+function AlertChip({ alert }: { alert: PatientAlert }) {
+  const style = SEV_STYLE[alert.severity];
+  const Icon = style.icon;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full ring-1 max-w-full",
+        style.bg,
+        style.ring,
+        style.text,
+      )}
+      title={alert.detail ?? alert.label}
+    >
+      <Icon className="size-3 shrink-0" />
+      <span className="text-xs font-semibold truncate">{alert.label}</span>
+    </span>
   );
 }

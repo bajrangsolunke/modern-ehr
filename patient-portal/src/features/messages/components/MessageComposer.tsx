@@ -11,12 +11,26 @@ interface Props {
    *  textarea and focuses for editing. Throws to surface errors. */
   onSuggest?: () => Promise<string | null>;
   onSend: (body: string) => Promise<void> | void;
+  /** Best-effort "user is typing" ping — fired (throttled) whenever
+   *  the textarea content changes. The backend broadcasts it as a
+   *  transient WS event so the staff side sees the indicator. */
+  onTyping?: () => void;
 }
 
-export function MessageComposer({ disabled, pending, onSuggest, onSend }: Props) {
+export function MessageComposer({
+  disabled,
+  pending,
+  onSuggest,
+  onSend,
+  onTyping,
+}: Props) {
   const [body, setBody] = useState("");
   const [suggesting, setSuggesting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  // Throttle to ~one ping per 2s so we don't hammer the endpoint on
+  // every keystroke. The backend's typing-state TTL is ~4s so this
+  // keeps the indicator alive without stale gaps.
+  const lastTypingPingRef = useRef<number>(0);
 
   useEffect(() => {
     setBody("");
@@ -82,7 +96,16 @@ export function MessageComposer({ disabled, pending, onSuggest, onSend }: Props)
         <textarea
           ref={textareaRef}
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={(e) => {
+            setBody(e.target.value);
+            if (onTyping && e.target.value.length > 0) {
+              const now = Date.now();
+              if (now - lastTypingPingRef.current > 2_000) {
+                lastTypingPingRef.current = now;
+                onTyping();
+              }
+            }
+          }}
           placeholder="Message your care team…"
           rows={1}
           disabled={disabled}

@@ -25,19 +25,18 @@ export interface DashboardTask {
   createdAt: string;
 }
 
-export interface DashboardMessage {
+export interface DashboardLatestMessage {
   conversationId: string;
-  senderName: string;
+  senderName: string | null;
   preview: string;
   sentAt: string;
-  unreadCount: number;
 }
 
 export interface DashboardSnapshot {
   requestedTasks: DashboardTask[];
   requestedTasksTotal: number;
   unreadMessagesCount: number;
-  recentUnreadMessages: DashboardMessage[];
+  latestMessage: DashboardLatestMessage | null;
 }
 
 interface BackendTaskDto {
@@ -52,19 +51,18 @@ interface BackendTaskDto {
   created_at: string;
 }
 
-interface BackendMessageDto {
+interface BackendLatestMessageDto {
   conversation_id: string;
-  sender_name: string;
+  sender_name: string | null;
   preview: string;
   sent_at: string;
-  unread_count: number;
 }
 
 interface BackendSnapshotDto {
   requested_tasks: BackendTaskDto[];
   requested_tasks_total: number;
   unread_messages_count: number;
-  recent_unread_messages: BackendMessageDto[];
+  latest_message: BackendLatestMessageDto | null;
 }
 
 function mapTask(dto: BackendTaskDto): DashboardTask {
@@ -81,13 +79,15 @@ function mapTask(dto: BackendTaskDto): DashboardTask {
   };
 }
 
-function mapMessage(dto: BackendMessageDto): DashboardMessage {
+function mapLatestMessage(
+  dto: BackendLatestMessageDto | null,
+): DashboardLatestMessage | null {
+  if (!dto) return null;
   return {
     conversationId: dto.conversation_id,
     senderName: dto.sender_name,
     preview: dto.preview,
     sentAt: dto.sent_at,
-    unreadCount: dto.unread_count,
   };
 }
 
@@ -98,7 +98,7 @@ export const dashboardApi = {
       requestedTasks: dto.requested_tasks.map(mapTask),
       requestedTasksTotal: dto.requested_tasks_total,
       unreadMessagesCount: dto.unread_messages_count,
-      recentUnreadMessages: dto.recent_unread_messages.map(mapMessage),
+      latestMessage: mapLatestMessage(dto.latest_message),
     };
   },
 };

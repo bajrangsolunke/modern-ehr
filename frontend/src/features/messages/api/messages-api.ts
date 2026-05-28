@@ -62,6 +62,7 @@ interface BackendConversationDto {
   unread: number;
   patient: BackendPatientSummaryDto | null;
   participants: BackendParticipantDto[];
+  patient_last_read_at: string | null;
 }
 
 interface BackendConversationDetailDto extends BackendConversationDto {
@@ -118,6 +119,7 @@ function mapConversation(dto: BackendConversationDto): Conversation {
     lastMessage: dto.last_message_preview ?? "",
     lastMessageAt: dto.last_message_at,
     unread: dto.unread,
+    patientLastReadAt: dto.patient_last_read_at,
   };
 }
 

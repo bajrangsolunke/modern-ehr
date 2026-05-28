@@ -19,7 +19,6 @@ import {
 } from "@/features/dashboard/components/MiniCharts";
 import { UpcomingAppointments } from "@/features/dashboard/components/UpcomingAppointments";
 import { RequestedTasks } from "@/features/dashboard/components/RequestedTasks";
-import { MessagesNotificationCard } from "@/features/dashboard/components/MessagesNotificationCard";
 import { useAuthStore } from "@/stores/auth-store";
 
 function useGreetingName() {
@@ -134,9 +133,8 @@ export function DashboardPage() {
         <div className="xl:col-span-2">
           <UpcomingAppointments />
         </div>
-        <div className="xl:col-span-1 space-y-4 lg:space-y-5">
+        <div className="xl:col-span-1">
           <RequestedTasks />
-          <MessagesNotificationCard />
         </div>
       </div>
     </>

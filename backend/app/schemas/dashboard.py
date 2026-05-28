@@ -9,17 +9,11 @@ those move under this endpoint once we have real telemetry. For now
 this endpoint is intentionally narrow.
 """
 from datetime import date, datetime
-from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.schemas.task import TaskPriorityLiteral, TaskStatusLiteral
-
-# Mirror the persisted `task_type` enum on the model. Inlined here so
-# the dashboard schema doesn't have to wait on whatever is in flux
-# in app.schemas.task.
-TaskTypeLiteral = Literal["user", "patient"]
+from app.schemas.task import TaskPriorityLiteral, TaskStatusLiteral, TaskTypeLiteral
 
 
 class DashboardTaskOut(BaseModel):
@@ -36,26 +30,28 @@ class DashboardTaskOut(BaseModel):
     created_at: datetime
 
 
-class DashboardMessageOut(BaseModel):
-    """A single unread-conversation row on the messages notification card."""
+class DashboardLatestMessage(BaseModel):
+    """The most recent message the viewer has in any conversation they
+    participate in. Drives the compact "Latest message" strip under
+    the Requested Tasks card."""
 
     conversation_id: UUID
-    sender_name: str
+    sender_name: str | None = None
     preview: str
     sent_at: datetime
-    unread_count: int
 
 
 class DashboardSnapshot(BaseModel):
     """Top-level payload returned by GET /dashboard.
 
     `requested_tasks` is capped to a small page (`requested_tasks_total`
-    is the full count so the card can show "+12 more"). Same idea for
-    messages — `recent_unread_messages` is the preview rows, and
-    `unread_messages_count` is the global sum.
+    is the full count so the card can show "+12 more"). For messages
+    we keep a single `latest_message` (matches the patient-portal
+    pattern — see `DashboardOut.recent_message`) plus the global
+    `unread_messages_count` for the inline badge.
     """
 
     requested_tasks: list[DashboardTaskOut]
     requested_tasks_total: int
     unread_messages_count: int
-    recent_unread_messages: list[DashboardMessageOut]
+    latest_message: DashboardLatestMessage | None = None

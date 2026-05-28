@@ -61,8 +61,19 @@ class MessagesService:
         audience: str | None = None,
         q: str | None = None,
     ) -> list[ConversationOut]:
+        # SQL-level filter — the conversation must have a
+        # participant row for the viewer. Both clinician and patient
+        # threads use the same rule now. Pushing this to the JOIN
+        # (instead of a post-hoc Python filter) means the database
+        # enforces the privacy boundary directly, and we never even
+        # ship non-visible rows to the application layer.
         stmt = (
             select(Conversation)
+            .join(
+                ConversationParticipant,
+                ConversationParticipant.conversation_id == Conversation.id,
+            )
+            .where(ConversationParticipant.user_id == viewer_id)
             .options(
                 selectinload(Conversation.participants).selectinload(
                     ConversationParticipant.conversation
@@ -84,16 +95,7 @@ class MessagesService:
             )
 
         rows = (await self.db.execute(stmt)).scalars().unique().all()
-
-        visible: list[Conversation] = []
-        for c in rows:
-            if c.audience == "clinician":
-                if any(p.user_id == viewer_id for p in c.participants):
-                    visible.append(c)
-            else:
-                visible.append(c)
-
-        return [await self._project(c, viewer_id=viewer_id) for c in visible]
+        return [await self._project(c, viewer_id=viewer_id) for c in rows]
 
     async def get_conversation(
         self, conversation_id: UUID, *, viewer_id: UUID
@@ -131,17 +133,31 @@ class MessagesService:
         body: str,
         urgent: bool,
     ) -> tuple[Conversation, Message]:
+        """Each (staff_user, patient) pair gets its OWN thread — we
+        don't share patient conversations across the whole care team
+        anymore. If the viewer already has a thread with this patient,
+        we append to it; otherwise we create a new private one with
+        the viewer added as the sole staff participant. The patient
+        sees one row per provider on their portal feed."""
         patient = await self.db.get(Patient, patient_id)
         if not patient:
             raise HTTPException(status_code=404, detail="Patient not found")
 
-        # Reuse an existing thread when one already exists for this patient.
+        # Reuse the viewer's OWN thread with this patient if one
+        # already exists. Threads belonging to other staff stay private.
         existing = (
             await self.db.execute(
-                select(Conversation).where(
+                select(Conversation)
+                .join(
+                    ConversationParticipant,
+                    ConversationParticipant.conversation_id == Conversation.id,
+                )
+                .where(
                     Conversation.audience == "patient",
                     Conversation.patient_id == patient_id,
+                    ConversationParticipant.user_id == viewer_id,
                 )
+                .limit(1)
             )
         ).scalar_one_or_none()
         if existing:
@@ -155,6 +171,12 @@ class MessagesService:
             title=f"{patient.first_name} {patient.last_name}".strip(),
         )
         self.db.add(conv)
+        await self.db.flush()
+        # The viewer becomes the only staff participant — gives us the
+        # same visibility/typing/read mechanics as clinician threads.
+        self.db.add(
+            ConversationParticipant(conversation_id=conv.id, user_id=viewer_id)
+        )
         await self.db.flush()
         msg = await self.append_message(
             conv.id, viewer_id=viewer_id, body=body, urgent=urgent
@@ -326,6 +348,11 @@ class MessagesService:
             "type": "conversation.typing",
             "conversation_id": str(conversation_id),
             "user_id": str(viewer_id),
+            # Always "user" here — provider/staff typing. Patient typing
+            # goes through PatientMessagesService.ping_typing and emits
+            # sender_kind: "patient" so the FE can render a different
+            # display name.
+            "sender_kind": "user",
             "ts": datetime.now(timezone.utc).isoformat(),
         }
         for user_id in await self._subscriber_ids(conv):
@@ -336,6 +363,13 @@ class MessagesService:
     async def mark_read(
         self, conversation_id: UUID, *, viewer_id: UUID, ts: datetime | None = None
     ) -> None:
+        # `get_conversation` already enforces participation via
+        # `_authorize_read` — by the time we reach the row update the
+        # viewer must already be a ConversationParticipant. We removed
+        # the old "auto-insert if missing" branch deliberately: it
+        # silently granted a non-participant access to the thread
+        # they were trying to mark read, which is exactly the leak we
+        # just sealed at the read paths.
         conv = await self.get_conversation(conversation_id, viewer_id=viewer_id)
         row = (
             await self.db.execute(
@@ -347,15 +381,13 @@ class MessagesService:
         ).scalar_one_or_none()
         when = ts or datetime.now(timezone.utc)
         if row is None:
-            self.db.add(
-                ConversationParticipant(
-                    conversation_id=conversation_id,
-                    user_id=viewer_id,
-                    last_read_at=when,
-                )
+            # Should be unreachable after _authorize_read; defensive
+            # raise so a silent bypass is loud instead of quiet.
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not a participant in this conversation.",
             )
-        else:
-            row.last_read_at = when
+        row.last_read_at = when
         await self.db.flush()
 
         # Tell everyone in the thread so their outgoing bubbles can
@@ -364,6 +396,7 @@ class MessagesService:
             "type": "conversation.read",
             "conversation_id": str(conversation_id),
             "user_id": str(viewer_id),
+            "sender_kind": "user",
             "last_read_at": when.isoformat(),
         }
         for user_id in await self._subscriber_ids(conv):
@@ -376,10 +409,69 @@ class MessagesService:
         payload = {
             "type": "message.created",
             "conversation_id": str(conv.id),
-            "message": projected.model_dump(),
+            "message": projected.model_dump(mode="json"),
         }
-        for user_id in await self._subscriber_ids(conv):
+        subscribers = await self._subscriber_ids(conv)
+        for user_id in subscribers:
             await ws_manager.send_to_user(str(user_id), payload)
+
+        # Fan out a `new_message` notification too. Recipients =
+        # every staff subscriber except the sender. Patients aren't
+        # in the User table so they're naturally excluded from the
+        # notification persistence — their feed comes from the
+        # patient_notifications_service.
+        await self._notify_new_message(conv, msg, subscribers)
+
+    async def _notify_new_message(
+        self,
+        conv: Conversation,
+        msg: Message,
+        subscribers: Iterable[UUID],
+    ) -> None:
+        from app.services.notification_service import NotificationService
+
+        sender_name: str = "Patient" if msg.sender_patient_id else "Care team"
+        if msg.sender_user_id is not None:
+            u = await self.db.get(User, msg.sender_user_id)
+            if u is not None:
+                sender_name = u.full_name or u.email
+        elif msg.sender_patient_id is not None:
+            from app.models.patient import Patient
+
+            p = await self.db.get(Patient, msg.sender_patient_id)
+            if p is not None:
+                sender_name = f"{p.first_name} {p.last_name}".strip()
+
+        # Truncate preview the same way the conversation's
+        # last_message_preview is truncated.
+        preview = (msg.body or "").strip().replace("\n", " ")
+        if len(preview) > 140:
+            preview = preview[:139].rstrip() + "…"
+        link = f"/messages?conversation={conv.id}"
+        urgency = "high" if msg.urgent else "normal"
+
+        notif_svc = NotificationService(self.db)
+        for sub_id in subscribers:
+            # Don't notify the sender of their own message.
+            if msg.sender_user_id is not None and sub_id == msg.sender_user_id:
+                continue
+            # Skip the patient — they get notified via the patient
+            # portal's feed-based service, not the User-keyed table.
+            if (
+                conv.patient_id is not None
+                and sub_id == conv.patient_id
+            ):
+                continue
+            await notif_svc.dispatch(
+                recipient_id=sub_id,
+                kind="new_message",
+                urgency=urgency,
+                title=f"New message from {sender_name}",
+                body=preview or None,
+                related_type="conversation",
+                related_id=conv.id,
+                link=link,
+            )
 
     async def _project_message(self, msg: Message) -> MessageOut:
         """Build the MessageOut payload — including the attached
@@ -420,17 +512,13 @@ class MessagesService:
         )
 
     async def _subscriber_ids(self, conv: Conversation) -> set[UUID]:
-        if conv.audience == "clinician":
-            return {p.user_id for p in conv.participants}
-        # Patient conversations are visible to all active staff. We
-        # also include the patient_id so the patient portal's WS
-        # connection (keyed by patient UUID) receives real-time
-        # notifications when a staff member replies.
-        rows = (
-            await self.db.execute(select(User.id).where(User.is_active.is_(True)))
-        ).scalars().all()
-        ids: set[UUID] = set(rows)
-        if conv.patient_id is not None:
+        """Who receives WS broadcasts (message/typing/read) for this
+        conversation. ONLY the actual staff participants + the
+        patient (for patient threads). Previously this fanned out to
+        every active staff user, which leaked patient threads across
+        the team."""
+        ids: set[UUID] = {p.user_id for p in conv.participants}
+        if conv.audience == "patient" and conv.patient_id is not None:
             ids.add(conv.patient_id)
         return ids
 
@@ -439,12 +527,14 @@ class MessagesService:
     async def _authorize_read(
         self, conv: Conversation, *, viewer_id: UUID
     ) -> None:
-        if conv.audience == "clinician":
-            if not any(p.user_id == viewer_id for p in conv.participants):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Not a participant in this conversation.",
-                )
+        """Same rule for clinician + patient threads now — viewer must
+        be in `participants`. Stops a leaked conversation_id from
+        being readable by a non-member of the thread."""
+        if not any(p.user_id == viewer_id for p in conv.participants):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not a participant in this conversation.",
+            )
 
     async def _project(
         self, conv: Conversation, *, viewer_id: UUID
@@ -499,6 +589,7 @@ class MessagesService:
             unread=unread,
             patient=patient_summary,
             participants=participants_out,
+            patient_last_read_at=conv.patient_last_read_at,
         )
 
     async def _unread_count(

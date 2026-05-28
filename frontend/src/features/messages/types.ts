@@ -69,4 +69,8 @@ export interface Conversation {
   lastMessage: string;
   lastMessageAt: string;
   unread: number;
+  /** For patient threads: when the patient last opened the
+   *  conversation on the patient portal. Drives the provider's
+   *  double-tick on outgoing bubbles. Null for clinician threads. */
+  patientLastReadAt: string | null;
 }

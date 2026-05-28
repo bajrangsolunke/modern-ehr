@@ -4,12 +4,15 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Empty } from "@/components/ui/empty";
 import { ErrorBanner } from "@/components/ui/error-banner";
+import { UserAvatar } from "@/components/ui/avatar";
 import { api } from "@/lib/api-client";
+import { messagesApi } from "./api/messages-api";
 import {
   useConversation,
   useConversations,
   useSendMessage,
 } from "./hooks/use-messages";
+import { useTypingStore, selectAnyoneTyping } from "./stores/typing-store";
 import { ConversationList } from "./components/ConversationList";
 import { MessageThread } from "./components/MessageThread";
 import { MessageComposer } from "./components/MessageComposer";
@@ -27,12 +30,32 @@ export function MessagesPage() {
     }
   }, [list.data, activeId]);
 
+  // Mark the thread read whenever it opens or receives a new message.
+  // Failures are silent — the worst case is a stale watermark on the
+  // provider side until the next reload.
+  useEffect(() => {
+    if (!activeId || !detail.data) return;
+    messagesApi.markRead(activeId).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, detail.data?.messages.length]);
+
+  // Staff-side typing indicator. The selector returns the latest
+  // typing state for the active conversation; the WS hook (mounted in
+  // the Topbar) keeps it fresh.
+  const staffTyping = useTypingStore((s) => selectAnyoneTyping(s, activeId));
+
   const handleSuggest = activeId
     ? async (): Promise<string | null> => {
         const res = await api.post<{ suggestions: string[] }>(
           `/patient-portal/me/conversations/${activeId}/ai-suggest`
         );
         return res.suggestions?.[0] ?? null;
+      }
+    : undefined;
+
+  const handleTyping = activeId
+    ? () => {
+        messagesApi.pingTyping(activeId).catch(() => {});
       }
     : undefined;
 
@@ -89,24 +112,28 @@ export function MessagesPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="border-b border-border px-5 py-3">
-                      <div className="text-sm font-semibold">
-                        {detail.data.participants
+                    <ChatHeader
+                      title={
+                        detail.data.participants
                           .filter((p) => p.trim().length > 0)
-                          .join(", ") || detail.data.title || "Care team"}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {detail.data.messages.length}{" "}
-                        {detail.data.messages.length === 1 ? "message" : "messages"}
-                      </div>
-                    </div>
+                          .join(", ") ||
+                        detail.data.title ||
+                        "Care team"
+                      }
+                      messageCount={detail.data.messages.length}
+                    />
                     <div className="flex-1 overflow-y-auto px-5 py-4 bg-secondary/30">
-                      <MessageThread messages={detail.data.messages} />
+                      <MessageThread
+                        messages={detail.data.messages}
+                        staffLastReadAt={detail.data.staff_last_read_at}
+                        staffTyping={staffTyping}
+                      />
                     </div>
                     <MessageComposer
                       pending={send.isPending}
                       onSuggest={handleSuggest}
                       onSend={(body) => send.mutateAsync(body).then(() => undefined)}
+                      onTyping={handleTyping}
                     />
                   </>
                 )}
@@ -116,5 +143,32 @@ export function MessagesPage() {
         </>
       )}
     </>
+  );
+}
+
+/**
+ * Chat header above the thread — mirrors the provider portal's
+ * `ParticipantHeader`. Big avatar on the left, sender name on top,
+ * message count subtitle below. The patient-portal `ConversationDetail`
+ * only exposes a `participants: string[]` (display names), so we use
+ * the first name to seed the avatar's initial colour.
+ */
+function ChatHeader({
+  title,
+  messageCount,
+}: {
+  title: string;
+  messageCount: number;
+}) {
+  return (
+    <div className="flex items-center gap-3 px-5 py-3 border-b border-border bg-white">
+      <UserAvatar name={title} size="lg" className="shrink-0" />
+      <div className="min-w-0 flex-1">
+        <h2 className="text-[15px] font-bold truncate">{title}</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {messageCount} {messageCount === 1 ? "message" : "messages"}
+        </p>
+      </div>
+    </div>
   );
 }

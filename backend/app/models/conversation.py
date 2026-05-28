@@ -40,6 +40,12 @@ class Conversation(Base, UUIDMixin):
         DateTime(timezone=True), server_default=func.now(), index=True
     )
     last_message_preview: Mapped[str | None] = mapped_column(Text)
+    # The patient participates implicitly via `patient_id`, so we track
+    # their read state here instead of in `conversation_participants`.
+    # Null = patient has never opened the thread.
+    patient_last_read_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
