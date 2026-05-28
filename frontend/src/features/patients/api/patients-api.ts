@@ -173,6 +173,14 @@ export const patientsApi = {
   },
 
   remove: (id: string): Promise<void> => api.delete(`/patients/${id}`),
+
+  invitePortal: async (
+    patientId: string
+  ): Promise<{ setup_url: string; expires_at: string }> =>
+    api.post<{ setup_url: string; expires_at: string }>(
+      `/patients/${patientId}/portal-invite`,
+      {}
+    ),
 };
 
 export interface PatientInput {

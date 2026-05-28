@@ -1,10 +1,13 @@
+import { useState } from "react";
 import {
   CalendarClock,
+  Copy,
   Mail,
   MapPin,
   MoreHorizontal,
   Pencil,
   Phone,
+  Send,
   Trash2,
   User as UserIcon,
 } from "lucide-react";
@@ -15,6 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
 import { PortraitUploader } from "@/features/patients/components/PortraitUploader";
 import { useUpdatePatient } from "@/features/patients/hooks/use-update-patient";
+import { usePortalInvite } from "@/features/patients/hooks/use-portal-invite";
+import { toast } from "@/lib/toast";
 import type { Patient } from "@/types";
 
 interface Props {
@@ -25,12 +30,26 @@ interface Props {
 
 export function PatientHeader({ patient, onEdit, onRemove }: Props) {
   const update = useUpdatePatient(patient.id);
+  const invite = usePortalInvite();
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
 
   const dobLabel = patient.dob ? formatDate(patient.dob) : "DOB unknown";
   const sexLabel =
     patient.sex === "F" ? "Female" : patient.sex === "M" ? "Male" : "Other";
 
+  const handleInvite = async () => {
+    const result = await invite.mutateAsync(patient.id);
+    setInviteUrl(result.setup_url);
+  };
+
+  const copyUrl = async () => {
+    if (!inviteUrl) return;
+    await navigator.clipboard.writeText(inviteUrl);
+    toast.success("Invite URL copied");
+  };
+
   return (
+    <div className="space-y-4">
     <Card>
       <CardContent className="p-5">
         <div className="flex items-start gap-5">
@@ -81,6 +100,16 @@ export function PatientHeader({ patient, onEdit, onRemove }: Props) {
                 <Button size="sm">
                   <CalendarClock className="size-3.5" /> Schedule visit
                 </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleInvite}
+                  disabled={invite.isPending}
+                  className="h-9"
+                >
+                  <Send className="size-3.5" />
+                  {invite.isPending ? "Generating…" : "Invite to portal"}
+                </Button>
                 <HeaderMenu onEdit={onEdit} onRemove={onRemove} />
               </div>
             </div>
@@ -120,6 +149,28 @@ export function PatientHeader({ patient, onEdit, onRemove }: Props) {
         </div>
       </CardContent>
     </Card>
+    {inviteUrl && (
+      <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
+        <div className="text-sm font-semibold text-primary mb-1">
+          Patient portal invite ready
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Share this one-time URL with the patient by email, SMS, or in person. It expires in 24 hours.
+        </p>
+        <div className="flex items-center gap-2">
+          <input
+            readOnly
+            value={inviteUrl}
+            className="flex-1 h-9 rounded-full border border-border bg-white px-3 text-xs font-mono ring-focus"
+            onClick={(e) => (e.target as HTMLInputElement).select()}
+          />
+          <Button variant="secondary" size="sm" onClick={copyUrl} className="h-9">
+            <Copy className="size-3.5" /> Copy
+          </Button>
+        </div>
+      </div>
+    )}
+    </div>
   );
 }
 
