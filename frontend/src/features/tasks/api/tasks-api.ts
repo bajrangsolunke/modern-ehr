@@ -14,6 +14,8 @@ export type TaskCategory =
 export type TaskPriority = "low" | "medium" | "high";
 export type TaskStatus = "new" | "in_progress" | "completed" | "cancelled";
 export type TaskScope = "all" | "mine" | "assigned";
+export type TaskAudience = "all" | "patients" | "users";
+export type TaskType = "user" | "patient";
 
 export interface Task {
   id: string;
@@ -22,6 +24,7 @@ export interface Task {
   category: TaskCategory;
   priority: TaskPriority;
   status: TaskStatus;
+  taskType: TaskType;
   createdByUserId: string | null;
   createdByName: string | null;
   assignedToUserId: string | null;
@@ -42,6 +45,7 @@ interface BackendTaskDto {
   category: TaskCategory;
   priority: TaskPriority;
   status: TaskStatus;
+  task_type: TaskType;
   created_by_user_id: string | null;
   created_by_name: string | null;
   assigned_to_user_id: string | null;
@@ -73,6 +77,9 @@ export interface TaskPage {
 
 export interface TaskFilters {
   scope?: TaskScope;
+  /** "patients" → only tasks linked to a patient; "users" → only
+   *  internal/team tasks. "all" or omitted → no audience filter. */
+  audience?: TaskAudience;
   q?: string;
   status?: TaskStatus;
   priority?: TaskPriority;
@@ -86,6 +93,7 @@ export interface TaskInput {
   description?: string | null;
   category: TaskCategory;
   priority: TaskPriority;
+  task_type?: TaskType;
   assigned_to_user_id?: string | null;
   patient_id?: string | null;
   due_date?: string | null;
@@ -97,6 +105,7 @@ export interface TaskUpdate {
   category?: TaskCategory;
   priority?: TaskPriority;
   status?: TaskStatus;
+  task_type?: TaskType;
   assigned_to_user_id?: string | null;
   patient_id?: string | null;
   due_date?: string | null;
@@ -110,6 +119,7 @@ function mapTask(dto: BackendTaskDto): Task {
     category: dto.category,
     priority: dto.priority,
     status: dto.status,
+    taskType: dto.task_type,
     createdByUserId: dto.created_by_user_id,
     createdByName: dto.created_by_name,
     assignedToUserId: dto.assigned_to_user_id,
