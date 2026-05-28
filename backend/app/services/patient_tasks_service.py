@@ -1,16 +1,28 @@
-"""Patient-facing tasks listing. Combines pending form_requests +
-open tasks tied to this patient into one chronological feed."""
+"""Patient-facing tasks + forms write surface.
+
+Two ownership invariants protect everything below:
+  * tasks are visible/writable only when `tasks.patient_id == current.id`
+  * form_requests are visible/writable only when
+    `form_requests.patient_id == current.id`
+"""
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.form_request import FormRequest, FormRequestStatus
 from app.models.task import Task, TaskStatus
 from app.models.user import User
-from app.schemas.patient_portal_tasks import PatientTaskListOut, PatientTaskOut
+from app.schemas.patient_portal_tasks import (
+    FormDetailOut,
+    PatientTaskListOut,
+    PatientTaskOut,
+)
 
 
 FORM_LABEL = {
@@ -87,6 +99,7 @@ class PatientTasksService:
                     due_date=f.due_date,
                     created_at=f.created_at,
                     requested_by=requester.full_name if requester else None,
+                    form_type=kind,
                 )
             )
 
@@ -101,6 +114,7 @@ class PatientTasksService:
                     due_date=t.due_date,
                     created_at=t.created_at,
                     requested_by=None,
+                    form_type=None,
                 )
             )
 
@@ -112,3 +126,64 @@ class PatientTasksService:
             forms_count=len(forms),
             tasks_count=len(tasks),
         )
+
+    async def complete_task(self, task_id: UUID, patient_id: UUID) -> Task:
+        task = await self.db.get(Task, task_id)
+        if task is None or task.patient_id != patient_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Task not found",
+            )
+        if task.status == TaskStatus.completed:
+            return task
+        task.status = TaskStatus.completed
+        task.completed_at = datetime.now(timezone.utc)
+        await self.db.commit()
+        await self.db.refresh(task)
+        return task
+
+    async def _own_form(self, form_id: UUID, patient_id: UUID) -> FormRequest:
+        form = await self.db.get(FormRequest, form_id)
+        if form is None or form.patient_id != patient_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Form not found",
+            )
+        return form
+
+    async def get_form_detail(
+        self, form_id: UUID, patient_id: UUID
+    ) -> FormDetailOut:
+        form = await self._own_form(form_id, patient_id)
+        requester_name = None
+        if form.requested_by_user_id:
+            user = await self.db.get(User, form.requested_by_user_id)
+            requester_name = user.full_name if user else None
+        return FormDetailOut(
+            id=form.id,
+            form_type=form.form_type.value,
+            status=form.status.value,
+            notes=form.notes,
+            due_date=form.due_date,
+            data=form.data,
+            requested_by=requester_name,
+            submitted_at=form.submitted_at,
+        )
+
+    async def submit_form(
+        self, form_id: UUID, patient_id: UUID, data: dict[str, Any]
+    ) -> FormDetailOut:
+        form = await self._own_form(form_id, patient_id)
+        if form.status not in (
+            FormRequestStatus.pending,
+            FormRequestStatus.submitted,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Form is already {form.status.value}",
+            )
+        form.data = data
+        form.status = FormRequestStatus.submitted
+        form.submitted_at = datetime.now(timezone.utc)
+        await self.db.commit()
+        return await self.get_form_detail(form_id, patient_id)

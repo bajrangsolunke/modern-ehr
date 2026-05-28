@@ -17,7 +17,11 @@ from app.schemas.patient_portal_messages import (
     SendMessageIn,
 )
 from app.schemas.patient_portal_notifications import PatientNotificationListOut
-from app.schemas.patient_portal_tasks import PatientTaskListOut
+from app.schemas.patient_portal_tasks import (
+    FormDetailOut,
+    PatientTaskListOut,
+    SubmitFormIn,
+)
 from app.services.patient_appointments_service import PatientAppointmentsService
 from app.services.patient_dashboard_service import PatientDashboardService
 from app.services.patient_documents_service import PatientDocumentsService
@@ -75,6 +79,32 @@ async def my_tasks(
     db: DbSession, current: CurrentPatient
 ) -> PatientTaskListOut:
     return await PatientTasksService(db).list_for_patient(current.id)
+
+
+@router.post("/me/tasks/{task_id}/complete", status_code=204)
+async def complete_my_task(
+    task_id: UUID, db: DbSession, current: CurrentPatient
+) -> None:
+    await PatientTasksService(db).complete_task(task_id, current.id)
+
+
+@router.get("/me/forms/{form_id}", response_model=FormDetailOut)
+async def my_form(
+    form_id: UUID, db: DbSession, current: CurrentPatient
+) -> FormDetailOut:
+    return await PatientTasksService(db).get_form_detail(form_id, current.id)
+
+
+@router.post("/me/forms/{form_id}/submit", response_model=FormDetailOut)
+async def submit_my_form(
+    form_id: UUID,
+    payload: SubmitFormIn,
+    db: DbSession,
+    current: CurrentPatient,
+) -> FormDetailOut:
+    return await PatientTasksService(db).submit_form(
+        form_id, current.id, payload.data
+    )
 
 
 @router.get("/me/conversations", response_model=ConversationListOut)
