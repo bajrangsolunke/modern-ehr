@@ -5,7 +5,9 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.chart_hash import compute_chart_hash
 from app.ai.llm import llm_client
+from app.models.ai_insight import AiInsight
 from app.models.allergy import Allergy
 from app.models.condition import Condition
 from app.models.form_request import FormRequest, FormRequestStatus, FormType
@@ -51,7 +53,13 @@ class SummaryService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    async def for_patient(self, patient_id: UUID, style: str = "clinical") -> AiSummaryResponse:
+    async def for_patient(
+        self,
+        patient_id: UUID,
+        style: str = "clinical",
+        *,
+        force: bool = False,
+    ) -> AiSummaryResponse:
         patient = await self.db.get(Patient, patient_id)
         if not patient:
             raise ValueError("Patient not found")
@@ -67,9 +75,45 @@ class SummaryService:
         ).scalars().all()
         labs = (
             await self.db.execute(
-                select(LabResult).where(LabResult.patient_id == patient_id).limit(10)
+                select(LabResult)
+                .where(LabResult.patient_id == patient_id)
+                .order_by(LabResult.collected_at.desc())
+                .limit(10)
             )
         ).scalars().all()
+
+        chart_hash = compute_chart_hash(
+            patient=patient,
+            allergies=allergies,
+            conditions=conditions,
+            medications=meds,
+            labs=labs,
+        )
+
+        if not force:
+            cached_row = (
+                await self.db.execute(
+                    select(AiInsight)
+                    .where(
+                        AiInsight.patient_id == patient_id,
+                        AiInsight.category == "chart_summary",
+                        AiInsight.content_hash == chart_hash,
+                    )
+                    .order_by(AiInsight.created_at.desc())
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+            if cached_row is not None:
+                actions = cached_row.actions or {}
+                return AiSummaryResponse(
+                    patient_id=patient_id,
+                    summary=cached_row.summary,
+                    bullets=list(actions.get("bullets") or []),
+                    confidence=float(cached_row.confidence or 0.0),
+                    model=cached_row.model,
+                    generated_at=cached_row.created_at,
+                    cached=True,
+                )
 
         ctx = self._format_context(patient, allergies, conditions, meds, labs, style)
         raw = await llm_client.chat(
@@ -82,13 +126,28 @@ class SummaryService:
         )
         parsed = self._safe_parse(raw, patient)
 
+        row = AiInsight(
+            patient_id=patient_id,
+            category="chart_summary",
+            title=f"Chart summary: {patient.first_name} {patient.last_name}",
+            summary=parsed["summary"],
+            confidence=parsed["confidence"],
+            model=llm_client.chat_model,
+            actions={"bullets": parsed["bullets"]},
+            content_hash=chart_hash,
+        )
+        self.db.add(row)
+        await self.db.flush()
+        await self.db.refresh(row)
+
         return AiSummaryResponse(
             patient_id=patient_id,
             summary=parsed["summary"],
             bullets=parsed["bullets"],
             confidence=parsed["confidence"],
             model=llm_client.chat_model,
-            generated_at=datetime.now(timezone.utc),
+            generated_at=row.created_at,
+            cached=False,
         )
 
     async def summarize_intake_form(
