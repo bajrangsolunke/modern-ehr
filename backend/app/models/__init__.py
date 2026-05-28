@@ -32,6 +32,11 @@ from app.models.form_request import (
     FormRequestStatus,
     FormType,
 )
+from app.models.icd_catalog import IcdCatalog
+from app.models.scribe_session import ScribeSession, ScribeSessionStatus
+from app.models.scribe_transcript import ScribeTranscript
+from app.models.scribe_soap_note import ScribeSoapNote
+from app.models.scribe_icd_suggestion import ScribeIcdSuggestion
 
 __all__ = [
     "User",
@@ -69,4 +74,10 @@ __all__ = [
     "FormRequest",
     "FormRequestStatus",
     "FormType",
+    "IcdCatalog",
+    "ScribeSession",
+    "ScribeSessionStatus",
+    "ScribeTranscript",
+    "ScribeSoapNote",
+    "ScribeIcdSuggestion",
 ]
