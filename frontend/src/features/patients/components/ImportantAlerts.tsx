@@ -1,4 +1,4 @@
-import { AlertOctagon, Info, MoreVertical, Plus } from "lucide-react";
+import { AlertOctagon, Info, MoreVertical, Plus, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -8,9 +8,10 @@ const alerts = [
     desc: "Apixaban: Pause confirmed 12.05.2025",
     color: "bg-danger/10 text-danger",
     icon: AlertOctagon,
+    source: "manual" as const,
   },
-  { title: "DNR", desc: "Yes", color: "bg-warning/10 text-warning", icon: AlertOctagon },
-  { title: "Lab tests", desc: "Update Hb/INR", color: "bg-info/10 text-info", icon: Info },
+  { title: "DNR", desc: "Yes", color: "bg-warning/10 text-warning", icon: AlertOctagon, source: "manual" as const },
+  { title: "Lab tests", desc: "Update Hb/INR", color: "bg-info/10 text-info", icon: Info, source: "ai" as const },
 ];
 
 export function ImportantAlerts() {
@@ -37,7 +38,15 @@ export function ImportantAlerts() {
               <a.icon className="size-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-semibold text-sm">{a.title}</div>
+              <div className="inline-flex items-center gap-1 font-semibold text-sm">
+                {a.source === "ai" && (
+                  <Sparkles
+                    className="size-3 text-primary shrink-0"
+                    aria-label="AI-generated alert"
+                  />
+                )}
+                {a.title}
+              </div>
               <div className="text-xs text-muted-foreground truncate">{a.desc}</div>
             </div>
             <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100">
