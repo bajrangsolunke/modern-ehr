@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { FormField } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { useFormDetail, useSubmitForm } from "@/features/tasks/hooks/use-tasks";
+import { IntakeFormEditor } from "@/features/forms/editors/IntakeFormEditor";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -144,6 +145,31 @@ export function FormFillModal({ formId, onClose }: Props) {
       }
     );
   };
+
+  // Intake forms use the full multi-section editor (parity with the
+  // provider portal). Everything else uses the simple inline form
+  // below.
+  if (detail?.form_type === "intake") {
+    return (
+      <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 animate-fade-in" />
+          <Dialog.Content
+            className="fixed left-1/2 top-1/2 z-50 w-[min(96vw,1100px)] max-h-[94vh] -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-background shadow-elev border border-border overflow-hidden flex flex-col"
+            aria-describedby={undefined}
+          >
+            <Dialog.Title className="sr-only">Intake form</Dialog.Title>
+            <div className="flex-1 overflow-y-auto p-6">
+              <IntakeFormEditor
+                form={{ id: detail.id, data: detail.data, status: detail.status }}
+                onClose={onClose}
+              />
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    );
+  }
 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
