@@ -1,0 +1,1 @@
+export { SoapNotePage } from "./SoapNotePage";

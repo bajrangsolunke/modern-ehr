@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ChevronDown,
   ChevronRight,
@@ -16,7 +17,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { SoapNoteDrawer } from "@/features/patients/components/SoapNoteDrawer";
 import {
   useDeleteNote,
   useNotes,
@@ -29,8 +29,7 @@ interface Props {
 }
 
 export function SoapNotesCard({ patientId }: Props) {
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editing, setEditing] = useState<SoapNote | null>(null);
+  const navigate = useNavigate();
   const [pendingDelete, setPendingDelete] = useState<SoapNote | null>(null);
 
   const { data, isLoading, isError, error, refetch, isFetching } =
@@ -44,14 +43,9 @@ export function SoapNotesCard({ patientId }: Props) {
   const latest = notes[0];
   const older = notes.slice(1);
 
-  const openCreate = () => {
-    setEditing(null);
-    setDrawerOpen(true);
-  };
-  const openEdit = (n: SoapNote) => {
-    setEditing(n);
-    setDrawerOpen(true);
-  };
+  const openCreate = () => navigate(`/patients/${patientId}/notes/new`);
+  const openEdit = (n: SoapNote) =>
+    navigate(`/patients/${patientId}/notes/${n.id}`);
 
   return (
     <>
@@ -113,16 +107,6 @@ export function SoapNotesCard({ patientId }: Props) {
           )}
         </CardContent>
       </Card>
-
-      <SoapNoteDrawer
-        open={drawerOpen}
-        onOpenChange={(open) => {
-          setDrawerOpen(open);
-          if (!open) setEditing(null);
-        }}
-        patientId={patientId}
-        note={editing ?? undefined}
-      />
 
       <ConfirmDialog
         open={Boolean(pendingDelete)}
