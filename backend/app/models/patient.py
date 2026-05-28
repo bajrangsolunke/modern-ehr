@@ -5,6 +5,7 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+import sqlalchemy as sa
 from sqlalchemy import ARRAY, Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -79,7 +80,7 @@ class Patient(Base, UUIDMixin, TimestampMixin):
     # password being set (lets admins deactivate without wiping data).
     hashed_password: Mapped[str | None] = mapped_column(String(255))
     portal_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False
+        Boolean, nullable=False, default=False, server_default=sa.false()
     )
     email_verified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
