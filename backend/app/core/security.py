@@ -17,7 +17,12 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
-def create_access_token(subject: str | int, claims: dict[str, Any] | None = None) -> str:
+def create_access_token(
+    subject: str | int,
+    claims: dict[str, Any] | None = None,
+    *,
+    token_type: str = "user",
+) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
@@ -26,19 +31,23 @@ def create_access_token(subject: str | int, claims: dict[str, Any] | None = None
         "exp": expire,
         "iat": datetime.now(timezone.utc),
         "type": "access",
+        "token_type": token_type,
     }
     if claims:
         payload.update(claims)
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def create_refresh_token(subject: str | int) -> str:
+def create_refresh_token(
+    subject: str | int, *, token_type: str = "user"
+) -> str:
     expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     payload = {
         "sub": str(subject),
         "exp": expire,
         "iat": datetime.now(timezone.utc),
         "type": "refresh",
+        "token_type": token_type,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
