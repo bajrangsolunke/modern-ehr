@@ -2,14 +2,18 @@
 enforces token_type=='patient' so staff tokens can't reach here."""
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Form, UploadFile
 from fastapi.responses import Response
 
 from app.api.deps import CurrentPatient, DbSession
 from app.schemas.patient_auth import PatientMeOut
 from app.schemas.patient_dashboard import DashboardOut
 from app.schemas.patient_portal_appointments import PatientAppointmentListOut
-from app.schemas.patient_portal_documents import PatientDocumentListOut
+from app.schemas.patient_portal_documents import (
+    PatientDocumentListOut,
+    PatientDocumentOut,
+)
+from app.schemas.patient_portal_forms import PatientFormRequestListOut
 from app.schemas.patient_portal_messages import (
     ConversationDetailOut,
     ConversationListOut,
@@ -66,6 +70,29 @@ async def my_documents(
     db: DbSession, current: CurrentPatient
 ) -> PatientDocumentListOut:
     return await PatientDocumentsService(db).list_for_patient(current.id)
+
+
+@router.post(
+    "/me/documents/upload",
+    response_model=PatientDocumentOut,
+    status_code=201,
+)
+async def upload_my_document(
+    file: UploadFile,
+    db: DbSession,
+    current: CurrentPatient,
+    category: str = Form("general"),
+) -> PatientDocumentOut:
+    return await PatientDocumentsService(db).upload_for_patient(
+        current.id, file, category
+    )
+
+
+@router.get("/me/forms", response_model=PatientFormRequestListOut)
+async def my_forms(
+    db: DbSession, current: CurrentPatient
+) -> PatientFormRequestListOut:
+    return await PatientTasksService(db).list_form_requests(current.id)
 
 
 @router.get("/me/notifications", response_model=PatientNotificationListOut)

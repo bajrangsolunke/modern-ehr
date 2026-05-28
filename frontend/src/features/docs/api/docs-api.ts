@@ -67,6 +67,9 @@ export interface DocumentFilters {
   patient_id?: string;
   category?: DocCategory;
   uploaded_by?: string;
+  /** Filter by upload source: "patient" returns client-uploaded
+   *  documents only; "staff" returns everything else. */
+  source?: "patient" | "staff";
   start_date?: string;
   end_date?: string;
   page?: number;

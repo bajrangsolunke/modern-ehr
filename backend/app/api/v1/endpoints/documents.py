@@ -59,6 +59,10 @@ async def list_documents(
     patient_id: UUID | None = None,
     category: str | None = None,
     uploaded_by: str | None = None,
+    source: str | None = Query(
+        None,
+        description='Filter by source: "patient" for client-uploaded docs, "staff" for staff-uploaded.',
+    ),
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     page: int = Query(1, ge=1),
@@ -81,6 +85,18 @@ async def list_documents(
     if uploaded_by:
         stmt = stmt.where(Document.uploaded_by == uploaded_by)
         count_stmt = count_stmt.where(Document.uploaded_by == uploaded_by)
+    if source == "patient":
+        stmt = stmt.where(Document.uploaded_by.like("patient:%"))
+        count_stmt = count_stmt.where(Document.uploaded_by.like("patient:%"))
+    elif source == "staff":
+        stmt = stmt.where(
+            Document.uploaded_by.is_not(None),
+            ~Document.uploaded_by.like("patient:%"),
+        )
+        count_stmt = count_stmt.where(
+            Document.uploaded_by.is_not(None),
+            ~Document.uploaded_by.like("patient:%"),
+        )
     if start_date is not None:
         stmt = stmt.where(Document.created_at >= start_date)
         count_stmt = count_stmt.where(Document.created_at >= start_date)

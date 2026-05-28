@@ -18,6 +18,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.form_request import FormRequest, FormRequestStatus
 from app.models.task import Task, TaskStatus
 from app.models.user import User
+from app.schemas.patient_portal_forms import (
+    PatientFormRequestListOut,
+    PatientFormRequestOut,
+)
 from app.schemas.patient_portal_tasks import (
     FormDetailOut,
     PatientTaskListOut,
@@ -168,6 +172,63 @@ class PatientTasksService:
             data=form.data,
             requested_by=requester_name,
             submitted_at=form.submitted_at,
+        )
+
+    async def list_form_requests(
+        self, patient_id: UUID
+    ) -> PatientFormRequestListOut:
+        rows = (
+            await self.db.execute(
+                select(FormRequest)
+                .where(FormRequest.patient_id == patient_id)
+                .order_by(FormRequest.created_at.desc())
+            )
+        ).scalars().all()
+
+        requester_ids = {
+            r.requested_by_user_id for r in rows if r.requested_by_user_id
+        }
+        requesters: dict[UUID, User] = {}
+        if requester_ids:
+            user_rows = (
+                await self.db.execute(
+                    select(User).where(User.id.in_(requester_ids))
+                )
+            ).scalars().all()
+            requesters = {u.id: u for u in user_rows}
+
+        items: list[PatientFormRequestOut] = []
+        pending = submitted = completed = 0
+        for r in rows:
+            req = (
+                requesters.get(r.requested_by_user_id)
+                if r.requested_by_user_id
+                else None
+            )
+            items.append(
+                PatientFormRequestOut(
+                    id=r.id,
+                    form_type=r.form_type.value,
+                    status=r.status.value,
+                    notes=r.notes,
+                    due_date=r.due_date,
+                    created_at=r.created_at,
+                    submitted_at=r.submitted_at,
+                    requested_by=req.full_name if req else None,
+                )
+            )
+            if r.status == FormRequestStatus.pending:
+                pending += 1
+            elif r.status == FormRequestStatus.submitted:
+                submitted += 1
+            elif r.status == FormRequestStatus.completed:
+                completed += 1
+
+        return PatientFormRequestListOut(
+            items=items,
+            pending=pending,
+            submitted=submitted,
+            completed=completed,
         )
 
     async def submit_form(

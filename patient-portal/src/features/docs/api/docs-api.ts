@@ -37,4 +37,25 @@ export const docsApi = {
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
       });
   },
+
+  upload: async (file: File, category: string): Promise<PatientDocument> => {
+    const token = localStorage.getItem(STORAGE_KEYS.accessToken);
+    if (!token) throw new Error("Not signed in");
+    const form = new FormData();
+    form.append("file", file);
+    form.append("category", category);
+    const res = await fetch(
+      `${env.API_BASE_URL}/patient-portal/me/documents/upload`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      }
+    );
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail.detail ?? `Upload failed (${res.status})`);
+    }
+    return (await res.json()) as PatientDocument;
+  },
 };

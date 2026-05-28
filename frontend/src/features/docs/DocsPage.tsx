@@ -61,6 +61,7 @@ export function DocsPage() {
   const debouncedQuery = useDebouncedValue(query, 300);
   const [category, setCategory] = useState<DocCategory | undefined>();
   const [scope, setScope] = useState<"all" | "mine">("all");
+  const [source, setSource] = useState<"any" | "patient" | "staff">("any");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [view, setView] = useState<ViewMode>("list");
@@ -74,10 +75,20 @@ export function DocsPage() {
       category,
       patient_id: searchParams.get("patient_id") ?? undefined,
       uploaded_by: scope === "mine" ? user?.email : undefined,
+      source: source === "any" ? undefined : source,
       page,
       page_size: pageSize,
     }),
-    [debouncedQuery, category, scope, user?.email, page, pageSize, searchParams]
+    [
+      debouncedQuery,
+      category,
+      scope,
+      user?.email,
+      source,
+      page,
+      pageSize,
+      searchParams,
+    ]
   );
 
   const { data, isLoading, isError, error, refetch, isFetching } =
@@ -96,11 +107,14 @@ export function DocsPage() {
   }, [data]);
 
   const activeFilterCount =
-    (category ? 1 : 0) + (scope === "mine" ? 1 : 0);
+    (category ? 1 : 0) +
+    (scope === "mine" ? 1 : 0) +
+    (source !== "any" ? 1 : 0);
 
   const resetFilters = () => {
     setCategory(undefined);
     setScope("all");
+    setSource("any");
   };
 
   return (
@@ -129,6 +143,11 @@ export function DocsPage() {
                     setPage(1);
                   }}
                   showScope={Boolean(user?.email)}
+                  source={source}
+                  setSource={(s) => {
+                    setSource(s);
+                    setPage(1);
+                  }}
                   onClear={() => {
                     resetFilters();
                     setPage(1);
@@ -556,6 +575,8 @@ function FilterPopoverBody({
   scope,
   setScope,
   showScope,
+  source,
+  setSource,
   onClear,
 }: {
   category: DocCategory | undefined;
@@ -563,6 +584,8 @@ function FilterPopoverBody({
   scope: "all" | "mine";
   setScope: (s: "all" | "mine") => void;
   showScope: boolean;
+  source: "any" | "patient" | "staff";
+  setSource: (s: "any" | "patient" | "staff") => void;
   onClear: () => void;
 }) {
   return (
@@ -608,6 +631,24 @@ function FilterPopoverBody({
           />
         </FilterGroup>
       )}
+
+      <FilterGroup label="Source">
+        <FilterChip
+          label="Any"
+          active={source === "any"}
+          onClick={() => setSource("any")}
+        />
+        <FilterChip
+          label="Staff"
+          active={source === "staff"}
+          onClick={() => setSource("staff")}
+        />
+        <FilterChip
+          label="Client uploaded"
+          active={source === "patient"}
+          onClick={() => setSource("patient")}
+        />
+      </FilterGroup>
     </div>
   );
 }

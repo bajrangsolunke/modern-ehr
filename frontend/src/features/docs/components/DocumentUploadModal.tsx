@@ -172,11 +172,17 @@ function PatientPicker({
   const [open, setOpen] = useState(false);
   const debounced = useDebouncedValue(query, 200);
 
-  const { data: results } = usePatients({
-    q: debounced || undefined,
-    page: 1,
-    page_size: 8,
-  });
+  // Only fetch when the picker dropdown is open, or when a value is
+  // set so we can resolve its display name. Skips the network call
+  // until the user actually clicks the picker.
+  const { data: results } = usePatients(
+    {
+      q: debounced || undefined,
+      page: 1,
+      page_size: 8,
+    },
+    { enabled: open || Boolean(value) }
+  );
   const selected = useMemo(
     () => results?.items.find((p) => p.id === value) ?? null,
     [results, value]
