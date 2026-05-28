@@ -144,7 +144,7 @@ export function ScribePage() {
   const streaming = useStreamingSession(patientId);
 
   // Historical session
-  const { data: historyFull } = useScribeSession(
+  const { data: historyFull, isLoading: historyLoading } = useScribeSession(
     historySessionId ?? undefined
   );
 
@@ -174,17 +174,26 @@ export function ScribePage() {
     streaming.state === "completed" ? liveSessionId : undefined
   );
 
-  // Pick which full session data to show in the workspace
+  // Pick which full session data to show in the workspace. React Query
+  // returns `undefined` while loading, so we also surface a separate
+  // `workspaceLoading` flag — the JSX uses that to render a spinner
+  // instead of trying to read fields off undefined.
   const workspaceSession = historySessionId
     ? historyFull
     : streaming.state === "completed"
     ? liveFull
     : null;
+  const workspaceLoading = historySessionId
+    ? historyLoading
+    : streaming.state === "completed"
+    ? liveLoading
+    : false;
 
   const isRecording = recorder.state === "recording";
   const isWorking =
     streaming.state === "creating" || streaming.state === "finalizing";
-  const showWorkspace = workspaceSession !== null;
+  // Boolean() catches both null AND undefined (React Query loading state).
+  const showWorkspace = Boolean(workspaceSession);
 
   const badge = statusBadge(
     historySessionId ? (historyFull?.status ?? "idle") : streaming.state
@@ -340,8 +349,17 @@ export function ScribePage() {
         </div>
       )}
 
+      {/* Loading state for historical workspace open while the full
+          payload is still in flight. The live "completed" case has its
+          own loader above. */}
+      {historySessionId && workspaceLoading && !workspaceSession && (
+        <div className="flex items-center justify-center rounded-2xl border border-dashed border-border p-12 text-muted-foreground text-sm">
+          Loading session…
+        </div>
+      )}
+
       {/* Workspace — historical or completed live session */}
-      {showWorkspace && (
+      {showWorkspace && workspaceSession && (
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Left: transcript */}
           <Card>
