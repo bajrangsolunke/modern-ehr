@@ -62,7 +62,7 @@ class SummaryService:
     ) -> AiSummaryResponse:
         patient = await self.db.get(Patient, patient_id)
         if not patient:
-            raise ValueError("Patient not found")
+            raise HTTPException(status_code=404, detail="Patient not found")
 
         allergies = (
             await self.db.execute(select(Allergy).where(Allergy.patient_id == patient_id))
@@ -96,7 +96,7 @@ class SummaryService:
                     select(AiInsight)
                     .where(
                         AiInsight.patient_id == patient_id,
-                        AiInsight.category == "chart_summary",
+                        AiInsight.category == f"chart_summary:{style}",
                         AiInsight.content_hash == chart_hash,
                     )
                     .order_by(AiInsight.created_at.desc())
@@ -128,7 +128,7 @@ class SummaryService:
 
         row = AiInsight(
             patient_id=patient_id,
-            category="chart_summary",
+            category=f"chart_summary:{style}",
             title=f"Chart summary: {patient.first_name} {patient.last_name}",
             summary=parsed["summary"],
             confidence=parsed["confidence"],

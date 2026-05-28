@@ -275,48 +275,49 @@ class FormRequestService:
         log = get_logger(__name__)
 
         try:
-            summary = await SummaryService(self.db).summarize_intake_form(form.id)
-            audit = AuditService(self.db)
+            async with self.db.begin_nested():
+                summary = await SummaryService(self.db).summarize_intake_form(form.id)
+                audit = AuditService(self.db)
 
-            created = 0
-            for raw_flag in summary.red_flags:
-                if created >= self._MAX_AI_ALERTS_PER_INTAKE:
-                    break
-                label = (raw_flag or "").strip()[:128]
-                if not label:
-                    continue
+                created = 0
+                for raw_flag in summary.red_flags:
+                    if created >= self._MAX_AI_ALERTS_PER_INTAKE:
+                        break
+                    label = (raw_flag or "").strip()[:128]
+                    if not label:
+                        continue
 
-                exists = (
-                    await self.db.execute(
-                        select(PatientAlert).where(
-                            PatientAlert.patient_id == form.patient_id,
-                            PatientAlert.label == label,
-                            PatientAlert.source == AlertSource.ai,
-                            PatientAlert.resolved.is_(False),
+                    exists = (
+                        await self.db.execute(
+                            select(PatientAlert).where(
+                                PatientAlert.patient_id == form.patient_id,
+                                PatientAlert.label == label,
+                                PatientAlert.source == AlertSource.ai,
+                                PatientAlert.resolved.is_(False),
+                            )
                         )
-                    )
-                ).scalar_one_or_none()
-                if exists is not None:
-                    continue
+                    ).scalar_one_or_none()
+                    if exists is not None:
+                        continue
 
-                alert = PatientAlert(
-                    patient_id=form.patient_id,
-                    label=label,
-                    detail=None,
-                    severity=AlertSeverity.warning,
-                    source=AlertSource.ai,
-                    created_by_id=None,
-                )
-                self.db.add(alert)
-                await self.db.flush()
-                await audit.record(
-                    user_id=viewer_id,
-                    action="alert.create.ai",
-                    resource_type="patient_alert",
-                    resource_id=str(alert.id),
-                    payload={"label": label, "form_id": str(form.id)},
-                )
-                created += 1
+                    alert = PatientAlert(
+                        patient_id=form.patient_id,
+                        label=label,
+                        detail=None,
+                        severity=AlertSeverity.warning,
+                        source=AlertSource.ai,
+                        created_by_id=None,
+                    )
+                    self.db.add(alert)
+                    await self.db.flush()
+                    await audit.record(
+                        user_id=viewer_id,
+                        action="alert.create.ai",
+                        resource_type="patient_alert",
+                        resource_id=str(alert.id),
+                        payload={"label": label, "form_id": str(form.id)},
+                    )
+                    created += 1
         except Exception as exc:
             log.warning(
                 "intake_propagation_failed",

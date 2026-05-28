@@ -10,6 +10,7 @@ from datetime import date as _date
 from datetime import datetime, timezone
 from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,7 +46,7 @@ class RiskService:
     ) -> AiRiskScoreResponse:
         patient = await self.db.get(Patient, patient_id)
         if not patient:
-            raise ValueError("Patient not found")
+            raise HTTPException(status_code=404, detail="Patient not found")
 
         conditions = (
             await self.db.execute(select(Condition).where(Condition.patient_id == patient_id))

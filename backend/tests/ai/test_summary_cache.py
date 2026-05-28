@@ -25,7 +25,7 @@ async def test_first_call_writes_insight_row_and_marks_uncached(
     count = await db_session.scalar(
         select(func.count(AiInsight.id)).where(
             AiInsight.patient_id == sample_patient.id,
-            AiInsight.category == "chart_summary",
+            AiInsight.category == "chart_summary:clinical",
         )
     )
     assert count == 1
@@ -43,7 +43,7 @@ async def test_second_call_returns_cached_without_new_row(
     count = await db_session.scalar(
         select(func.count(AiInsight.id)).where(
             AiInsight.patient_id == sample_patient.id,
-            AiInsight.category == "chart_summary",
+            AiInsight.category == "chart_summary:clinical",
         )
     )
     assert count == 1
@@ -61,7 +61,7 @@ async def test_force_true_bypasses_cache_and_writes_new_row(
     count = await db_session.scalar(
         select(func.count(AiInsight.id)).where(
             AiInsight.patient_id == sample_patient.id,
-            AiInsight.category == "chart_summary",
+            AiInsight.category == "chart_summary:clinical",
         )
     )
     assert count == 2
