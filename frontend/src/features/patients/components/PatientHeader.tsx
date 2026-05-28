@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
 import { PortraitUploader } from "@/features/patients/components/PortraitUploader";
+import { PatientRiskChip } from "./PatientRiskChip";
 import { useUpdatePatient } from "@/features/patients/hooks/use-update-patient";
 import { usePortalInvite } from "@/features/patients/hooks/use-portal-invite";
 import { toast } from "@/lib/toast";
@@ -71,6 +72,7 @@ export function PatientHeader({ patient, onEdit, onRemove }: Props) {
                   <Badge variant="default" size="sm">
                     MRN {patient.mrn}
                   </Badge>
+                  <PatientRiskChip patientId={patient.id} />
                 </div>
                 <div className="flex items-center gap-x-3 gap-y-1 mt-1.5 text-sm text-muted-foreground flex-wrap">
                   <Meta icon={<UserIcon className="size-3.5" />}>
