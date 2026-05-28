@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ClipboardList,
   Download,
@@ -16,22 +16,30 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SortableTh, TABLE_ROW_BG } from "@/components/ui/sortable-th";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useDocuments, useUploadDocument } from "./hooks/use-documents";
+import {
+  FilterPopover,
+  FilterHeader,
+  FilterGroup,
+} from "@/components/ui/filter-popover";
+import { FilterChip } from "@/components/ui/filter-chip";
+import { useDocuments } from "./hooks/use-documents";
 import { useForms } from "@/features/forms/hooks/use-forms";
 import { docsApi, type PatientDocument } from "./api/docs-api";
+import { UploadDocumentModal } from "./components/UploadDocumentModal";
 import { FormFillModal } from "@/features/tasks/components/FormFillModal";
 import { formatBytes, formatDate } from "@/lib/utils";
 import type { PatientFormRequest } from "@/features/forms/api/forms-api";
 
 const CATEGORY_LABEL: Record<string, string> = {
+  general: "General",
   consent: "Consent",
   imaging: "Imaging",
   lab: "Lab",
   insurance: "Insurance",
   referral: "Referral",
   discharge: "Discharge",
-  general: "General",
 };
+const CATEGORY_KEYS = Object.keys(CATEGORY_LABEL);
 
 const CATEGORY_TONE: Record<
   string,
@@ -65,20 +73,61 @@ const FORM_STATUS_VARIANT: Record<
   denied: "danger",
 };
 
+type Source = "any" | "you" | "team";
+type DateRange = "any" | "7d" | "30d" | "90d";
+
 export function DocsPage() {
   const docs = useDocuments();
   const forms = useForms();
-  const upload = useUploadDocument();
-  const fileRef = useRef<HTMLInputElement | null>(null);
-  const [category, setCategory] = useState<string>("general");
   const [activeFormId, setActiveFormId] = useState<string | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
-  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    upload.mutate({ file, category });
-    e.target.value = "";
-  };
+  // Documents filters
+  const [docCategory, setDocCategory] = useState<string | undefined>();
+  const [docSource, setDocSource] = useState<Source>("any");
+  const [docRange, setDocRange] = useState<DateRange>("any");
+
+  // Forms filters
+  const [formStatus, setFormStatus] = useState<string | undefined>();
+  const [formType, setFormType] = useState<string | undefined>();
+
+  const filteredDocs = useMemo(() => {
+    const items = docs.data?.items ?? [];
+    const cutoffMs =
+      docRange === "7d"
+        ? Date.now() - 7 * 86_400_000
+        : docRange === "30d"
+          ? Date.now() - 30 * 86_400_000
+          : docRange === "90d"
+            ? Date.now() - 90 * 86_400_000
+            : null;
+    return items.filter((d) => {
+      if (docCategory && d.category !== docCategory) return false;
+      if (docSource === "you" && !d.uploaded_by?.startsWith("patient:"))
+        return false;
+      if (docSource === "team" && d.uploaded_by?.startsWith("patient:"))
+        return false;
+      if (cutoffMs !== null && new Date(d.created_at).getTime() < cutoffMs)
+        return false;
+      return true;
+    });
+  }, [docs.data, docCategory, docSource, docRange]);
+
+  const filteredForms = useMemo(() => {
+    const items = forms.data?.items ?? [];
+    return items.filter((f) => {
+      if (formStatus && f.status !== formStatus) return false;
+      if (formType && f.form_type !== formType) return false;
+      return true;
+    });
+  }, [forms.data, formStatus, formType]);
+
+  const docActiveCount =
+    (docCategory ? 1 : 0) +
+    (docSource !== "any" ? 1 : 0) +
+    (docRange !== "any" ? 1 : 0);
+
+  const formActiveCount = (formStatus ? 1 : 0) + (formType ? 1 : 0);
 
   return (
     <>
@@ -103,32 +152,79 @@ export function DocsPage() {
               Records shared by your care team — plus anything you upload.
             </p>
             <div className="flex items-center gap-2">
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="h-10 rounded-full border border-border bg-white px-4 text-sm shadow-soft ring-focus"
-              >
-                {Object.entries(CATEGORY_LABEL).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-              <input
-                ref={fileRef}
-                type="file"
-                onChange={onFile}
-                className="hidden"
-              />
-              <Button
-                onClick={() => fileRef.current?.click()}
-                disabled={upload.isPending}
-              >
-                {upload.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Upload className="size-4" />
+              <FilterPopover
+                activeCount={docActiveCount}
+                renderBody={(close) => (
+                  <>
+                    <FilterHeader
+                      onClear={() => {
+                        setDocCategory(undefined);
+                        setDocSource("any");
+                        setDocRange("any");
+                        close();
+                      }}
+                    />
+                    <FilterGroup label="Category">
+                      <FilterChip
+                        label="Any"
+                        active={!docCategory}
+                        onClick={() => setDocCategory(undefined)}
+                      />
+                      {CATEGORY_KEYS.map((k) => (
+                        <FilterChip
+                          key={k}
+                          label={CATEGORY_LABEL[k]}
+                          active={docCategory === k}
+                          onClick={() =>
+                            setDocCategory(docCategory === k ? undefined : k)
+                          }
+                        />
+                      ))}
+                    </FilterGroup>
+                    <FilterGroup label="Source">
+                      <FilterChip
+                        label="Any"
+                        active={docSource === "any"}
+                        onClick={() => setDocSource("any")}
+                      />
+                      <FilterChip
+                        label="You uploaded"
+                        active={docSource === "you"}
+                        onClick={() => setDocSource("you")}
+                      />
+                      <FilterChip
+                        label="Care team"
+                        active={docSource === "team"}
+                        onClick={() => setDocSource("team")}
+                      />
+                    </FilterGroup>
+                    <FilterGroup label="Uploaded">
+                      <FilterChip
+                        label="Any time"
+                        active={docRange === "any"}
+                        onClick={() => setDocRange("any")}
+                      />
+                      <FilterChip
+                        label="Last 7 days"
+                        active={docRange === "7d"}
+                        onClick={() => setDocRange("7d")}
+                      />
+                      <FilterChip
+                        label="Last 30 days"
+                        active={docRange === "30d"}
+                        onClick={() => setDocRange("30d")}
+                      />
+                      <FilterChip
+                        label="Last 90 days"
+                        active={docRange === "90d"}
+                        onClick={() => setDocRange("90d")}
+                      />
+                    </FilterGroup>
+                  </>
                 )}
+              />
+              <Button onClick={() => setUploadOpen(true)}>
+                <Upload className="size-4" />
                 Upload
               </Button>
             </div>
@@ -146,19 +242,83 @@ export function DocsPage() {
           )}
 
           {!docs.isLoading && !docs.isError && docs.data && (
-            docs.data.items.length === 0 ? (
+            filteredDocs.length === 0 ? (
               <Empty
                 icon={<FileText className="size-5" />}
-                title="No documents yet"
-                description="Upload a record above or wait for your care team to share one."
+                title={
+                  docActiveCount > 0
+                    ? "No documents match these filters"
+                    : "No documents yet"
+                }
+                description={
+                  docActiveCount > 0
+                    ? "Try widening the filters or clearing them."
+                    : "Upload a record above or wait for your care team to share one."
+                }
               />
             ) : (
-              <DocsTable items={docs.data.items} />
+              <DocsTable items={filteredDocs} />
             )
           )}
         </TabsContent>
 
         <TabsContent value="forms">
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <p className="text-sm text-muted-foreground">
+              Forms requested by your care team — fill them out here.
+            </p>
+            <FilterPopover
+              activeCount={formActiveCount}
+              renderBody={(close) => (
+                <>
+                  <FilterHeader
+                    onClear={() => {
+                      setFormStatus(undefined);
+                      setFormType(undefined);
+                      close();
+                    }}
+                  />
+                  <FilterGroup label="Status">
+                    <FilterChip
+                      label="Any"
+                      active={!formStatus}
+                      onClick={() => setFormStatus(undefined)}
+                    />
+                    {(
+                      ["pending", "submitted", "completed", "denied"] as const
+                    ).map((s) => (
+                      <FilterChip
+                        key={s}
+                        label={s}
+                        active={formStatus === s}
+                        onClick={() =>
+                          setFormStatus(formStatus === s ? undefined : s)
+                        }
+                      />
+                    ))}
+                  </FilterGroup>
+                  <FilterGroup label="Type">
+                    <FilterChip
+                      label="Any"
+                      active={!formType}
+                      onClick={() => setFormType(undefined)}
+                    />
+                    {Object.entries(FORM_LABEL).map(([k, v]) => (
+                      <FilterChip
+                        key={k}
+                        label={v}
+                        active={formType === k}
+                        onClick={() =>
+                          setFormType(formType === k ? undefined : k)
+                        }
+                      />
+                    ))}
+                  </FilterGroup>
+                </>
+              )}
+            />
+          </div>
+
           {forms.isLoading && <Loader />}
 
           {forms.isError && !forms.isLoading && (
@@ -171,22 +331,28 @@ export function DocsPage() {
           )}
 
           {!forms.isLoading && !forms.isError && forms.data && (
-            forms.data.items.length === 0 ? (
+            filteredForms.length === 0 ? (
               <Empty
                 icon={<ClipboardList className="size-5" />}
-                title="No forms requested"
-                description="When your care team asks you to fill out a form, it'll appear here."
+                title={
+                  formActiveCount > 0
+                    ? "No forms match these filters"
+                    : "No forms requested"
+                }
+                description={
+                  formActiveCount > 0
+                    ? "Try widening the filters or clearing them."
+                    : "When your care team asks you to fill out a form, it'll appear here."
+                }
               />
             ) : (
-              <FormsTable
-                items={forms.data.items}
-                onOpen={setActiveFormId}
-              />
+              <FormsTable items={filteredForms} onOpen={setActiveFormId} />
             )
           )}
         </TabsContent>
       </Tabs>
 
+      <UploadDocumentModal open={uploadOpen} onOpenChange={setUploadOpen} />
       <FormFillModal formId={activeFormId} onClose={() => setActiveFormId(null)} />
     </>
   );

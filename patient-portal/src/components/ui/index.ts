@@ -5,6 +5,8 @@ export * from "./card";
 export * from "./confirm-dialog";
 export * from "./empty";
 export * from "./error-banner";
+export * from "./filter-chip";
+export * from "./filter-popover";
 export * from "./form";
 export * from "./input";
 export * from "./pagination";

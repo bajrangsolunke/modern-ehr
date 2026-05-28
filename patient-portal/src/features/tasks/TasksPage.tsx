@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   CheckCircle2,
   ClipboardList,
@@ -15,10 +15,16 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { SummaryTile } from "@/components/ui/summary-tile";
 import { SortableTh, TABLE_ROW_BG } from "@/components/ui/sortable-th";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  FilterPopover,
+  FilterHeader,
+  FilterGroup,
+} from "@/components/ui/filter-popover";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { formatDate } from "@/lib/utils";
 import { useCompleteTask, useTasks } from "./hooks/use-tasks";
 import { FormFillModal } from "./components/FormFillModal";
-import type { PatientTask } from "./api/tasks-api";
+import type { PatientTask, PatientTaskKind } from "./api/tasks-api";
 
 const STATUS_VARIANT: Record<
   string,
@@ -41,17 +47,163 @@ function statusLabel(s: string): string {
   return STATUS_LABEL[s] ?? s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+type KindFilter = "any" | PatientTaskKind;
+type StatusFilter = "any" | "pending" | "in_progress" | "submitted";
+type DueFilter = "any" | "overdue" | "today" | "7d" | "no-date";
+
+const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: "any", label: "Any" },
+  { value: "pending", label: "Pending" },
+  { value: "in_progress", label: "In progress" },
+  { value: "submitted", label: "Submitted" },
+];
+
+function isOverdue(due: string): boolean {
+  return new Date(due) < new Date(new Date().setHours(0, 0, 0, 0));
+}
+function isToday(due: string): boolean {
+  const d = new Date(due);
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+function inNextDays(due: string, days: number): boolean {
+  const d = new Date(due);
+  const start = new Date(new Date().setHours(0, 0, 0, 0));
+  const end = new Date(start);
+  end.setDate(end.getDate() + days);
+  return d >= start && d <= end;
+}
+
 export function TasksPage() {
   const { data, isLoading, isError, error, refetch, isFetching } = useTasks();
   const complete = useCompleteTask();
   const [formId, setFormId] = useState<string | null>(null);
   const [confirmTaskId, setConfirmTaskId] = useState<string | null>(null);
 
+  const [kindFilter, setKindFilter] = useState<KindFilter>("any");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("any");
+  const [dueFilter, setDueFilter] = useState<DueFilter>("any");
+
+  const filtered = useMemo(() => {
+    const items = data?.items ?? [];
+    return items.filter((t) => {
+      if (kindFilter !== "any" && t.kind !== kindFilter) return false;
+      // "pending" matches both pending (forms) and new (tasks); "in_progress"
+      // matches the task in_progress; "submitted" matches the form state.
+      if (statusFilter !== "any") {
+        if (statusFilter === "pending") {
+          if (t.status !== "pending" && t.status !== "new") return false;
+        } else if (t.status !== statusFilter) {
+          return false;
+        }
+      }
+      if (dueFilter !== "any") {
+        if (dueFilter === "no-date") {
+          if (t.due_date) return false;
+        } else if (!t.due_date) {
+          return false;
+        } else if (dueFilter === "overdue" && !isOverdue(t.due_date)) {
+          return false;
+        } else if (dueFilter === "today" && !isToday(t.due_date)) {
+          return false;
+        } else if (dueFilter === "7d" && !inNextDays(t.due_date, 7)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [data, kindFilter, statusFilter, dueFilter]);
+
+  const overdueCount = useMemo(() => {
+    const items = data?.items ?? [];
+    return items.filter((t) => t.due_date && isOverdue(t.due_date)).length;
+  }, [data]);
+
+  const activeFilterCount =
+    (kindFilter !== "any" ? 1 : 0) +
+    (statusFilter !== "any" ? 1 : 0) +
+    (dueFilter !== "any" ? 1 : 0);
+
   return (
     <>
       <PageHeader
         title="Tasks"
         subtitle="Forms to complete and follow-ups from your care team."
+        right={
+          <FilterPopover
+            activeCount={activeFilterCount}
+            renderBody={(close) => (
+              <>
+                <FilterHeader
+                  onClear={() => {
+                    setKindFilter("any");
+                    setStatusFilter("any");
+                    setDueFilter("any");
+                    close();
+                  }}
+                />
+                <FilterGroup label="Type">
+                  <FilterChip
+                    label="Any"
+                    active={kindFilter === "any"}
+                    onClick={() => setKindFilter("any")}
+                  />
+                  <FilterChip
+                    label="Forms"
+                    active={kindFilter === "form"}
+                    onClick={() => setKindFilter("form")}
+                  />
+                  <FilterChip
+                    label="Tasks"
+                    active={kindFilter === "task"}
+                    onClick={() => setKindFilter("task")}
+                  />
+                </FilterGroup>
+                <FilterGroup label="Status">
+                  {STATUS_OPTIONS.map((s) => (
+                    <FilterChip
+                      key={s.value}
+                      label={s.label}
+                      active={statusFilter === s.value}
+                      onClick={() => setStatusFilter(s.value)}
+                    />
+                  ))}
+                </FilterGroup>
+                <FilterGroup label="Due">
+                  <FilterChip
+                    label="Any"
+                    active={dueFilter === "any"}
+                    onClick={() => setDueFilter("any")}
+                  />
+                  <FilterChip
+                    label="Overdue"
+                    active={dueFilter === "overdue"}
+                    onClick={() => setDueFilter("overdue")}
+                  />
+                  <FilterChip
+                    label="Today"
+                    active={dueFilter === "today"}
+                    onClick={() => setDueFilter("today")}
+                  />
+                  <FilterChip
+                    label="Next 7 days"
+                    active={dueFilter === "7d"}
+                    onClick={() => setDueFilter("7d")}
+                  />
+                  <FilterChip
+                    label="No due date"
+                    active={dueFilter === "no-date"}
+                    onClick={() => setDueFilter("no-date")}
+                  />
+                </FilterGroup>
+              </>
+            )}
+          />
+        }
       />
 
       {!isLoading && !isError && data && (
@@ -75,10 +227,10 @@ export function TasksPage() {
             tone="info"
           />
           <SummaryTile
-            label="Completed today"
-            value={complete.isSuccess ? 1 : 0}
+            label="Overdue"
+            value={overdueCount}
             icon={<CheckCircle2 />}
-            tone="success"
+            tone={overdueCount > 0 ? "danger" : "success"}
           />
         </div>
       )}
@@ -100,11 +252,19 @@ export function TasksPage() {
 
       {!isLoading && !isError && data && (
         <>
-          {data.items.length === 0 ? (
+          {filtered.length === 0 ? (
             <Empty
               icon={<CheckCircle2 className="size-5" />}
-              title="You're all caught up"
-              description="There's nothing waiting on you right now. We'll let you know when there is."
+              title={
+                activeFilterCount > 0
+                  ? "No items match these filters"
+                  : "You're all caught up"
+              }
+              description={
+                activeFilterCount > 0
+                  ? "Try widening the filters or clearing them."
+                  : "There's nothing waiting on you right now. We'll let you know when there is."
+              }
             />
           ) : (
             <Card className="overflow-hidden p-3 sm:p-4">
@@ -124,7 +284,7 @@ export function TasksPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.items.map((t) => (
+                    {filtered.map((t) => (
                       <TaskRow
                         key={`${t.kind}-${t.id}`}
                         task={t}
@@ -171,6 +331,7 @@ interface RowProps {
 function TaskRow({ task, completing, onComplete, onOpenForm }: RowProps) {
   const isForm = task.kind === "form";
   const statusVariant = STATUS_VARIANT[task.status] ?? "neutral";
+  const overdue = task.due_date ? isOverdue(task.due_date) : false;
 
   return (
     <tr className="hover:[&_td]:bg-[#EEF2F8] transition">
@@ -212,10 +373,19 @@ function TaskRow({ task, completing, onComplete, onOpenForm }: RowProps) {
         </Badge>
       </td>
       <td
-        className="px-4 py-2 text-foreground/80 tabular-nums"
+        className="px-4 py-2 tabular-nums"
         style={{ background: TABLE_ROW_BG }}
       >
-        {task.due_date ? formatDate(task.due_date) : (
+        {task.due_date ? (
+          <span className={overdue ? "text-danger font-semibold" : "text-foreground/80"}>
+            {formatDate(task.due_date)}
+            {overdue && (
+              <span className="ml-1 text-[10px] uppercase tracking-wider">
+                Overdue
+              </span>
+            )}
+          </span>
+        ) : (
           <span className="text-muted-foreground italic">—</span>
         )}
       </td>
