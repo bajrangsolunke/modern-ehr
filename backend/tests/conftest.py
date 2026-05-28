@@ -4,6 +4,8 @@ Provides:
   - db_session  : an AsyncSession connected to the real dev DB, rolled back
                   after each test so tests are isolated.
   - sample_patient : a minimal Patient row persisted within the test transaction.
+  - provider_user  : a provider-role User row for form workflow tests.
+  - submitted_intake_form : a submitted intake FormRequest ready to be approved.
 """
 from __future__ import annotations
 
@@ -82,3 +84,60 @@ async def sample_patient(db_session: AsyncSession) -> Patient:
     await db_session.flush()
     await db_session.refresh(patient)
     return patient
+
+
+# ---------------------------------------------------------------------------
+# provider_user — a provider-role User for form workflow tests
+# ---------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture()
+async def provider_user(db_session: AsyncSession):
+    """A provider-role user that can request + review forms."""
+    from app.models.user import User, UserRole
+
+    u = User(
+        email=f"provider-{uuid.uuid4()}@test.example",
+        full_name="Test Provider",
+        hashed_password="$2b$12$test",  # dummy bcrypt
+        role=UserRole.provider,
+        is_active=True,
+    )
+    db_session.add(u)
+    await db_session.flush()
+    await db_session.refresh(u)
+    return u
+
+
+# ---------------------------------------------------------------------------
+# submitted_intake_form — a submitted-state intake FormRequest ready to review
+# ---------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture()
+async def submitted_intake_form(db_session: AsyncSession, sample_patient, provider_user):
+    """A submitted-state intake form_request for the sample_patient, ready
+    to be approved. Data payload is minimal but valid per IntakeFormPayload."""
+    from datetime import datetime, timezone
+
+    from app.models.form_request import FormRequest, FormRequestStatus, FormType
+    from app.schemas.form_request import validate_payload
+
+    minimal_intake = {
+        "demographics": {"first_name": "Test", "last_name": "Patient"},
+    }
+    validated = validate_payload("intake", minimal_intake)
+
+    form = FormRequest(
+        patient_id=sample_patient.id,
+        form_type=FormType.intake,
+        status=FormRequestStatus.submitted,
+        requested_by_user_id=provider_user.id,
+        data=validated,
+        submitted_at=datetime.now(timezone.utc),
+        submitted_by_user_id=provider_user.id,
+    )
+    db_session.add(form)
+    await db_session.flush()
+    await db_session.refresh(form)
+    return form

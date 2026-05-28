@@ -232,6 +232,14 @@ class FormRequestService:
                 else:
                     task.status = TaskStatus.cancelled
 
+        # AI side-effect — best-effort, runs after the workflow state
+        # is set so any failure can't roll back the review.
+        if (
+            next_status == FormRequestStatus.completed
+            and row.form_type == FormType.intake
+        ):
+            await self._propagate_intake_red_flags(form=row, viewer_id=viewer_id)
+
         await self.db.flush()
         await self.db.refresh(row)
         return await self._project(row)
@@ -243,6 +251,78 @@ class FormRequestService:
         # FK has ON DELETE SET NULL so the task survives.
         await self.db.delete(row)
         await self.db.flush()
+
+    # ---------------------------------------------------------- AI hooks
+
+    _MAX_AI_ALERTS_PER_INTAKE = 5
+
+    async def _propagate_intake_red_flags(
+        self, *, form: FormRequest, viewer_id: UUID
+    ) -> None:
+        """On intake approval, run the AI summarizer and convert each
+        red flag into a patient_alert with source='ai'. Best-effort —
+        any failure is logged at warn level and swallowed so the
+        review request still succeeds.
+
+        Dedup: skip if the same (patient_id, label, source='ai',
+        resolved=false) row already exists. Hard cap at 5 alerts per
+        approval (the model can be chatty)."""
+        from app.ai.summary import SummaryService
+        from app.core.logging import get_logger
+        from app.models.alert import AlertSeverity, AlertSource, PatientAlert
+        from app.services.audit_service import AuditService
+
+        log = get_logger(__name__)
+
+        try:
+            summary = await SummaryService(self.db).summarize_intake_form(form.id)
+            audit = AuditService(self.db)
+
+            created = 0
+            for raw_flag in summary.red_flags:
+                if created >= self._MAX_AI_ALERTS_PER_INTAKE:
+                    break
+                label = (raw_flag or "").strip()[:128]
+                if not label:
+                    continue
+
+                exists = (
+                    await self.db.execute(
+                        select(PatientAlert).where(
+                            PatientAlert.patient_id == form.patient_id,
+                            PatientAlert.label == label,
+                            PatientAlert.source == AlertSource.ai,
+                            PatientAlert.resolved.is_(False),
+                        )
+                    )
+                ).scalar_one_or_none()
+                if exists is not None:
+                    continue
+
+                alert = PatientAlert(
+                    patient_id=form.patient_id,
+                    label=label,
+                    detail=None,
+                    severity=AlertSeverity.warning,
+                    source=AlertSource.ai,
+                    created_by_id=None,
+                )
+                self.db.add(alert)
+                await self.db.flush()
+                await audit.record(
+                    user_id=viewer_id,
+                    action="alert.create.ai",
+                    resource_type="patient_alert",
+                    resource_id=str(alert.id),
+                    payload={"label": label, "form_id": str(form.id)},
+                )
+                created += 1
+        except Exception as exc:
+            log.warning(
+                "intake_propagation_failed",
+                form_id=str(form.id),
+                error=str(exc),
+            )
 
     # ---------------------------------------------------------- helpers
 
