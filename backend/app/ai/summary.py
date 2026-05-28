@@ -53,34 +53,30 @@ If a section is empty, return [] for that key — do not fabricate items.
 """
 
 
-SOAP_SYSTEM_PROMPT = """You are a clinical scribe drafting a SOAP note
-from a patient intake form. The note is a STARTING POINT — the provider
-will review and edit before signing — so be conservative and never
-invent observations or findings the intake doesn't support.
+SOAP_SYSTEM_PROMPT = """You are a clinical scribe drafting ONLY the
+Subjective section of a SOAP note from a patient intake form. The
+intake form contains patient-reported history but NO exam findings,
+vitals, clinical observations, or provider judgment — therefore you
+MUST NOT generate the Objective, Assessment, or Plan sections. Those
+require the provider to have seen the patient.
 
-SOAP structure rules:
-- Subjective: patient-reported information from the intake (chief
-  complaint inferred from diagnosed_problems / past_surgeries, history,
-  allergies, medications). 2-4 sentences.
-- Objective: intake forms generally do NOT contain exam findings. Write
-  a brief placeholder noting that vitals + physical exam are pending
-  pre-visit. Do NOT fabricate values.
-- Assessment: clinical impression based on diagnosed_problems and risk
-  factors (anticoagulants, allergies, multiple conditions). 2-3
-  sentences. List the top 1-2 problems by priority.
-- Plan: pre-visit preparation steps (confirm med list, allergy
-  reactions, anticoag pause window if relevant, labs to order). Use
-  bullet-style line breaks (use \\n between bullets) but no leading
-  dashes — the UI renders plain text.
+Subjective drafting rules:
+- 3-5 sentences, written in plain clinical prose.
+- Cover (in this order): reason for visit / chief complaint inferred
+  from diagnosed_problems; relevant past medical and surgical history;
+  current medications; documented allergies; pertinent family history.
+- Use patient-reported phrasing ("reports", "denies", "endorses").
+- Do NOT invent symptoms or complaints not present in the intake.
+- Do NOT speculate about diagnosis — that's the Assessment, which the
+  provider writes after the encounter.
 
 Output strict JSON:
 {
   "subjective": "...",
-  "objective": "...",
-  "assessment": "...",
-  "plan": "...",
   "confidence": 0.0-1.0
 }
+Return ONLY these two keys. Do not include objective, assessment, or
+plan fields — those are explicitly out of scope here.
 """
 
 
@@ -276,9 +272,12 @@ class SummaryService:
             form_id=form.id,
             patient_id=patient_id,
             subjective=parsed["subjective"],
-            objective=parsed["objective"],
-            assessment=parsed["assessment"],
-            plan=parsed["plan"],
+            # Objective / Assessment / Plan are intentionally empty:
+            # intake forms contain no exam findings and the provider
+            # must document those after the encounter.
+            objective="",
+            assessment="",
+            plan="",
             confidence=parsed["confidence"],
             model=llm_client.chat_model,
             generated_at=datetime.now(timezone.utc),
@@ -286,50 +285,62 @@ class SummaryService:
 
     @staticmethod
     def _safe_parse_soap(raw: str, intake_data: dict) -> dict:
-        """Parse the SOAP JSON the LLM returned, falling back to a sensible
-        stub when the model isn't configured or returns malformed JSON. The
-        stub is enough to demo without an API key."""
+        """Parse the Subjective JSON the LLM returned. Falls back to a
+        deterministic stub built directly from the intake payload when the
+        model isn't configured or returns malformed JSON — enough to demo
+        without an API key.
+
+        Only the Subjective field is produced here; the calling code zeros
+        out Objective / Assessment / Plan because those require the
+        provider to have seen the patient (out of scope for an intake
+        autofill)."""
         import json
 
         try:
             obj = json.loads(raw)
-            return {
-                "subjective": (obj.get("subjective") or "").strip(),
-                "objective": (obj.get("objective") or "").strip(),
-                "assessment": (obj.get("assessment") or "").strip(),
-                "plan": (obj.get("plan") or "").strip(),
-                "confidence": float(obj.get("confidence", 0.6)),
-            }
+            subjective = (obj.get("subjective") or "").strip()
+            if subjective:
+                return {
+                    "subjective": subjective,
+                    "confidence": float(obj.get("confidence", 0.6)),
+                }
         except Exception:
-            health = intake_data.get("health_history") or {}
-            problems = health.get("diagnosed_problems") or "no chronic problems"
-            allergies = health.get("allergies") or []
-            meds = health.get("current_medications") or []
-            allergy_str = (
-                ", ".join(a.get("name", "?") for a in allergies)
-                or "no known allergies"
+            pass
+
+        # Stub fallback — readable Subjective prose from raw intake fields.
+        health = intake_data.get("health_history") or {}
+        problems = health.get("diagnosed_problems") or "no chronic problems documented"
+        allergies = health.get("allergies") or []
+        meds = health.get("current_medications") or []
+        surgeries = health.get("past_surgeries") or []
+
+        allergy_str = (
+            ", ".join(a.get("name", "?") for a in allergies if a.get("name"))
+            or "no known allergies"
+        )
+        med_str = (
+            ", ".join(m.get("name", "?") for m in meds if m.get("name"))
+            or "no current medications"
+        )
+        surgery_str = (
+            ", ".join(
+                f"{s.get('name', '?')}"
+                + (f" ({s.get('onset_date')})" if s.get("onset_date") else "")
+                for s in surgeries
+                if s.get("name")
             )
-            med_str = (
-                ", ".join(m.get("name", "?") for m in meds)
-                or "no current medications"
-            )
-            return {
-                "subjective": (
-                    f"Per intake form: history includes {problems}. "
-                    f"Reported allergies: {allergy_str}. Current medications: {med_str}."
-                ),
-                "objective": "Vitals and physical exam pending at next visit.",
-                "assessment": (
-                    f"Active issues per intake: {problems}. "
-                    "Review allergy reactions and medication adherence at visit."
-                ),
-                "plan": (
-                    "Confirm allergy reactions and severity\n"
-                    "Reconcile current medication list with patient\n"
-                    "Order baseline labs if not on file"
-                ),
-                "confidence": 0.4,
-            }
+            or "no past surgeries reported"
+        )
+
+        return {
+            "subjective": (
+                f"Patient reports history of {problems}. "
+                f"Past surgical history: {surgery_str}. "
+                f"Current medications: {med_str}. "
+                f"Reported allergies: {allergy_str}."
+            ),
+            "confidence": 0.4,
+        }
 
     @staticmethod
     def _format_intake_context(data: dict, style: str) -> str:

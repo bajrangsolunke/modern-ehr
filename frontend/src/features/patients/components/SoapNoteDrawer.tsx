@@ -49,19 +49,20 @@ export function SoapNoteDrawer({ open, onOpenChange, patientId, note }: Props) {
   const [filling, setFilling] = useState(false);
   const [filledFrom, setFilledFrom] = useState<{ model: string; confidence: number } | null>(null);
 
-  const fillFromIntake = async () => {
+  const fillSubjectiveFromIntake = async () => {
     setFilling(true);
     try {
       const draft = await patientsAiApi.soapFromIntake(patientId);
+      // Intake forms contain patient-reported history but no exam
+      // findings — only the Subjective is honest to autofill.
+      // Objective / Assessment / Plan need to come from the encounter,
+      // not the intake form.
       setValue("subjective", draft.subjective, { shouldDirty: true });
-      setValue("objective", draft.objective, { shouldDirty: true });
-      setValue("assessment", draft.assessment, { shouldDirty: true });
-      setValue("plan", draft.plan, { shouldDirty: true });
       setFilledFrom({ model: draft.model, confidence: draft.confidence });
-      toast.success("Draft filled from intake — please review before saving");
+      toast.success("Subjective drafted from intake — please review and document O/A/P after exam");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Couldn't fill from intake";
-      toast.error("Couldn't fill from intake", { description: message });
+      const message = err instanceof Error ? err.message : "Couldn't draft Subjective from intake";
+      toast.error("Couldn't draft Subjective from intake", { description: message });
     } finally {
       setFilling(false);
     }
@@ -128,7 +129,7 @@ export function SoapNoteDrawer({ open, onOpenChange, patientId, note }: Props) {
               <Sparkles className="size-4 text-primary mt-0.5 shrink-0" />
               <div className="min-w-0">
                 <div className="text-sm font-semibold flex items-center gap-2 flex-wrap">
-                  Pre-fill from intake
+                  Draft Subjective from intake
                   <AiTag>Beta</AiTag>
                   {filledFrom && (
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
@@ -137,7 +138,10 @@ export function SoapNoteDrawer({ open, onOpenChange, patientId, note }: Props) {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  AI drafts each section from the patient&apos;s most recent intake form. Review and edit before saving.
+                  AI fills only the Subjective section from the patient&apos;s
+                  most recent intake form. Objective, Assessment, and Plan
+                  must be documented from the encounter — intake has no
+                  exam findings.
                 </p>
               </div>
             </div>
@@ -146,7 +150,7 @@ export function SoapNoteDrawer({ open, onOpenChange, patientId, note }: Props) {
               size="sm"
               variant="secondary"
               className="h-8 shrink-0"
-              onClick={fillFromIntake}
+              onClick={fillSubjectiveFromIntake}
               disabled={filling}
             >
               {filling ? (
@@ -154,7 +158,11 @@ export function SoapNoteDrawer({ open, onOpenChange, patientId, note }: Props) {
               ) : (
                 <Sparkles className="size-3.5" />
               )}
-              {filling ? "Filling…" : filledFrom ? "Re-fill" : "Fill from intake"}
+              {filling
+                ? "Drafting…"
+                : filledFrom
+                  ? "Re-draft Subjective"
+                  : "Draft Subjective"}
             </Button>
           </div>
         )}
@@ -176,13 +184,13 @@ export function SoapNoteDrawer({ open, onOpenChange, patientId, note }: Props) {
         <FormField
           label="Objective"
           htmlFor="note-o"
-          hint="Exam findings, vitals, labs, imaging."
+          hint="Exam findings, vitals, labs, imaging. Document after exam."
           error={errors.objective?.message}
         >
           <Textarea
             id="note-o"
             rows={4}
-            placeholder="e.g. BP 142/88, HR 92, afebrile. ECG sinus rhythm…"
+            placeholder="Document after exam — e.g. BP 142/88, HR 92, afebrile. ECG sinus rhythm…"
             {...register("objective")}
           />
         </FormField>
@@ -190,13 +198,13 @@ export function SoapNoteDrawer({ open, onOpenChange, patientId, note }: Props) {
         <FormField
           label="Assessment"
           htmlFor="note-a"
-          hint="Clinical impression, differential, working diagnosis."
+          hint="Clinical impression, differential, working diagnosis. Document after exam."
           error={errors.assessment?.message}
         >
           <Textarea
             id="note-a"
             rows={4}
-            placeholder="e.g. Suspected unstable angina; rule out NSTEMI…"
+            placeholder="Document after exam — e.g. Suspected unstable angina; rule out NSTEMI…"
             {...register("assessment")}
           />
         </FormField>
@@ -204,13 +212,13 @@ export function SoapNoteDrawer({ open, onOpenChange, patientId, note }: Props) {
         <FormField
           label="Plan"
           htmlFor="note-p"
-          hint="Orders, medications, procedures, follow-up, patient education."
+          hint="Orders, medications, procedures, follow-up, patient education. Document after assessment."
           error={errors.plan?.message}
         >
           <Textarea
             id="note-p"
             rows={4}
-            placeholder="e.g. Trend troponin q3h, start aspirin 325 mg, cardiology consult…"
+            placeholder="Document after assessment — e.g. Trend troponin q3h, start aspirin 325 mg, cardiology consult…"
             {...register("plan")}
           />
         </FormField>
