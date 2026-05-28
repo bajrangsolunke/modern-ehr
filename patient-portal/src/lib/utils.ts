@@ -5,37 +5,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function timeOfDayGreeting(): "morning" | "afternoon" | "evening" {
-  const h = new Date().getHours();
-  if (h < 12) return "morning";
-  if (h < 18) return "afternoon";
-  return "evening";
-}
-
-export function humanWhen(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  const now = new Date();
-  const diffDays = Math.round(
-    (d.setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / 86400000
-  );
-  const d2 = new Date(iso);
-  const time = d2.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  if (diffDays === 0) return `Today at ${time}`;
-  if (diffDays === 1) return `Tomorrow at ${time}`;
-  if (diffDays > 1 && diffDays < 7) {
-    return `${d2.toLocaleDateString("en-US", { weekday: "long" })} at ${time}`;
-  }
-  return `${d2.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  })} at ${time}`;
-}
-
-export function formatDate(value: string | Date | null | undefined): string {
+/**
+ * Format a date for display. Falls back to an em-dash for empty,
+ * null, undefined, or otherwise-unparseable values — Intl will throw
+ * "Invalid time value" on bad input, which used to crash whole
+ * tables when a patient's procedureDate was an empty string.
+ */
+export function formatDate(
+  value: string | Date | null | undefined,
+  opts?: Intl.DateTimeFormatOptions
+) {
   if (value === null || value === undefined || value === "") return "—";
   const d = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(d.getTime())) return "—";
@@ -43,6 +22,18 @@ export function formatDate(value: string | Date | null | undefined): string {
     day: "2-digit",
     month: "short",
     year: "numeric",
+    ...opts,
+  }).format(d);
+}
+
+export function formatTime(value: string | Date | null | undefined) {
+  if (value === null || value === undefined || value === "") return "—";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
   }).format(d);
 }
 
@@ -57,6 +48,15 @@ export function initials(name: string | null | undefined) {
     .toUpperCase();
 }
 
+export function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+export function pct(value: number, total: number) {
+  if (!total) return 0;
+  return Math.round((value / total) * 100);
+}
+
 const colorPool = [
   "bg-blue-100 text-blue-700",
   "bg-violet-100 text-violet-700",
@@ -65,6 +65,19 @@ const colorPool = [
   "bg-rose-100 text-rose-700",
   "bg-sky-100 text-sky-700",
 ];
+
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let i = 0;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
+    i++;
+  }
+  const rounded = value >= 10 || i === 0 ? Math.round(value) : value.toFixed(1);
+  return `${rounded} ${units[i]}`;
+}
 
 export function avatarColor(seed: string) {
   let hash = 0;

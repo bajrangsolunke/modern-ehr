@@ -26,6 +26,28 @@
     --radius: 0.875rem;
   }
 
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 213 31% 95%;
+    --card: 222 47% 9%;
+    --card-foreground: 213 31% 95%;
+    --popover: 222 47% 9%;
+    --popover-foreground: 213 31% 95%;
+    --primary: 217 100% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 222 30% 14%;
+    --secondary-foreground: 213 31% 95%;
+    --muted: 222 30% 14%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 222 30% 14%;
+    --accent-foreground: 213 31% 95%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 222 30% 18%;
+    --input: 222 30% 18%;
+    --ring: 217 100% 65%;
+  }
+
   * { @apply border-border; }
   html, body, #root { @apply h-full; }
   body {
@@ -41,11 +63,369 @@
 }
 
 @layer components {
+  .glass {
+    @apply bg-white/70 backdrop-blur-xl border border-white/40;
+  }
+  .glass-dark {
+    @apply bg-slate-900/60 backdrop-blur-xl border border-white/10;
+  }
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-elev hover:-translate-y-0.5;
+  }
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-primary-gradient;
+  }
   .ring-focus {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(230, 238, 249, 0.6) 0%,
+      rgba(230, 238, 249, 1) 50%,
+      rgba(230, 238, 249, 0.6) 100%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer rounded-xl;
   }
 }
 
 @layer utilities {
   .text-balance { text-wrap: balance; }
+  .grid-cols-dash {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Print styles — used by the forms preview download flow.                    */
+/* Strategy: hide the app shell + modal chrome, promote the .form-preview     */
+/* block to the document root so it flows across as many pages as the data    */
+/* requires. The old `position: absolute; inset: 0` clipped everything to one */
+/* viewport which is why long forms only showed page 1.                       */
+/* -------------------------------------------------------------------------- */
+.print-only { display: none; }
+.screen-only { display: initial; }
+
+@media print {
+  /* A4 with portal-style margins; the bottom-right margin box gets a
+     "Page X of Y" running counter (supported in Chrome ≥ 90, Safari, FF). */
+  @page {
+    size: A4;
+    margin: 18mm 14mm 22mm;
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: 9pt;
+      color: #64748b;
+    }
+    @bottom-left {
+      content: "Padmavat · AI-native EHR — Confidential patient information";
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: 9pt;
+      color: #64748b;
+    }
+  }
+
+  html, body {
+    background: #ffffff !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  body { font-size: 10pt; color: #0f172a; }
+
+  /* Hide everything by default, then opt the print container back in. */
+  body > *:not(.print-root) { display: none !important; }
+  .print-root { display: block !important; }
+
+  /* When the modal is open the FormDetailsModal portals itself into
+     #print-root for the duration of print so the content escapes the
+     modal's overflow/scroll containment. */
+  .print-root,
+  .print-root * { visibility: visible; }
+
+  .no-print,
+  .no-print * { display: none !important; }
+  .print-only { display: block; }
+  .screen-only { display: none !important; }
+
+  /* Preserve background colors / borders we rely on for layout. */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Keep cards, table rows, and section headings together with their
+     content rather than splitting across pages mid-row. */
+  .print-break-avoid { break-inside: avoid; page-break-inside: avoid; }
+  .print-break-before { break-before: page; page-break-before: always; }
+  h1, h2, h3, h4 { break-after: avoid; page-break-after: avoid; }
+  table { break-inside: auto; }
+  tr, td, th { break-inside: avoid; page-break-inside: avoid; }
+
+  /* Trim shadows / soft chrome that wastes ink and looks weak on paper. */
+  .form-preview { box-shadow: none; }
+  .shadow-soft, .shadow-elev { box-shadow: none !important; }
+  a { color: inherit; text-decoration: none; }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Branded print document layout (.print-doc)                                  */
+/* Used by features/forms/components/FormPrintLayout — escapes the modal       */
+/* via a body-level portal, hidden on screen via .print-only.                  */
+/* -------------------------------------------------------------------------- */
+.print-doc {
+  color: #0f172a;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.4;
+}
+
+@media print {
+  .print-doc { font-size: 10pt; }
+
+  .print-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #1e293b;
+    margin-bottom: 14px;
+  }
+  .print-header__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .print-header__logo {
+    display: inline-grid;
+    place-items: center;
+  }
+  .print-header__title {
+    font-size: 14pt;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #0f172a;
+    line-height: 1.1;
+  }
+  .print-header__subtitle {
+    font-size: 8.5pt;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 1px;
+  }
+  .print-header__tag { text-align: right; }
+  .print-header__pill {
+    display: inline-block;
+    font-size: 7.5pt;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid #fecaca;
+  }
+  .print-header__doctype {
+    font-size: 11pt;
+    font-weight: 700;
+    margin-top: 4px;
+    text-transform: capitalize;
+  }
+  .print-header__docid {
+    font-size: 8pt;
+    color: #64748b;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .print-banner {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 10px;
+    background: #f8fafc;
+  }
+  .print-banner > div {
+    padding: 8px 12px;
+    border-right: 1px solid #e2e8f0;
+  }
+  .print-banner > div:last-child { border-right: none; }
+  .print-banner__label {
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    font-weight: 600;
+  }
+  .print-banner__value {
+    font-size: 11pt;
+    font-weight: 600;
+    margin-top: 2px;
+    color: #0f172a;
+  }
+
+  .print-meta {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px 12px;
+    margin-bottom: 14px;
+    padding: 8px 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .print-meta__cell { min-width: 0; }
+  .print-meta__label {
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    font-weight: 600;
+  }
+  .print-meta__value {
+    font-size: 9.5pt;
+    margin-top: 1px;
+    color: #0f172a;
+    word-wrap: break-word;
+  }
+
+  .print-section { margin-top: 14px; }
+  .print-section__title {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #0f172a;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 4px 0 6px;
+    margin: 0 0 8px;
+    border-bottom: 1px solid #1e293b;
+  }
+
+  .print-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .print-cell {
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 5px 8px;
+    background: #ffffff;
+  }
+  .print-cell__label {
+    font-size: 7pt;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
+    font-weight: 600;
+  }
+  .print-cell__value {
+    font-size: 9.5pt;
+    color: #0f172a;
+    margin-top: 1px;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+  }
+  .print-cell__empty { color: #94a3b8; font-style: italic; }
+
+  .print-table-wrap { margin-top: 8px; }
+  .print-table__label {
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #475569;
+    font-weight: 700;
+    margin: 6px 0 3px;
+  }
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+    border: 1px solid #cbd5e1;
+  }
+  .print-table thead th {
+    background: #f1f5f9;
+    text-align: left;
+    padding: 5px 8px;
+    border-bottom: 1px solid #cbd5e1;
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #475569;
+    font-weight: 700;
+  }
+  .print-table tbody td {
+    padding: 5px 8px;
+    border-top: 1px solid #e2e8f0;
+    vertical-align: top;
+    word-wrap: break-word;
+  }
+  .print-table-empty {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    border: 1px dashed #cbd5e1;
+    border-radius: 4px;
+    padding: 5px 8px;
+    margin-top: 6px;
+    background: #f8fafc;
+  }
+  .print-table-empty__label {
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #475569;
+    font-weight: 700;
+  }
+  .print-table-empty__value {
+    font-size: 9pt;
+    color: #94a3b8;
+    font-style: italic;
+  }
+
+  .print-body-text { font-size: 10pt; color: #0f172a; }
+
+  .print-signature {
+    margin-top: 22px;
+    padding-top: 10px;
+    border-top: 1px solid #cbd5e1;
+  }
+  .print-signature__row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 24px;
+    margin-bottom: 14px;
+  }
+  .print-signature__field { min-width: 0; }
+  .print-signature__line {
+    height: 28px;
+    border-bottom: 1px solid #0f172a;
+  }
+  .print-signature__caption {
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #475569;
+    font-weight: 600;
+    margin-top: 4px;
+  }
+
+  .print-footer {
+    margin-top: 18px;
+    padding-top: 8px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 7.5pt;
+    color: #64748b;
+  }
 }

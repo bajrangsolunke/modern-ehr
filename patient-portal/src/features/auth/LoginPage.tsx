@@ -1,16 +1,17 @@
-import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { FormField } from "@/components/ui/FormField";
-import { Spinner } from "@/components/ui/Spinner";
-import { useForm, zodResolver, z } from "@/lib/form";
+import { useNavigate, Link } from "react-router-dom";
+import { Loader2, Lock, Mail } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { FormField } from "@/components/ui/form";
+import { useForm, zodResolver, z, mapApiError } from "@/lib/form";
 import { useLogin } from "@/features/auth/hooks/use-login";
+import { AuthFrame } from "@/features/auth/components/AuthFrame";
 import { ROUTES } from "@/config/constants";
 
 const schema = z.object({
   email: z.string().email("Enter a valid email"),
-  password: z.string().min(1, "Required"),
+  password: z.string().min(1, "Password is required"),
 });
 type Values = z.infer<typeof schema>;
 
@@ -20,87 +21,83 @@ export function LoginPage() {
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<Values>({ resolver: zodResolver(schema) });
 
   const submit = handleSubmit(async (values) => {
-    await login.mutateAsync(values);
-    navigate(ROUTES.dashboard);
+    try {
+      await login.mutateAsync(values);
+      navigate(ROUTES.dashboard, { replace: true });
+    } catch (err) {
+      mapApiError(err, setError);
+    }
   });
 
   return (
-    <div className="min-h-screen bg-[#F5F9FF] grid place-items-center px-6 py-10">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center space-y-3">
-          <div className="size-14 rounded-full bg-primary-gradient grid place-items-center text-white shadow-glow mx-auto">
-            <svg width="22" height="22" viewBox="0 0 18 18" fill="none">
-              <path
-                d="M9 2v14M2 9h14"
-                stroke="currentColor"
-                strokeWidth="2.6"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-          <div className="font-display text-[26px] font-bold tracking-tight">Padmavat</div>
+    <AuthFrame>
+      <Card className="p-6 space-y-5">
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
+          <p className="text-sm text-muted-foreground">
+            Welcome back. Sign in to your patient portal.
+          </p>
         </div>
+        <form onSubmit={submit} className="space-y-4" noValidate>
+          <FormField
+            label="Email"
+            htmlFor="email"
+            required
+            error={errors.email?.message}
+          >
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@email.com"
+              icon={<Mail />}
+              {...register("email")}
+            />
+          </FormField>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">Sign in</CardTitle>
-            <CardDescription>Welcome back. Sign in to your patient portal.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={submit} className="space-y-4" noValidate>
-              <FormField
-                label="Email"
-                htmlFor="email"
-                required
-                error={errors.email?.message}
-              >
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@email.com"
-                  {...register("email")}
-                  invalid={Boolean(errors.email)}
-                />
-              </FormField>
+          <FormField
+            label="Password"
+            htmlFor="password"
+            required
+            error={errors.password?.message}
+          >
+            <Input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              placeholder="••••••••"
+              icon={<Lock />}
+              {...register("password")}
+            />
+          </FormField>
 
-              <FormField
-                label="Password"
-                htmlFor="password"
-                required
-                error={errors.password?.message}
-              >
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  {...register("password")}
-                  invalid={Boolean(errors.password)}
-                />
-              </FormField>
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={login.isPending}
+          >
+            {login.isPending && <Loader2 className="animate-spin" />}
+            {login.isPending ? "Signing in…" : "Sign in"}
+          </Button>
+        </form>
 
-              <Button
-                type="submit"
-                size="lg"
-                className="w-full"
-                disabled={login.isPending}
-              >
-                {login.isPending && <Spinner />}
-                {login.isPending ? "Signing in…" : "Sign in"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <div className="text-center text-sm text-muted-foreground">
+          Forgot your password?{" "}
+          <Link to={ROUTES.reset} className="text-primary font-semibold hover:underline">
+            Reset it
+          </Link>
+        </div>
+      </Card>
 
-        <p className="text-center text-sm text-muted-foreground">
-          Need help signing in? Contact your provider.
-        </p>
-      </div>
-    </div>
+      <p className="text-center text-sm text-muted-foreground">
+        Need help signing in? Contact your provider.
+      </p>
+    </AuthFrame>
   );
 }

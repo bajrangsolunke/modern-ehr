@@ -6,9 +6,7 @@ export function useRequestReset() {
   return useMutation({
     mutationFn: (email: string) => authApi.requestReset(email),
     onSuccess: () => {
-      toast.success(
-        "If that email is on file, a reset link is on its way."
-      );
+      toast.success("If that email is on file, a reset link is on its way.");
     },
   });
 }

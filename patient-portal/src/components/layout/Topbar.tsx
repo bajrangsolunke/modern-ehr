@@ -8,23 +8,25 @@ import {
 import { NavLink, useNavigate } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Popover from "@radix-ui/react-popover";
-import { UserAvatar } from "@/components/ui/Avatar";
-import { Button } from "@/components/ui/Button";
+import { UserAvatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth-store";
+import { ROUTES } from "@/config/constants";
 import { cn } from "@/lib/utils";
 
 interface NavLeaf {
   to: string;
   label: string;
+  end?: boolean;
 }
 
 const navItems: NavLeaf[] = [
-  { to: "/", label: "Dashboard" },
-  { to: "/messages", label: "Communication" },
-  { to: "/appointments", label: "Appointments" },
-  { to: "/docs", label: "Docs" },
-  { to: "/tasks", label: "Tasks" },
-  { to: "/notifications", label: "Notifications" },
+  { to: ROUTES.dashboard, label: "Dashboard", end: true },
+  { to: ROUTES.messages, label: "Communication" },
+  { to: ROUTES.appointments, label: "Appointments" },
+  { to: ROUTES.docs, label: "Docs" },
+  { to: ROUTES.tasks, label: "Tasks" },
+  { to: ROUTES.notifications, label: "Notifications" },
 ];
 
 export function Topbar() {
@@ -48,7 +50,9 @@ export function Topbar() {
               />
             </svg>
           </div>
-          <div className="font-display text-[22px] font-bold tracking-tight">Padmavat</div>
+          <div className="font-display text-[22px] font-bold tracking-tight">
+            Padmavat
+          </div>
         </div>
 
         <nav className="hidden lg:flex items-center gap-1 mx-auto bg-[#F1F4F9] rounded-full p-1">
@@ -56,7 +60,7 @@ export function Topbar() {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === "/"}
+              end={item.end}
               className={({ isActive }) =>
                 cn(
                   "px-4 xl:px-5 py-2 rounded-full text-[14px] font-medium transition-all inline-flex items-center gap-2",
@@ -102,7 +106,7 @@ export function Topbar() {
             size="icon"
             className="size-10 rounded-full bg-[#F1F4F9] hover:bg-[#E6EBF2] text-slate-700"
             aria-label="Settings"
-            onClick={() => navigate("/settings")}
+            onClick={() => navigate(ROUTES.settings)}
           >
             <Settings className="size-[18px]" />
           </Button>
@@ -113,7 +117,7 @@ export function Topbar() {
                 <UserAvatar name={displayName} size="md" />
                 <div className="hidden sm:flex flex-col leading-tight text-left">
                   <span className="text-sm font-bold">{displayName}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground truncate max-w-[140px]">
                     {displayEmail || "Patient"}
                   </span>
                 </div>
@@ -127,14 +131,14 @@ export function Topbar() {
                 className="z-50 w-56 rounded-2xl bg-white shadow-elev border border-border p-1.5 animate-fade-in"
               >
                 <DropdownMenu.Item
-                  onSelect={() => navigate("/settings")}
+                  onSelect={() => navigate(ROUTES.settings)}
                   className="flex items-center gap-2 px-3 py-2 text-sm rounded-xl hover:bg-secondary cursor-pointer outline-none"
                 >
                   <UserIcon className="size-4 text-muted-foreground" />
                   Profile
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
-                  onSelect={() => navigate("/settings")}
+                  onSelect={() => navigate(ROUTES.settings)}
                   className="flex items-center gap-2 px-3 py-2 text-sm rounded-xl hover:bg-secondary cursor-pointer outline-none"
                 >
                   <Settings className="size-4 text-muted-foreground" />

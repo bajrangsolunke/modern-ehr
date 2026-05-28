@@ -1,9 +1,10 @@
 import { api } from "@/lib/api-client";
-import type { PatientMe } from "@/stores/auth-store";
+import type { PatientMe } from "@/types";
 
 export interface Tokens {
   access_token: string;
   refresh_token: string;
+  token_type: "bearer";
   expires_in: number;
 }
 

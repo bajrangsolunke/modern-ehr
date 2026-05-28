@@ -1,6 +1,7 @@
-import { Settings, User as UserIcon, Mail, Phone, Calendar } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { Calendar, LogOut, Mail, Phone, User as UserIcon } from "lucide-react";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth-store";
 import { formatDate } from "@/lib/utils";
 
@@ -15,28 +16,21 @@ export function SettingsPage() {
     { icon: <Mail />, label: "Email", value: me.email ?? "—" },
     { icon: <Phone />, label: "Phone", value: me.phone ?? "—" },
     { icon: <Calendar />, label: "Date of birth", value: me.dob ? formatDate(me.dob) : "—" },
+    { icon: <UserIcon />, label: "MRN", value: me.mrn },
   ];
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="space-y-1">
-        <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-          Settings
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Your profile, sign-in, and account.
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="Settings"
+        subtitle="Your profile and account."
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="size-4 text-primary" />
+      <div className="max-w-3xl space-y-4">
+        <Card className="p-6">
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
             Profile
-          </CardTitle>
-          <CardDescription>Need a change? Contact your provider's office.</CardDescription>
-        </CardHeader>
-        <CardContent>
+          </div>
           <dl className="divide-y divide-border">
             {rows.map((r) => (
               <div key={r.label} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
@@ -53,32 +47,25 @@ export function SettingsPage() {
                 </div>
               </div>
             ))}
-            <div className="flex items-center gap-4 py-3 last:pb-0">
-              <div className="size-9 rounded-xl bg-primary/10 text-primary grid place-items-center [&_svg]:size-4 shrink-0">
-                <UserIcon />
-              </div>
-              <div className="min-w-0 flex-1">
-                <dt className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-                  MRN
-                </dt>
-                <dd className="text-sm font-semibold text-foreground truncate">{me.mrn}</dd>
-              </div>
-            </div>
           </dl>
-        </CardContent>
-      </Card>
+          <p className="mt-4 text-xs text-muted-foreground">
+            Need a change? Contact your provider's office.
+          </p>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Sign out</CardTitle>
-          <CardDescription>End your session on this device.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="destructive" size="default" onClick={() => logout()}>
+        <Card className="p-6">
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
+            Session
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            End your session on this device.
+          </p>
+          <Button variant="destructive" onClick={() => logout()}>
+            <LogOut className="size-4" />
             Sign out
           </Button>
-        </CardContent>
-      </Card>
-    </div>
+        </Card>
+      </div>
+    </>
   );
 }

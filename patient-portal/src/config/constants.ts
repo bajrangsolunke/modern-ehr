@@ -1,4 +1,5 @@
 export const APP_NAME = "Padmavat";
+export const APP_TAGLINE = "Patient portal";
 
 export const ROUTES = {
   dashboard: "/",
@@ -12,6 +13,11 @@ export const ROUTES = {
   setup: "/setup",
   reset: "/reset",
 } as const;
+
+export const QUERY_KEYS = {
+  auth: { me: ["auth", "me"] as const },
+  dashboard: { me: ["dashboard", "me"] as const },
+};
 
 export const STORAGE_KEYS = {
   accessToken: "padmavat-portal.access_token",

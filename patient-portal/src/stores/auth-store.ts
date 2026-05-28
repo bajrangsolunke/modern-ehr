@@ -1,16 +1,6 @@
 import { create } from "zustand";
 import { STORAGE_KEYS } from "@/config/constants";
-import { registerLogout } from "@/lib/api-client";
-
-export interface PatientMe {
-  id: string;
-  mrn: string;
-  first_name: string;
-  last_name: string;
-  email: string | null;
-  phone: string | null;
-  dob: string | null;
-}
+import type { PatientMe } from "@/types";
 
 interface AuthState {
   me: PatientMe | null;
@@ -52,6 +42,4 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 }));
 
-registerLogout(() => {
-  useAuthStore.getState().logout();
-});
+export const selectIsAuthenticated = (s: AuthState) => Boolean(s.accessToken);
