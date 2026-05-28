@@ -19,6 +19,7 @@ from app.api.v1.endpoints import (
     patient_auth,
     patient_portal,
     patients,
+    scribe,
     tasks,
     users,
     vitals,
@@ -48,3 +49,4 @@ api_router.include_router(messages.router)
 api_router.include_router(tasks.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(ws.router)
+api_router.include_router(scribe.router)

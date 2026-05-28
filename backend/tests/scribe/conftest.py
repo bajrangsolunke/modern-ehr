@@ -5,10 +5,12 @@ summary calls."""
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
 import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
 
 from app.models.icd_catalog import IcdCatalog
 from app.models.scribe_session import ScribeSession, ScribeSessionStatus
@@ -96,6 +98,44 @@ def mock_groq(monkeypatch):
     # Cleanup the per-session event-bus queues so they don't leak
     # between tests.
     scribe_event_bus.reset_for_tests()
+
+
+# ---------------------------------------------------------------------------
+# HTTP client + auth helpers for endpoint tests
+# ---------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture
+async def client(db_session):
+    """Authenticated httpx async client backed by the FastAPI app, with
+    DbSession dep overridden to use the test transaction session."""
+    from app.db.session import get_db
+    from app.main import app
+
+    async def _override():
+        yield db_session
+
+    app.dependency_overrides[get_db] = _override
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+    app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def auth_headers(provider_user):
+    from jose import jwt
+
+    from app.core.config import settings
+
+    payload = {
+        "sub": str(provider_user.id),
+        "type": "access",
+        "token_type": "user",
+        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+    }
+    token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest_asyncio.fixture

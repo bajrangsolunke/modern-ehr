@@ -105,3 +105,36 @@ async def get_current_patient(
 
 
 CurrentPatient = Annotated[Patient, Depends(get_current_patient)]
+
+
+# ---------------------------------------------------------------- SSE token
+
+
+async def get_user_from_token(
+    db: DbSession,
+    access_token: str,
+) -> User:
+    """JWT-from-query-param resolver for endpoints that browsers can't
+    attach Bearer headers to (e.g. SSE via EventSource)."""
+    creds_exc = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+    )
+    try:
+        payload = jwt.decode(
+            access_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        if payload.get("type") != "access":
+            raise creds_exc
+        if payload.get("token_type", "user") != "user":
+            raise creds_exc
+        user_id = payload.get("sub")
+        if user_id is None:
+            raise creds_exc
+    except JWTError as exc:
+        raise creds_exc from exc
+
+    user = await UserRepository(db).get(user_id)
+    if not user or not user.is_active:
+        raise creds_exc
+    return user
