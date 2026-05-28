@@ -16,6 +16,7 @@ from app.api.v1.endpoints import (
     notes,
     notifications,
     patient_auth,
+    patient_portal,
     patients,
     tasks,
     users,
@@ -27,6 +28,7 @@ api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(auth.router)
 api_router.include_router(patient_auth.router)
+api_router.include_router(patient_portal.router)
 api_router.include_router(users.router)
 api_router.include_router(availability.router)
 api_router.include_router(patients.router)
