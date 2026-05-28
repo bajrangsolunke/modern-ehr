@@ -14,7 +14,11 @@ from app.models.form_request import FormRequest, FormRequestStatus, FormType
 from app.models.lab_result import LabResult
 from app.models.medication import Medication
 from app.models.patient import Patient
-from app.schemas.ai import AiIntakeSummaryResponse, AiSummaryResponse
+from app.schemas.ai import (
+    AiIntakeSummaryResponse,
+    AiSoapDraftResponse,
+    AiSummaryResponse,
+)
 
 
 SYSTEM_PROMPT = """You are a senior clinical AI assistant for a hospital EHR.
@@ -46,6 +50,37 @@ Output strict JSON:
   "confidence": 0.0-1.0
 }
 If a section is empty, return [] for that key — do not fabricate items.
+"""
+
+
+SOAP_SYSTEM_PROMPT = """You are a clinical scribe drafting a SOAP note
+from a patient intake form. The note is a STARTING POINT — the provider
+will review and edit before signing — so be conservative and never
+invent observations or findings the intake doesn't support.
+
+SOAP structure rules:
+- Subjective: patient-reported information from the intake (chief
+  complaint inferred from diagnosed_problems / past_surgeries, history,
+  allergies, medications). 2-4 sentences.
+- Objective: intake forms generally do NOT contain exam findings. Write
+  a brief placeholder noting that vitals + physical exam are pending
+  pre-visit. Do NOT fabricate values.
+- Assessment: clinical impression based on diagnosed_problems and risk
+  factors (anticoagulants, allergies, multiple conditions). 2-3
+  sentences. List the top 1-2 problems by priority.
+- Plan: pre-visit preparation steps (confirm med list, allergy
+  reactions, anticoag pause window if relevant, labs to order). Use
+  bullet-style line breaks (use \\n between bullets) but no leading
+  dashes — the UI renders plain text.
+
+Output strict JSON:
+{
+  "subjective": "...",
+  "objective": "...",
+  "assessment": "...",
+  "plan": "...",
+  "confidence": 0.0-1.0
+}
 """
 
 
@@ -193,6 +228,108 @@ class SummaryService:
             model=llm_client.chat_model,
             generated_at=datetime.now(timezone.utc),
         )
+
+    async def intake_to_soap_for_patient(
+        self, patient_id: UUID
+    ) -> AiSoapDraftResponse:
+        """Find the patient's most recent intake form with submitted data
+        and synthesize a SOAP-note draft from it. Used by the SOAP drawer's
+        'Fill from intake' button."""
+        from sqlalchemy import desc
+
+        form = (
+            await self.db.execute(
+                select(FormRequest)
+                .where(
+                    FormRequest.patient_id == patient_id,
+                    FormRequest.form_type == FormType.intake,
+                    FormRequest.status.in_(
+                        [
+                            FormRequestStatus.submitted,
+                            FormRequestStatus.completed,
+                        ]
+                    ),
+                )
+                .order_by(desc(FormRequest.submitted_at))
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+
+        if form is None or not form.data:
+            raise HTTPException(
+                status_code=404,
+                detail="No submitted intake form found for this patient.",
+            )
+
+        ctx = self._format_intake_context(form.data, "clinical")
+        raw = await llm_client.chat(
+            messages=[
+                {"role": "system", "content": SOAP_SYSTEM_PROMPT},
+                {"role": "user", "content": ctx},
+            ],
+            json_mode=True,
+            max_tokens=900,
+        )
+        parsed = self._safe_parse_soap(raw, form.data)
+
+        return AiSoapDraftResponse(
+            form_id=form.id,
+            patient_id=patient_id,
+            subjective=parsed["subjective"],
+            objective=parsed["objective"],
+            assessment=parsed["assessment"],
+            plan=parsed["plan"],
+            confidence=parsed["confidence"],
+            model=llm_client.chat_model,
+            generated_at=datetime.now(timezone.utc),
+        )
+
+    @staticmethod
+    def _safe_parse_soap(raw: str, intake_data: dict) -> dict:
+        """Parse the SOAP JSON the LLM returned, falling back to a sensible
+        stub when the model isn't configured or returns malformed JSON. The
+        stub is enough to demo without an API key."""
+        import json
+
+        try:
+            obj = json.loads(raw)
+            return {
+                "subjective": (obj.get("subjective") or "").strip(),
+                "objective": (obj.get("objective") or "").strip(),
+                "assessment": (obj.get("assessment") or "").strip(),
+                "plan": (obj.get("plan") or "").strip(),
+                "confidence": float(obj.get("confidence", 0.6)),
+            }
+        except Exception:
+            health = intake_data.get("health_history") or {}
+            problems = health.get("diagnosed_problems") or "no chronic problems"
+            allergies = health.get("allergies") or []
+            meds = health.get("current_medications") or []
+            allergy_str = (
+                ", ".join(a.get("name", "?") for a in allergies)
+                or "no known allergies"
+            )
+            med_str = (
+                ", ".join(m.get("name", "?") for m in meds)
+                or "no current medications"
+            )
+            return {
+                "subjective": (
+                    f"Per intake form: history includes {problems}. "
+                    f"Reported allergies: {allergy_str}. Current medications: {med_str}."
+                ),
+                "objective": "Vitals and physical exam pending at next visit.",
+                "assessment": (
+                    f"Active issues per intake: {problems}. "
+                    "Review allergy reactions and medication adherence at visit."
+                ),
+                "plan": (
+                    "Confirm allergy reactions and severity\n"
+                    "Reconcile current medication list with patient\n"
+                    "Order baseline labs if not on file"
+                ),
+                "confidence": 0.4,
+            }
 
     @staticmethod
     def _format_intake_context(data: dict, style: str) -> str:

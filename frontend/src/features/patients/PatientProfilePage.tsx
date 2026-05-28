@@ -102,11 +102,14 @@ export function PatientProfilePage() {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
                 <div className="lg:col-span-8 space-y-4">
                   <AiSummary patientId={patient.id} onOpenSoap={() => setTab("notes")} />
-                  <KeyClinicalOverview onEdit={() => setEditOpen(true)} />
+                  <KeyClinicalOverview
+                    patient={patient}
+                    onEdit={() => setEditOpen(true)}
+                  />
                 </div>
                 <div className="lg:col-span-4 space-y-4">
                   <ClinicalActions patientId={patient.id} onGoToTab={setTab} />
-                  <Timeline />
+                  <Timeline patientId={patient.id} />
                 </div>
               </div>
             </TabsContent>
@@ -155,7 +158,7 @@ export function PatientProfilePage() {
                   <ChecklistCard />
                 </div>
                 <div className="lg:col-span-4 space-y-4">
-                  <Timeline />
+                  <Timeline patientId={patient.id} />
                 </div>
               </div>
             </TabsContent>

@@ -90,3 +90,20 @@ class AiChartContextResponse(BaseModel):
     summary: AiSummaryResponse
     risk: AiRiskScoreResponse
     ai_alerts_count: int
+
+
+class AiSoapDraftResponse(BaseModel):
+    """SOAP-note draft synthesized from a submitted intake form. Used by
+    the SoapNoteDrawer's 'Fill from intake' affordance — the provider
+    edits before saving, so the model output is a starting point, not a
+    final note."""
+
+    form_id: UUID
+    patient_id: UUID
+    subjective: str
+    objective: str
+    assessment: str
+    plan: str
+    confidence: float
+    model: str
+    generated_at: datetime

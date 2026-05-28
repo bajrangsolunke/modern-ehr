@@ -1,13 +1,17 @@
-import { Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Loader2, Sparkles } from "lucide-react";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { FormField } from "@/components/ui/form";
+import { AiTag } from "@/components/ui/ai-tag";
 import { useForm, zodResolver, z } from "@/lib/form";
 import {
   useCreateNote,
   useUpdateNote,
 } from "@/features/patients/hooks/use-notes";
+import { patientsAiApi } from "@/features/patients/api/ai-api";
+import { toast } from "@/lib/toast";
 import type { SoapNote } from "@/types";
 
 const schema = z
@@ -42,11 +46,32 @@ export function SoapNoteDrawer({ open, onOpenChange, patientId, note }: Props) {
   const isEdit = Boolean(note);
   const create = useCreateNote(patientId);
   const update = useUpdateNote(patientId);
+  const [filling, setFilling] = useState(false);
+  const [filledFrom, setFilledFrom] = useState<{ model: string; confidence: number } | null>(null);
+
+  const fillFromIntake = async () => {
+    setFilling(true);
+    try {
+      const draft = await patientsAiApi.soapFromIntake(patientId);
+      setValue("subjective", draft.subjective, { shouldDirty: true });
+      setValue("objective", draft.objective, { shouldDirty: true });
+      setValue("assessment", draft.assessment, { shouldDirty: true });
+      setValue("plan", draft.plan, { shouldDirty: true });
+      setFilledFrom({ model: draft.model, confidence: draft.confidence });
+      toast.success("Draft filled from intake — please review before saving");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Couldn't fill from intake";
+      toast.error("Couldn't fill from intake", { description: message });
+    } finally {
+      setFilling(false);
+    }
+  };
 
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<Values>({
     resolver: zodResolver(schema),
@@ -97,6 +122,43 @@ export function SoapNoteDrawer({ open, onOpenChange, patientId, note }: Props) {
       size="lg"
     >
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
+        {!isEdit && (
+          <div className="rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-start gap-2 min-w-0">
+              <Sparkles className="size-4 text-primary mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-sm font-semibold flex items-center gap-2 flex-wrap">
+                  Pre-fill from intake
+                  <AiTag>Beta</AiTag>
+                  {filledFrom && (
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                      · {filledFrom.model} · {Math.round(filledFrom.confidence * 100)}% confidence
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  AI drafts each section from the patient&apos;s most recent intake form. Review and edit before saving.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="h-8 shrink-0"
+              onClick={fillFromIntake}
+              disabled={filling}
+            >
+              {filling ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="size-3.5" />
+              )}
+              {filling ? "Filling…" : filledFrom ? "Re-fill" : "Fill from intake"}
+            </Button>
+          </div>
+        )}
+
         <FormField
           label="Subjective"
           htmlFor="note-s"

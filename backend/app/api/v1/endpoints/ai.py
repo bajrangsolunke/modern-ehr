@@ -17,6 +17,7 @@ from app.schemas.ai import (
     AiQuestionRequest,
     AiQuestionResponse,
     AiRiskScoreResponse,
+    AiSoapDraftResponse,
     AiSummaryRequest,
     AiSummaryResponse,
 )
@@ -153,6 +154,32 @@ async def intake_summary(
         resource_type="form_request",
         resource_id=str(form_id),
         payload={"model": res.model, "style": payload.style},
+    )
+    return res
+
+
+@router.post(
+    "/soap-from-intake/{patient_id}",
+    response_model=AiSoapDraftResponse,
+)
+async def soap_from_intake(
+    patient_id: UUID,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
+) -> AiSoapDraftResponse:
+    """Generate a SOAP-note draft from this patient's most recent
+    submitted intake form. The frontend's SoapNoteDrawer 'Fill from
+    intake' button hits this endpoint. The provider then edits before
+    saving — the draft is a starting point, not a final note."""
+    res = await SummaryService(db).intake_to_soap_for_patient(patient_id)
+    await AuditService(db).record_request(
+        request,
+        user_id=current.id,
+        action="ai.soap_from_intake",
+        resource_type="patient",
+        resource_id=str(patient_id),
+        payload={"model": res.model, "form_id": str(res.form_id)},
     )
     return res
 

@@ -85,6 +85,44 @@ function mapRisk(d: RiskDto): PatientRisk {
   };
 }
 
+export interface SoapDraft {
+  formId: string;
+  patientId: string;
+  subjective: string;
+  objective: string;
+  assessment: string;
+  plan: string;
+  confidence: number;
+  model: string;
+  generatedAt: string;
+}
+
+interface SoapDraftDto {
+  form_id: string;
+  patient_id: string;
+  subjective: string;
+  objective: string;
+  assessment: string;
+  plan: string;
+  confidence: number;
+  model: string;
+  generated_at: string;
+}
+
+function mapSoapDraft(d: SoapDraftDto): SoapDraft {
+  return {
+    formId: d.form_id,
+    patientId: d.patient_id,
+    subjective: d.subjective,
+    objective: d.objective,
+    assessment: d.assessment,
+    plan: d.plan,
+    confidence: d.confidence,
+    model: d.model,
+    generatedAt: d.generated_at,
+  };
+}
+
 export const patientsAiApi = {
   getChartContext: async (
     patientId: string,
@@ -118,5 +156,12 @@ export const patientsAiApi = {
       searchParams: { force: "true" },
     });
     return mapRisk(dto);
+  },
+
+  soapFromIntake: async (patientId: string): Promise<SoapDraft> => {
+    const dto = await api.post<SoapDraftDto>(
+      `/ai/soap-from-intake/${patientId}`
+    );
+    return mapSoapDraft(dto);
   },
 };
