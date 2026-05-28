@@ -2,11 +2,13 @@ import { api } from "@/lib/api-client";
 import { stripUndefined } from "@/lib/api-utils";
 
 export type AlertSeverity = "critical" | "warning" | "info";
+export type AlertSource = "manual" | "ai" | "system";
 
 export interface PatientAlert {
   id: string;
   patientId: string;
   severity: AlertSeverity;
+  source: AlertSource;
   label: string;
   detail: string | null;
   resolved: boolean;
@@ -19,6 +21,7 @@ interface BackendAlertDto {
   id: string;
   patient_id: string;
   severity: AlertSeverity;
+  source?: AlertSource;
   label: string;
   detail?: string | null;
   resolved: boolean;
@@ -39,6 +42,7 @@ function mapAlert(dto: BackendAlertDto): PatientAlert {
     id: dto.id,
     patientId: dto.patient_id,
     severity: dto.severity,
+    source: dto.source ?? "manual",
     label: dto.label,
     detail: dto.detail ?? null,
     resolved: dto.resolved,
@@ -53,6 +57,7 @@ function alertToBackendDto(a: PatientAlert): BackendAlertDto {
     id: a.id,
     patient_id: a.patientId,
     severity: a.severity,
+    source: a.source,
     label: a.label,
     detail: a.detail,
     resolved: a.resolved,
