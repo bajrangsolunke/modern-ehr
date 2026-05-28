@@ -1,5 +1,5 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Card } from "@/components/ui/Card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { FormField } from "@/components/ui/FormField";
@@ -18,6 +18,29 @@ const schema = z
     path: ["confirm"],
   });
 type Values = z.infer<typeof schema>;
+
+function PageFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-[#F5F9FF] grid place-items-center px-6 py-10">
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center space-y-3">
+          <div className="size-14 rounded-full bg-primary-gradient grid place-items-center text-white shadow-glow mx-auto">
+            <svg width="22" height="22" viewBox="0 0 18 18" fill="none">
+              <path
+                d="M9 2v14M2 9h14"
+                stroke="currentColor"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+          <div className="font-display text-[26px] font-bold tracking-tight">Padmavat</div>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export function SetupPage() {
   const navigate = useNavigate();
@@ -40,55 +63,54 @@ export function SetupPage() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-bg grid place-items-center px-6">
-        <Card className="max-w-md w-full text-center space-y-3">
-          <h1 className="text-xl font-bold">Missing setup link</h1>
-          <p className="text-muted text-sm">
-            Open the setup link your provider shared with you.
-          </p>
+      <PageFrame>
+        <Card>
+          <CardHeader>
+            <CardTitle>Missing setup link</CardTitle>
+            <CardDescription>
+              Open the setup link your provider shared with you.
+            </CardDescription>
+          </CardHeader>
         </Card>
-      </div>
+      </PageFrame>
     );
   }
 
   if (verify.isLoading) {
     return (
-      <div className="min-h-screen grid place-items-center">
-        <Spinner className="size-6 text-primary" />
-      </div>
+      <PageFrame>
+        <div className="grid place-items-center py-8">
+          <Spinner className="size-6 text-primary" />
+        </div>
+      </PageFrame>
     );
   }
 
   if (verify.isError || !verify.data) {
     return (
-      <div className="min-h-screen bg-bg grid place-items-center px-6">
-        <Card className="max-w-md w-full text-center space-y-3">
-          <h1 className="text-xl font-bold">Link expired</h1>
-          <p className="text-muted text-sm">
-            This setup link is no longer valid. Ask your provider for a fresh
-            invite.
-          </p>
+      <PageFrame>
+        <Card>
+          <CardHeader>
+            <CardTitle>Link expired</CardTitle>
+            <CardDescription>
+              This setup link is no longer valid. Ask your provider for a fresh invite.
+            </CardDescription>
+          </CardHeader>
         </Card>
-      </div>
+      </PageFrame>
     );
   }
 
   return (
-    <div className="min-h-screen bg-bg grid place-items-center px-6">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center space-y-2">
-          <div className="size-12 rounded-full bg-primary grid place-items-center text-primary-foreground font-bold text-xl mx-auto">
-            P
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">
-            Welcome, {verify.data.first_name}
-          </h1>
-          <p className="text-muted">
+    <PageFrame>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">Welcome, {verify.data.first_name}</CardTitle>
+          <CardDescription>
             Set a password for {verify.data.masked_email} to finish setup.
-          </p>
-        </div>
-
-        <Card>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
           <form onSubmit={submit} className="space-y-4" noValidate>
             <FormField
               label="New password"
@@ -101,6 +123,7 @@ export function SetupPage() {
                 id="password"
                 type="password"
                 autoComplete="new-password"
+                placeholder="••••••••"
                 {...register("password")}
                 invalid={Boolean(errors.password)}
               />
@@ -116,6 +139,7 @@ export function SetupPage() {
                 id="confirm"
                 type="password"
                 autoComplete="new-password"
+                placeholder="••••••••"
                 {...register("confirm")}
                 invalid={Boolean(errors.confirm)}
               />
@@ -123,6 +147,7 @@ export function SetupPage() {
 
             <Button
               type="submit"
+              size="lg"
               className="w-full"
               disabled={setup.isPending}
             >
@@ -130,8 +155,8 @@ export function SetupPage() {
               {setup.isPending ? "Setting up…" : "Set password & sign in"}
             </Button>
           </form>
-        </Card>
-      </div>
-    </div>
+        </CardContent>
+      </Card>
+    </PageFrame>
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Card } from "@/components/ui/Card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { FormField } from "@/components/ui/FormField";
@@ -28,6 +28,29 @@ const requestSchema = z.object({
 });
 type RequestValues = z.infer<typeof requestSchema>;
 
+function PageFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-[#F5F9FF] grid place-items-center px-6 py-10">
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center space-y-3">
+          <div className="size-14 rounded-full bg-primary-gradient grid place-items-center text-white shadow-glow mx-auto">
+            <svg width="22" height="22" viewBox="0 0 18 18" fill="none">
+              <path
+                d="M9 2v14M2 9h14"
+                stroke="currentColor"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+          <div className="font-display text-[26px] font-bold tracking-tight">Padmavat</div>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function ResetPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -50,33 +73,32 @@ function RequestReset() {
   });
 
   return (
-    <div className="min-h-screen bg-bg grid place-items-center px-6">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold">Reset password</h1>
-          <p className="text-muted">
-            Enter your email and we'll send a reset link.
-          </p>
-        </div>
-        <Card>
+    <PageFrame>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">Reset password</CardTitle>
+          <CardDescription>Enter your email and we'll send a reset link.</CardDescription>
+        </CardHeader>
+        <CardContent>
           <form onSubmit={submit} className="space-y-4" noValidate>
             <FormField label="Email" htmlFor="email" required error={errors.email?.message}>
               <Input
                 id="email"
                 type="email"
                 autoComplete="email"
+                placeholder="you@email.com"
                 {...register("email")}
                 invalid={Boolean(errors.email)}
               />
             </FormField>
-            <Button type="submit" className="w-full" disabled={ask.isPending}>
+            <Button type="submit" size="lg" className="w-full" disabled={ask.isPending}>
               {ask.isPending && <Spinner />}
               {ask.isPending ? "Sending…" : "Send reset link"}
             </Button>
           </form>
-        </Card>
-      </div>
-    </div>
+        </CardContent>
+      </Card>
+    </PageFrame>
   );
 }
 
@@ -109,12 +131,13 @@ function FinishReset({ token, onDone }: { token: string; onDone: () => void }) {
   });
 
   return (
-    <div className="min-h-screen bg-bg grid place-items-center px-6">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold">Choose a new password</h1>
-        </div>
-        <Card>
+    <PageFrame>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">Choose a new password</CardTitle>
+          <CardDescription>You'll be signed in once you save it.</CardDescription>
+        </CardHeader>
+        <CardContent>
           <form onSubmit={submit} className="space-y-4" noValidate>
             <FormField
               label="New password"
@@ -127,6 +150,7 @@ function FinishReset({ token, onDone }: { token: string; onDone: () => void }) {
                 id="password"
                 type="password"
                 autoComplete="new-password"
+                placeholder="••••••••"
                 {...register("password")}
                 invalid={Boolean(errors.password)}
               />
@@ -141,17 +165,18 @@ function FinishReset({ token, onDone }: { token: string; onDone: () => void }) {
                 id="confirm"
                 type="password"
                 autoComplete="new-password"
+                placeholder="••••••••"
                 {...register("confirm")}
                 invalid={Boolean(errors.confirm)}
               />
             </FormField>
-            <Button type="submit" className="w-full" disabled={busy}>
+            <Button type="submit" size="lg" className="w-full" disabled={busy}>
               {busy && <Spinner />}
               {busy ? "Saving…" : "Save & sign in"}
             </Button>
           </form>
-        </Card>
-      </div>
-    </div>
+        </CardContent>
+      </Card>
+    </PageFrame>
   );
 }

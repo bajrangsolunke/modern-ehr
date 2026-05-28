@@ -1,11 +1,13 @@
 import { Outlet } from "react-router-dom";
-import { Header } from "./Header";
+import { Topbar } from "./Topbar";
 
 export function Shell() {
   return (
-    <div className="min-h-screen bg-bg">
-      <Header />
-      <main className="max-w-column mx-auto px-6 py-8 space-y-6">
+    <div className="min-h-screen bg-[#F5F9FF]">
+      <div className="mx-auto w-full max-w-[1720px] px-4 sm:px-5 lg:px-6 3xl:px-8 pt-4 sm:pt-5 lg:pt-6">
+        <Topbar />
+      </div>
+      <main className="mx-auto w-full max-w-[1720px] px-4 sm:px-5 lg:px-6 3xl:px-8 pb-6 lg:pb-8 pt-6 lg:pt-8">
         <Outlet />
       </main>
     </div>

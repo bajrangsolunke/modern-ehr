@@ -2,6 +2,12 @@ export const APP_NAME = "Padmavat";
 
 export const ROUTES = {
   dashboard: "/",
+  messages: "/messages",
+  appointments: "/appointments",
+  docs: "/docs",
+  tasks: "/tasks",
+  notifications: "/notifications",
+  settings: "/settings",
   login: "/login",
   setup: "/setup",
   reset: "/reset",

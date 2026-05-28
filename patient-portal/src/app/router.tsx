@@ -4,6 +4,12 @@ import { LoginPage } from "@/features/auth/LoginPage";
 import { SetupPage } from "@/features/auth/SetupPage";
 import { ResetPage } from "@/features/auth/ResetPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { MessagesPage } from "@/features/messages/MessagesPage";
+import { AppointmentsPage } from "@/features/appointments/AppointmentsPage";
+import { DocsPage } from "@/features/docs/DocsPage";
+import { TasksPage } from "@/features/tasks/TasksPage";
+import { NotificationsPage } from "@/features/notifications/NotificationsPage";
+import { SettingsPage } from "@/features/settings/SettingsPage";
 import { PublicRoute } from "@/features/auth/components/PublicRoute";
 import { ProtectedRoute } from "@/features/auth/components/ProtectedRoute";
 import { ROUTES } from "@/config/constants";
@@ -19,6 +25,12 @@ export function AppRouter() {
       <Route element={<ProtectedRoute />}>
         <Route element={<Shell />}>
           <Route path={ROUTES.dashboard} element={<DashboardPage />} />
+          <Route path={ROUTES.messages} element={<MessagesPage />} />
+          <Route path={ROUTES.appointments} element={<AppointmentsPage />} />
+          <Route path={ROUTES.docs} element={<DocsPage />} />
+          <Route path={ROUTES.tasks} element={<TasksPage />} />
+          <Route path={ROUTES.notifications} element={<NotificationsPage />} />
+          <Route path={ROUTES.settings} element={<SettingsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to={ROUTES.dashboard} replace />} />

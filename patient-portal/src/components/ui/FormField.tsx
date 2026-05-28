@@ -29,7 +29,7 @@ export function FormField({
       </label>
       {children}
       {hint && !error && (
-        <p className="text-xs text-muted">{hint}</p>
+        <p className="text-xs text-muted-foreground">{hint}</p>
       )}
       {error && (
         <p className={cn("text-xs text-danger font-medium")}>{error}</p>
