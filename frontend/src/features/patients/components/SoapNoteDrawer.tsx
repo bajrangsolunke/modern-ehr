@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, Sparkles } from "lucide-react";
+import { ChevronDown, Loader2, Mic, Sparkles } from "lucide-react";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -48,6 +48,33 @@ export function SoapNoteDrawer({ open, onOpenChange, patientId, note }: Props) {
   const update = useUpdateNote(patientId);
   const [filling, setFilling] = useState(false);
   const [filledFrom, setFilledFrom] = useState<{ model: string; confidence: number } | null>(null);
+
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [scribing, setScribing] = useState(false);
+
+  const scribeFromTranscript = async () => {
+    if (!transcript.trim()) {
+      toast.error("Paste or dictate a transcript first");
+      return;
+    }
+    setScribing(true);
+    try {
+      const soap = await patientsAiApi.scribeFromTranscript(transcript, patientId);
+      // Fill all four sections — the transcript represents the full
+      // encounter so O/A/P are valid here (unlike intake autofill).
+      setValue("subjective", soap.subjective, { shouldDirty: true });
+      setValue("objective", soap.objective, { shouldDirty: true });
+      setValue("assessment", soap.assessment, { shouldDirty: true });
+      setValue("plan", soap.plan, { shouldDirty: true });
+      toast.success("SOAP drafted from transcript — please review before saving");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Couldn't generate SOAP";
+      toast.error("Couldn't generate SOAP", { description: message });
+    } finally {
+      setScribing(false);
+    }
+  };
 
   const fillSubjectiveFromIntake = async () => {
     setFilling(true);
@@ -165,6 +192,72 @@ export function SoapNoteDrawer({ open, onOpenChange, patientId, note }: Props) {
                   : "Draft Subjective"}
             </Button>
           </div>
+        )}
+
+        {/* AI scribe — paste/dictate encounter transcript → full SOAP draft.
+            Unlike the intake autofill above, transcripts represent the
+            actual visit so all four sections can be safely populated.
+            Collapsible to keep the drawer clean when not in use. Hidden
+            in edit mode to avoid clobbering an existing note's fields. */}
+        {!isEdit && (
+        <div className="rounded-2xl border border-primary/30 bg-primary/5">
+          <button
+            type="button"
+            onClick={() => setTranscriptOpen((v) => !v)}
+            className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-primary/5 transition rounded-2xl"
+            aria-expanded={transcriptOpen}
+          >
+            <div className="flex items-start gap-2 min-w-0">
+              <Mic className="size-4 text-primary mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-sm font-semibold flex items-center gap-2 flex-wrap">
+                  AI scribe — dictate or paste transcript
+                  <AiTag>Beta</AiTag>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  After the visit, paste your dictation or notes — AI drafts
+                  all four SOAP sections from the encounter. Review and edit
+                  before signing.
+                </p>
+              </div>
+            </div>
+            <ChevronDown
+              className={`size-4 text-muted-foreground shrink-0 mt-1 transition-transform ${transcriptOpen ? "" : "-rotate-90"}`}
+              aria-hidden
+            />
+          </button>
+
+          {transcriptOpen && (
+            <div className="px-4 pb-4 space-y-2">
+              <Textarea
+                rows={6}
+                placeholder="Paste your dictation here, e.g. 'Patient presents with 3-day history of dyspnea on exertion. Denies chest pain. BP 142/88, HR 92, afebrile. Lungs clear bilaterally. Suspect early CHF, will order BNP and echo, start lisinopril 5 mg daily, follow up in 1 week.'"
+                value={transcript}
+                onChange={(e) => setTranscript(e.target.value)}
+                className="text-sm"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  {transcript.length} chars
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8"
+                  onClick={scribeFromTranscript}
+                  disabled={scribing || !transcript.trim()}
+                >
+                  {scribing ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="size-3.5" />
+                  )}
+                  {scribing ? "Generating…" : "Generate SOAP"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
         )}
 
         <FormField

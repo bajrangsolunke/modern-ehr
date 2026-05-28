@@ -128,11 +128,31 @@ async def ask(
 
 class ScribeRequest(BaseModel):
     transcript: str
+    patient_id: UUID | None = None
 
 
 @router.post("/scribe")
-async def scribe(payload: ScribeRequest, current: CurrentUser) -> dict:
-    return await ScribeService().transcript_to_soap(payload.transcript)
+async def scribe(
+    payload: ScribeRequest,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
+) -> dict:
+    """Turn a clinical-encounter transcript into a SOAP draft. The
+    transcript can come from dictation, an ambient recorder, or pasted
+    notes. The provider edits before saving — the draft is a starting
+    point, not a final note."""
+    res = await ScribeService().transcript_to_soap(payload.transcript)
+    if payload.patient_id is not None:
+        await AuditService(db).record_request(
+            request,
+            user_id=current.id,
+            action="ai.scribe",
+            resource_type="patient",
+            resource_id=str(payload.patient_id),
+            payload={"model": llm_client.chat_model, "transcript_chars": len(payload.transcript)},
+        )
+    return res
 
 
 @router.post(

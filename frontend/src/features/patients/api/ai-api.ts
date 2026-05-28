@@ -164,4 +164,30 @@ export const patientsAiApi = {
     );
     return mapSoapDraft(dto);
   },
+
+  /** Turn an encounter transcript (dictation or paste) into a SOAP
+   *  draft. The backend hits the LLM with a scribe prompt and returns
+   *  all four sections. The provider edits before saving. */
+  scribeFromTranscript: async (
+    transcript: string,
+    patientId: string
+  ): Promise<{
+    subjective: string;
+    objective: string;
+    assessment: string;
+    plan: string;
+  }> => {
+    const res = await api.post<{
+      subjective?: string;
+      objective?: string;
+      assessment?: string;
+      plan?: string;
+    }>("/ai/scribe", { transcript, patient_id: patientId });
+    return {
+      subjective: res.subjective ?? "",
+      objective: res.objective ?? "",
+      assessment: res.assessment ?? "",
+      plan: res.plan ?? "",
+    };
+  },
 };
