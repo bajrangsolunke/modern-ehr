@@ -8,6 +8,7 @@ from fastapi import APIRouter, Query, Request, status
 
 from app.api.deps import CurrentUser, DbSession
 from app.models.task import TaskCategory, TaskPriority, TaskStatus
+from app.models.user import UserRole
 from app.schemas.common import Page
 from app.schemas.task import (
     TaskAudienceLiteral,
@@ -39,6 +40,11 @@ async def list_tasks(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
 ) -> Page[TaskOut]:
+    # Non-admins (provider / staff) never see tasks unrelated to them.
+    # When they ask for "all" we silently scope it to tasks they're
+    # either assigned to OR created — the same union the UI groups as
+    # "tasks I care about". Admins keep the full firehose.
+    restrict_to_viewer = current.role != UserRole.admin
     items, total, pages = await TaskService(db).list(
         viewer_id=current.id,
         scope=scope,
@@ -49,6 +55,7 @@ async def list_tasks(
         category=TaskCategory(category) if category else None,
         page=page,
         page_size=page_size,
+        restrict_to_viewer=restrict_to_viewer,
     )
     return Page[TaskOut](
         items=items, total=total, page=page, page_size=page_size, pages=pages

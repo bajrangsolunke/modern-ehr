@@ -6,7 +6,7 @@ import { FormField } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { PortraitUploader } from "@/features/patients/components/PortraitUploader";
-import { useUsers } from "@/features/users/hooks/use-users";
+import { useAssignableUsers } from "@/features/users/hooks/use-users";
 import type { PatientInput } from "@/features/patients/api/patients-api";
 import type { Patient } from "@/types";
 
@@ -442,10 +442,11 @@ function ProviderPicker({
   onChange: (id: string) => void;
 }) {
   // Active providers only — staff and admins aren't clinicians and
-  // shouldn't be the "assigned provider" on a chart.
-  const { data } = useUsers({
+  // shouldn't be the "assigned provider" on a chart. Hits the
+  // assignable endpoint so non-admin providers can still see the
+  // list while editing a chart.
+  const { data } = useAssignableUsers({
     role: "provider",
-    is_active: true,
     page: 1,
     page_size: 100,
   });

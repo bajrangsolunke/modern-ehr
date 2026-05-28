@@ -22,6 +22,21 @@ export function useUsers(
   });
 }
 
+/** Drop-in replacement for useUsers when the caller only needs an
+ *  assignee picker — hits /users/assignable so non-admin providers
+ *  can still see their teammates. */
+export function useAssignableUsers(
+  filters: Pick<UserFilters, "q" | "role" | "page" | "page_size">,
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: ["users", "assignable", filters],
+    queryFn: () => usersApi.listAssignable(filters),
+    staleTime: 30_000,
+    enabled: options?.enabled ?? true,
+  });
+}
+
 export function useUser(id: string | undefined) {
   return useQuery({
     queryKey: QUERY_KEYS.users.byId(id ?? "none"),

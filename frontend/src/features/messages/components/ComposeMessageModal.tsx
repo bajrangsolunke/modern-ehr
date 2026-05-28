@@ -3,7 +3,7 @@ import { Search, Send } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { usePatients } from "@/features/patients/hooks/use-patients";
-import { useUsers } from "@/features/users/hooks/use-users";
+import { useAssignableUsers } from "@/features/users/hooks/use-users";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useComposeBroadcast } from "../hooks/use-messages";
 import type { Audience } from "../types";
@@ -40,8 +40,8 @@ export function ComposeMessageModal({ open, onOpenChange, defaultAudience }: Pro
     { q: debouncedQuery || undefined, page: 1, page_size: 30 },
     { enabled: open && audience === "patient" }
   );
-  const usersQuery = useUsers(
-    { q: debouncedQuery || undefined, page: 1, page_size: 30, is_active: true },
+  const usersQuery = useAssignableUsers(
+    { q: debouncedQuery || undefined, page: 1, page_size: 30 },
     { enabled: open && audience === "clinician" }
   );
 

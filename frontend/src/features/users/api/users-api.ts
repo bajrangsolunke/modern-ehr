@@ -138,6 +138,30 @@ export const usersApi = {
     };
   },
 
+  /** Open to any active staff member — used by the task assignee
+   *  picker, appointment provider picker, and other "assign to
+   *  someone" flows so non-admin providers + staff can pick a
+   *  teammate without needing admin access to /users. */
+  listAssignable: async (
+    filters: Pick<UserFilters, "q" | "role" | "page" | "page_size">
+  ): Promise<UserPage> => {
+    const data = await api.get<BackendUserPage>("/users/assignable", {
+      searchParams: {
+        q: filters.q,
+        role: filters.role,
+        page: filters.page,
+        page_size: filters.page_size,
+      },
+    });
+    return {
+      items: data.items.map(mapUser),
+      total: data.total,
+      page: data.page,
+      page_size: data.page_size,
+      pages: data.pages,
+    };
+  },
+
   get: async (id: string): Promise<AppUser> => {
     const dto = await api.get<BackendUserDto>(`/users/${id}`);
     return mapUser(dto);

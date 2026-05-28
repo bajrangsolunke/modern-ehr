@@ -51,6 +51,13 @@ async def list_patients(
     ),
     sort_dir: str = Query("desc", pattern="^(asc|desc)$"),
 ) -> Page[PatientListItem]:
+    # Non-admins (provider / staff) only see their own caseload.
+    # Overriding the client-provided physician_id here means a provider
+    # can't escalate the view by passing someone else's UUID. Admins
+    # keep the full list and the manual physician_id filter still pivots.
+    if current.role != UserRole.admin:
+        physician_id = current.id
+
     filters = PatientFilters(
         q=q,
         status=status,

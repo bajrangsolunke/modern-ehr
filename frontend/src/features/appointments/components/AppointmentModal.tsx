@@ -25,7 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/ui/avatar";
 import { useForm, zodResolver, z, mapApiError } from "@/lib/form";
 import { usePatients } from "@/features/patients/hooks/use-patients";
-import { useUsers } from "@/features/users/hooks/use-users";
+import { useAssignableUsers } from "@/features/users/hooks/use-users";
 import {
   useAvailableSlots,
   useCreateAppointment,
@@ -603,9 +603,8 @@ function ProviderPicker({
   value: string;
   onChange: (id: string) => void;
 }) {
-  const { data: providers } = useUsers({
+  const { data: providers } = useAssignableUsers({
     role: "provider",
-    is_active: true,
     page: 1,
     page_size: 50,
   });

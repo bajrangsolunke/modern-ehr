@@ -16,9 +16,10 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.patient import Patient
-from app.models.task import Task, TaskCategory, TaskPriority, TaskStatus
+from app.models.task import Task, TaskCategory, TaskPriority, TaskStatus, TaskType
 from app.models.user import User
 from app.schemas.task import TaskCreate, TaskOut, TaskUpdate
+from app.services.notification_service import NotificationService
 
 
 class TaskService:
@@ -39,6 +40,7 @@ class TaskService:
         category: TaskCategory | None = None,
         page: int = 1,
         page_size: int = 10,
+        restrict_to_viewer: bool = False,
     ) -> tuple[list[TaskOut], int, int]:
         stmt = select(Task)
         count_stmt = select(func.count(Task.id))
@@ -62,37 +64,25 @@ class TaskService:
                     Task.assigned_to_user_id != viewer_id,
                 ),
             )
+        elif restrict_to_viewer:
+            # Non-admin "all" view = anything I'm assigned to OR
+            # anything I created. Admins skip this branch and see
+            # every task in the system.
+            mine_or_mine = or_(
+                Task.assigned_to_user_id == viewer_id,
+                Task.created_by_user_id == viewer_id,
+            )
+            stmt = stmt.where(mine_or_mine)
+            count_stmt = count_stmt.where(mine_or_mine)
 
-        # Audience partitions the queue by who *owns* the task — the
-        # patient (no user assignee) vs a user (with or without a linked
-        # patient as "related to"). A task assigned to a user but
-        # referencing a patient stays in the user queue; the patient
-        # link only shows in the Related To column.
+        # Audience maps 1:1 onto the persisted task_type enum — no
+        # more inferring from FK presence.
         if audience == "patients":
-            stmt = stmt.where(
-                Task.patient_id.is_not(None),
-                Task.assigned_to_user_id.is_(None),
-            )
-            count_stmt = count_stmt.where(
-                Task.patient_id.is_not(None),
-                Task.assigned_to_user_id.is_(None),
-            )
+            stmt = stmt.where(Task.task_type == TaskType.patient)
+            count_stmt = count_stmt.where(Task.task_type == TaskType.patient)
         elif audience == "users":
-            # Everything that isn't a pure patient-owned task — i.e.
-            # assigned to a user, OR unassigned (team queue), OR linked
-            # to a patient *with* a user assignee.
-            stmt = stmt.where(
-                or_(
-                    Task.patient_id.is_(None),
-                    Task.assigned_to_user_id.is_not(None),
-                )
-            )
-            count_stmt = count_stmt.where(
-                or_(
-                    Task.patient_id.is_(None),
-                    Task.assigned_to_user_id.is_not(None),
-                )
-            )
+            stmt = stmt.where(Task.task_type == TaskType.user)
+            count_stmt = count_stmt.where(Task.task_type == TaskType.user)
 
         if q:
             like = f"%{q.strip()}%"
@@ -151,6 +141,7 @@ class TaskService:
             category=TaskCategory(payload.category),
             priority=TaskPriority(payload.priority),
             status=TaskStatus.new,
+            task_type=TaskType(payload.task_type),
             created_by_user_id=viewer_id,
             assigned_to_user_id=payload.assigned_to_user_id,
             patient_id=payload.patient_id,
@@ -158,6 +149,15 @@ class TaskService:
         )
         self.db.add(task)
         await self.db.flush()
+
+        # Notify the assignee (but not the creator if they assigned to
+        # themselves — that's a silent self-task).
+        if (
+            payload.assigned_to_user_id is not None
+            and payload.assigned_to_user_id != viewer_id
+        ):
+            await self._notify_assignment(task, assigner_id=viewer_id)
+
         return await self._project(task)
 
     async def update(
@@ -165,6 +165,7 @@ class TaskService:
     ) -> TaskOut:
         task = await self.get(task_id)
         data = payload.model_dump(exclude_unset=True)
+        prior_assignee = task.assigned_to_user_id
 
         if "assigned_to_user_id" in data and data["assigned_to_user_id"] is not None:
             if not await self.db.get(User, data["assigned_to_user_id"]):
@@ -178,6 +179,8 @@ class TaskService:
                 task.category = TaskCategory(v)
             elif k == "priority" and v is not None:
                 task.priority = TaskPriority(v)
+            elif k == "task_type" and v is not None:
+                task.task_type = TaskType(v)
             elif k == "status" and v is not None:
                 new_status = TaskStatus(v)
                 if (
@@ -197,6 +200,15 @@ class TaskService:
                 setattr(task, k, v)
 
         await self.db.flush()
+
+        # Reassignment fires the same notification the create path does.
+        if (
+            task.assigned_to_user_id is not None
+            and task.assigned_to_user_id != prior_assignee
+            and task.assigned_to_user_id != viewer_id
+        ):
+            await self._notify_assignment(task, assigner_id=viewer_id)
+
         return await self._project(task)
 
     async def delete(self, task_id: UUID) -> None:
@@ -231,6 +243,7 @@ class TaskService:
             category=task.category.value,
             priority=task.priority.value,
             status=task.status.value,
+            task_type=task.task_type.value,
             created_by_user_id=task.created_by_user_id,
             created_by_name=creator_name,
             assigned_to_user_id=task.assigned_to_user_id,
@@ -242,4 +255,36 @@ class TaskService:
             completed_by_user_id=task.completed_by_user_id,
             created_at=task.created_at,
             updated_at=task.updated_at,
+        )
+
+    # ---------------------------------------------------------------- notify
+
+    async def _notify_assignment(self, task: Task, *, assigner_id: UUID) -> None:
+        """Fire a `task_assigned` notification to the new assignee. High
+        priority tasks ride the `high` urgency rail so the FE pops an
+        OS toast if the recipient's tab is hidden."""
+        assigner = await self.db.get(User, assigner_id)
+        assigner_name = (
+            (assigner.full_name or assigner.email) if assigner else "Someone"
+        )
+        urgency = "high" if task.priority == TaskPriority.high else "normal"
+        body = (
+            f"Assigned by {assigner_name}"
+            + (
+                f" · Due {task.due_date.isoformat()}"
+                if task.due_date is not None
+                else ""
+            )
+        )
+        # `audience` routes the link to the right tab on the Tasks page.
+        audience = "patients" if task.task_type == TaskType.patient else "users"
+        await NotificationService(self.db).dispatch(
+            recipient_id=task.assigned_to_user_id,
+            kind="task_assigned",
+            urgency=urgency,
+            title=f"New task: {task.title}",
+            body=body,
+            related_type="task",
+            related_id=task.id,
+            link=f"/tasks?audience={audience}",
         )

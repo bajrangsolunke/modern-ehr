@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { FormField } from "@/components/ui/form";
 import { UserAvatar } from "@/components/ui/avatar";
 import { useForm, zodResolver, z } from "@/lib/form";
-import { useUsers } from "@/features/users/hooks/use-users";
+import { useAssignableUsers } from "@/features/users/hooks/use-users";
 import { usePatients } from "@/features/patients/hooks/use-patients";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useCreateTask, useUpdateTask } from "../hooks/use-tasks";
@@ -22,7 +22,7 @@ import {
   STATUSES,
   STATUS_LABEL,
 } from "../utils";
-import type { Task, TaskAudience, TaskCategory } from "../api/tasks-api";
+import type { Task, TaskAudience, TaskCategory, TaskType } from "../api/tasks-api";
 import { cn } from "@/lib/utils";
 
 const categoryEnum = z.enum([
@@ -133,6 +133,7 @@ export function TaskDrawer({ open, onOpenChange, task, audience = "users" }: Pro
       ? null
       : values.assigned_to_user_id || null;
     const patientId = values.patient_id || null;
+    const taskType: TaskType = isPatientMode ? "patient" : "user";
 
     if (isEdit && task) {
       await update.mutateAsync({
@@ -143,6 +144,7 @@ export function TaskDrawer({ open, onOpenChange, task, audience = "users" }: Pro
           category: values.category,
           priority: values.priority,
           status: values.status,
+          task_type: taskType,
           assigned_to_user_id: assignedToUserId,
           patient_id: patientId,
           due_date: values.due_date || null,
@@ -154,6 +156,7 @@ export function TaskDrawer({ open, onOpenChange, task, audience = "users" }: Pro
         description: values.description || null,
         category: values.category,
         priority: values.priority,
+        task_type: taskType,
         assigned_to_user_id: assignedToUserId,
         patient_id: patientId,
         due_date: values.due_date || null,
@@ -352,13 +355,13 @@ function AssigneePicker({
 
   // Only fetch when the assignee dropdown is open, or when a value is
   // set and we still need to resolve the display name. Skips the 20-row
-  // user list every time the parent drawer opens.
-  const { data: users } = useUsers(
+  // user list every time the parent drawer opens. Hits /users/assignable
+  // so non-admin providers can still see the list.
+  const { data: users } = useAssignableUsers(
     {
       q: debounced || undefined,
       page: 1,
-      page_size: 20,
-      is_active: true,
+      page_size: 50,
     },
     { enabled: open || Boolean(value) }
   );

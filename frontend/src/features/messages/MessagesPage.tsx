@@ -13,6 +13,7 @@
  * persistent thread.
  */
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { MessageSquarePlus, Plus } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ import {
   useSendMessage,
   useComposeBroadcast,
 } from "./hooks/use-messages";
-import { useUsers } from "@/features/users/hooks/use-users";
+import { useAssignableUsers } from "@/features/users/hooks/use-users";
 import { useAuthStore } from "@/stores/auth-store";
 import {
   selectTypingMap,
@@ -45,12 +46,17 @@ import { cn } from "@/lib/utils";
 
 export function MessagesPage() {
   const currentUser = useAuthStore((s) => s.user);
+  // Deep-link targets — `?patient=<id>` from PatientHeader's Message
+  // button, `?conversation=<id>` from notification toasts.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkPatientId = searchParams.get("patient");
+  const deepLinkConversationId = searchParams.get("conversation");
 
   const [audience, setAudience] = useState<Audience>("patient");
   const [query, setQuery] = useState("");
   const [condition, setCondition] = useState<ConditionTag | null>(null);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
-    null
+    deepLinkConversationId,
   );
   const [activeDraftUserId, setActiveDraftUserId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
@@ -66,8 +72,9 @@ export function MessagesPage() {
 
   // Pull every active staff user — only fires on the My Users tab; the
   // patient tab skips the network call entirely via { enabled: false }.
-  const usersQuery = useUsers(
-    { page: 1, page_size: 100, is_active: true },
+  // Hits /users/assignable so non-admin providers can see teammates.
+  const usersQuery = useAssignableUsers(
+    { page: 1, page_size: 100 },
     { enabled: audience === "clinician" }
   );
   const allUsers = audience === "clinician" ? usersQuery.data?.items ?? [] : [];
@@ -168,6 +175,29 @@ export function MessagesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversationId, detail?.messages.length]);
 
+  // Resolve a `?patient=<id>` deep-link (from PatientHeader's Message
+  // button) to the matching conversation once the patient list loads.
+  // Falls back silently if no conversation exists for that patient yet
+  // — the user can use Compose to start one. Runs once per param
+  // change so it doesn't fight the user's later clicks.
+  useEffect(() => {
+    if (!deepLinkPatientId) return;
+    if (audience !== "patient") return;
+    if (conversations.length === 0) return;
+    const match = conversations.find(
+      (c) => c.participant.id === deepLinkPatientId,
+    );
+    if (match) {
+      setActiveConversationId(match.id);
+      setActiveDraftUserId(null);
+    }
+    // Clear the param so a later manual selection isn't reverted.
+    const next = new URLSearchParams(searchParams);
+    next.delete("patient");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkPatientId, conversations.length, audience]);
+
   const draftParticipant: Participant | null = useMemo(() => {
     if (!activeDraftUserId) return null;
     const row = rows.find(
@@ -219,12 +249,16 @@ export function MessagesPage() {
     ? detail.conversation.participant
     : draftParticipant;
 
-  // Highest last_read_at across other staff participants. Outgoing
-  // bubbles sent at or before this timestamp are "read". Patient
-  // threads have no staff "other side" — read receipts only show for
-  // clinician threads.
+  // Highest last_read_at across the "other side". For clinician
+  // threads that's other staff participants; for patient threads
+  // it's `conversation.patientLastReadAt` (denormalized on the
+  // conversation row — patient is implicit, not a participant).
+  // Outgoing bubbles sent at/before this timestamp render ✓✓.
   const readWatermark = useMemo<string | null>(() => {
     if (!detail || !currentUser) return null;
+    if (detail.conversation.audience === "patient") {
+      return detail.conversation.patientLastReadAt ?? null;
+    }
     let max: string | null = null;
     for (const p of detail.participants) {
       if (p.id === currentUser.id) continue;
@@ -250,6 +284,16 @@ export function MessagesPage() {
     return liveIds
       .filter((uid) => uid !== currentUser.id)
       .map((uid) => {
+        // Patient threads — when the patient is typing the user_id
+        // is the patient's UUID, which matches the conversation's
+        // primary participant. Surface their first name so the
+        // provider sees "Wanda is typing" not "Someone is typing".
+        if (
+          detail.conversation.audience === "patient" &&
+          detail.conversation.participant.id === uid
+        ) {
+          return detail.conversation.participant.name.split(" ")[0] ?? "Patient";
+        }
         const p = detail.participants.find((x) => x.id === uid);
         return p?.name ?? "Someone";
       });

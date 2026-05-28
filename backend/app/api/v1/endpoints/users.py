@@ -22,6 +22,51 @@ admin_only = Depends(require_roles(UserRole.admin))
 router = APIRouter(prefix="/users", tags=["users"])
 
 
+@router.get("/assignable", response_model=Page[UserOut])
+async def list_assignable_users(
+    db: DbSession,
+    current: CurrentUser,  # noqa: ARG001 — any active staff user
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    q: str | None = Query(None, description="Search name or email"),
+    role: UserRole | None = Query(
+        None,
+        description='Optional role filter — e.g. "provider" for an appointment provider picker.',
+    ),
+) -> Page[UserOut]:
+    """Lightweight assignee picker used by the task drawer and other
+    "assign to someone" flows. Open to any active staff user — not
+    admin-only, because providers + staff need to assign tasks to
+    each other. Always filters to is_active=True so deactivated
+    accounts never show up as candidates."""
+    stmt = select(User).where(User.is_active.is_(True))
+    count_stmt = select(func.count(User.id)).where(User.is_active.is_(True))
+
+    if q:
+        needle = f"%{q.strip()}%"
+        cond = or_(User.full_name.ilike(needle), User.email.ilike(needle))
+        stmt = stmt.where(cond)
+        count_stmt = count_stmt.where(cond)
+    if role is not None:
+        stmt = stmt.where(User.role == role)
+        count_stmt = count_stmt.where(User.role == role)
+
+    total = (await db.execute(count_stmt)).scalar_one()
+    stmt = (
+        stmt.order_by(User.full_name.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    items = (await db.execute(stmt)).scalars().all()
+    return Page[UserOut](
+        items=[UserOut.model_validate(u) for u in items],
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=ceil(total / page_size) if page_size else 1,
+    )
+
+
 @router.get(
     "",
     response_model=Page[UserOut],
