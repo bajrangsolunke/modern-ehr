@@ -52,4 +52,9 @@ ignore = ["PLR0913", "B008"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# Share an event loop across tests in a module so SQLAlchemy's async
+# engine pool doesn't try to close connections on a dead loop between
+# tests (manifests as "Event loop is closed" during teardown).
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
