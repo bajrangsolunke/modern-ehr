@@ -49,11 +49,19 @@ export function UserAvatar({
   name,
   src,
   size = "md",
+  variant = "seeded",
   className,
 }: {
   name: string;
   src?: string;
   size?: "xs" | "sm" | "md" | "lg" | "xl";
+  /**
+   * "seeded" picks a stable color from a small palette based on the
+   * name — good for lists where rows should be visually distinct.
+   * "gradient" uses the brand primary gradient — use it for the
+   * signed-in user's own avatar in chrome (topbar, profile header).
+   */
+  variant?: "seeded" | "gradient";
   className?: string;
 }) {
   const sizes = {
@@ -66,7 +74,16 @@ export function UserAvatar({
   return (
     <Avatar className={cn(sizes[size], className)}>
       {src && <AvatarImage src={src} alt={name} />}
-      <AvatarFallback seed={name}>{initials(name)}</AvatarFallback>
+      <AvatarFallback
+        seed={name}
+        className={
+          variant === "gradient"
+            ? "!bg-primary-gradient !text-white font-bold"
+            : undefined
+        }
+      >
+        {initials(name)}
+      </AvatarFallback>
     </Avatar>
   );
 }

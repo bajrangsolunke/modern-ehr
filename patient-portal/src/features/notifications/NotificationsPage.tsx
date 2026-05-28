@@ -55,7 +55,7 @@ export function NotificationsPage() {
       )}
 
       {!isLoading && !isError && data && (
-        <div className="max-w-3xl">
+        <div className="max-w-4xl">
           {data.items.length === 0 ? (
             <Empty
               icon={<Bell className="size-5" />}

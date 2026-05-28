@@ -58,7 +58,7 @@ export function DashboardPage() {
   const docsCount = data.recent_documents.length;
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6">
       <Greeting firstName={data.greeting.first_name} />
 
       {/* Top stat row — same shape as provider StatCard grid */}

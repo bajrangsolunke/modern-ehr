@@ -122,8 +122,13 @@ export function Topbar() {
 
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
-              <button className="flex items-center gap-2.5 pl-2 ml-1 h-10 ring-focus rounded-full">
-                <UserAvatar name={displayName} size="md" />
+              <button className="flex items-center gap-2.5 pl-1 pr-3 ml-1 h-11 rounded-full bg-[#F1F4F9] hover:bg-[#E6EBF2] transition ring-focus">
+                <UserAvatar
+                  name={displayName}
+                  size="md"
+                  variant="gradient"
+                  className="ring-2 ring-white shadow-glow"
+                />
                 <div className="hidden sm:flex flex-col leading-tight text-left">
                   <span className="text-sm font-bold">{displayName}</span>
                   <span className="text-xs text-muted-foreground truncate max-w-[140px]">
