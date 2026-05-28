@@ -1,18 +1,29 @@
-import { CalendarClock, Loader2, MapPin } from "lucide-react";
+import { useState } from "react";
+import {
+  CalendarClock,
+  LayoutGrid,
+  List as ListIcon,
+  Loader2,
+  MapPin,
+  Stethoscope,
+} from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Empty } from "@/components/ui/empty";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { SortableTh, TABLE_ROW_BG } from "@/components/ui/sortable-th";
-import { SummaryTile } from "@/components/ui/summary-tile";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAppointments } from "./hooks/use-appointments";
 import { humanWhen } from "@/lib/datetime";
+import { cn } from "@/lib/utils";
 import type { PatientAppointment } from "./api/appointments-api";
+
+type View = "cards" | "list";
 
 const STATUS_VARIANT: Record<
   string,
-  "info" | "success" | "warning" | "neutral" | "danger"
+  "info" | "success" | "warning" | "neutral" | "danger" | "default"
 > = {
   scheduled: "info",
   confirmed: "success",
@@ -28,36 +39,15 @@ function typeLabel(t: string): string {
 
 export function AppointmentsPage() {
   const { data, isLoading, isError, error, refetch, isFetching } = useAppointments();
+  const [view, setView] = useState<View>("cards");
 
   return (
     <>
       <PageHeader
         title="Appointments"
         subtitle="Upcoming and past visits with your care team."
+        right={<ViewToggle mode={view} onChange={setView} />}
       />
-
-      {!isLoading && !isError && data && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 lg:gap-3 mb-3">
-          <SummaryTile
-            label="Upcoming"
-            value={data.upcoming.length}
-            icon={<CalendarClock />}
-            tone="primary"
-          />
-          <SummaryTile
-            label="Past"
-            value={data.past.length}
-            icon={<CalendarClock />}
-            tone="neutral"
-          />
-          <SummaryTile
-            label="Total"
-            value={data.upcoming.length + data.past.length}
-            icon={<CalendarClock />}
-            tone="info"
-          />
-        </div>
-      )}
 
       {isLoading && (
         <div className="grid place-items-center py-16">
@@ -75,79 +65,195 @@ export function AppointmentsPage() {
       )}
 
       {!isLoading && !isError && data && (
-        <div className="space-y-6">
-          <AppointmentsSection
-            title="Upcoming"
-            items={data.upcoming}
-            emptyHint="When your provider schedules a visit, it'll appear here."
-          />
+        <Tabs defaultValue="upcoming">
+          <TabsList>
+            <TabsTrigger value="upcoming">
+              Upcoming · {data.upcoming.length}
+            </TabsTrigger>
+            <TabsTrigger value="past">Past · {data.past.length}</TabsTrigger>
+          </TabsList>
 
-          {data.past.length > 0 && (
+          <TabsContent value="upcoming">
             <AppointmentsSection
-              title="Past"
-              items={data.past}
-              emptyHint=""
+              items={data.upcoming}
+              view={view}
+              emptyTitle="No upcoming appointments"
+              emptyHint="When your provider schedules a visit, it'll appear here."
             />
-          )}
-        </div>
+          </TabsContent>
+
+          <TabsContent value="past">
+            <AppointmentsSection
+              items={data.past}
+              view={view}
+              emptyTitle="No past appointments"
+              emptyHint="Your visit history will appear here."
+            />
+          </TabsContent>
+        </Tabs>
       )}
     </>
   );
 }
 
+function ViewToggle({
+  mode,
+  onChange,
+}: {
+  mode: View;
+  onChange: (m: View) => void;
+}) {
+  return (
+    <div className="inline-flex items-center gap-1 rounded-full bg-[#F1F4F9] p-1">
+      <ToggleBtn active={mode === "cards"} onClick={() => onChange("cards")}>
+        <LayoutGrid className="size-4" />
+        Cards
+      </ToggleBtn>
+      <ToggleBtn active={mode === "list"} onClick={() => onChange("list")}>
+        <ListIcon className="size-4" />
+        List
+      </ToggleBtn>
+    </div>
+  );
+}
+
+function ToggleBtn({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-3 h-8 text-xs font-semibold transition ring-focus",
+        active
+          ? "bg-slate-900 text-white shadow-soft"
+          : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 function AppointmentsSection({
-  title,
   items,
+  view,
+  emptyTitle,
   emptyHint,
 }: {
-  title: string;
   items: PatientAppointment[];
+  view: View;
+  emptyTitle: string;
   emptyHint: string;
 }) {
   if (items.length === 0) {
-    if (!emptyHint) return null;
     return (
-      <section className="space-y-3">
-        <h2 className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-          {title}
-        </h2>
-        <Empty
-          icon={<CalendarClock className="size-5" />}
-          title={`No ${title.toLowerCase()} appointments`}
-          description={emptyHint}
-        />
-      </section>
+      <Empty
+        icon={<CalendarClock className="size-5" />}
+        title={emptyTitle}
+        description={emptyHint}
+      />
     );
   }
+  return view === "cards" ? (
+    <CardsView items={items} />
+  ) : (
+    <ListView items={items} />
+  );
+}
+
+function CardsView({ items }: { items: PatientAppointment[] }) {
   return (
-    <section className="space-y-3">
-      <h2 className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-        {title} · {items.length}
-      </h2>
-      <Card className="overflow-hidden p-3 sm:p-4">
-        <div className="overflow-x-auto">
-          <table
-            className="w-full text-sm border-separate"
-            style={{ borderSpacing: "0 6px" }}
-          >
-            <thead>
-              <tr className="text-xs text-muted-foreground text-left">
-                <SortableTh first>When</SortableTh>
-                <SortableTh>Type</SortableTh>
-                <SortableTh>Provider</SortableTh>
-                <SortableTh>Where</SortableTh>
-                <SortableTh last>Status</SortableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((a) => (
-                <AppointmentRow key={a.id} appt={a} />
-              ))}
-            </tbody>
-          </table>
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {items.map((a) => (
+        <AppointmentCard key={a.id} appt={a} />
+      ))}
+    </div>
+  );
+}
+
+function AppointmentCard({ appt }: { appt: PatientAppointment }) {
+  return (
+    <Card className="p-5 h-full flex flex-col">
+      <div className="flex items-start gap-3 mb-3">
+        <div className="size-11 rounded-2xl bg-primary/10 text-primary grid place-items-center shrink-0">
+          <CalendarClock className="size-5" />
         </div>
-      </Card>
-    </section>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold tabular-nums truncate">
+            {humanWhen(appt.starts_at)}
+          </div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            {typeLabel(appt.type)} · {appt.duration_minutes} min
+          </div>
+        </div>
+        <Badge variant={STATUS_VARIANT[appt.status] ?? "neutral"} size="sm">
+          {appt.status}
+        </Badge>
+      </div>
+
+      <dl className="space-y-2 text-sm">
+        {appt.provider_name && (
+          <div className="flex items-start gap-2">
+            <Stethoscope className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <div className="text-foreground/90 truncate">{appt.provider_name}</div>
+              {appt.provider_specialty && (
+                <div className="text-[11px] text-muted-foreground">
+                  {appt.provider_specialty}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {appt.room && (
+          <div className="flex items-center gap-2">
+            <MapPin className="size-3.5 text-muted-foreground shrink-0" />
+            <span className="text-foreground/90">{appt.room}</span>
+          </div>
+        )}
+        {appt.reason && (
+          <div className="text-sm text-muted-foreground mt-1 line-clamp-2">
+            {appt.reason}
+          </div>
+        )}
+      </dl>
+    </Card>
+  );
+}
+
+function ListView({ items }: { items: PatientAppointment[] }) {
+  return (
+    <Card className="overflow-hidden p-3 sm:p-4">
+      <div className="overflow-x-auto">
+        <table
+          className="w-full text-sm border-separate"
+          style={{ borderSpacing: "0 6px" }}
+        >
+          <thead>
+            <tr className="text-xs text-muted-foreground text-left">
+              <SortableTh first>When</SortableTh>
+              <SortableTh>Type</SortableTh>
+              <SortableTh>Provider</SortableTh>
+              <SortableTh>Where</SortableTh>
+              <SortableTh last>Status</SortableTh>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((a) => (
+              <AppointmentRow key={a.id} appt={a} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
   );
 }
 
