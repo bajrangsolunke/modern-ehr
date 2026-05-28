@@ -15,7 +15,9 @@ from app.schemas.patient import (
 )
 from app.services.audit_service import AuditService
 from app.schemas.form_request import FormRequestCreate
+from app.schemas.patient_auth import PortalInviteOut
 from app.services.form_request_service import FormRequestService
+from app.services.patient_auth_service import PatientAuthService
 from app.services.patient_service import PatientService
 
 # Writes (create/update/delete) are restricted to providers + admins.
@@ -175,3 +177,29 @@ async def delete_patient(
         resource_type="patient",
         resource_id=str(patient_id),
     )
+
+
+@router.post(
+    "/{patient_id}/portal-invite",
+    response_model=PortalInviteOut,
+    dependencies=[write_role_dep],
+)
+async def invite_to_portal(
+    patient_id: UUID,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
+) -> PortalInviteOut:
+    """Provider/admin generates a one-time setup URL the patient uses
+    to set their portal password. The provider copies the URL out-of-
+    band (email/SMS/print) for the first ship; email auto-delivery is
+    a follow-up."""
+    url, expires = await PatientAuthService(db).issue_invite(patient_id)
+    await AuditService(db).record_request(
+        request,
+        user_id=current.id,
+        action="patient.invite",
+        resource_type="patient",
+        resource_id=str(patient_id),
+    )
+    return PortalInviteOut(setup_url=url, expires_at=expires)
