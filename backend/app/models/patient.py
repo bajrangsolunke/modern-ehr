@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import enum
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import ARRAY, Date, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import ARRAY, Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDMixin
@@ -73,6 +73,23 @@ class Patient(Base, UUIDMixin, TimestampMixin):
     # `tags` which is free-form (#ASA II etc.).
     condition_tag: Mapped[str | None] = mapped_column(String(32), index=True)
     notes_internal: Mapped[str | None] = mapped_column(Text)
+
+    # Patient portal auth — null until the patient activates via an
+    # invite link. portal_active gates login independently of the
+    # password being set (lets admins deactivate without wiping data).
+    hashed_password: Mapped[str | None] = mapped_column(String(255))
+    portal_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    password_reset_token: Mapped[str | None] = mapped_column(
+        String(128), index=True
+    )
+    password_reset_expires: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
     assigned_physician_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), index=True
