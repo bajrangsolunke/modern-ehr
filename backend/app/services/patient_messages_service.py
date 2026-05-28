@@ -23,6 +23,7 @@ from app.schemas.patient_portal_messages import (
     ConversationOut,
     MessageOut,
 )
+from app.websockets.manager import ws_manager
 
 
 class PatientMessagesService:
@@ -153,6 +154,27 @@ class PatientMessagesService:
         conv.last_message_preview = body.strip()[:240]
         await self.db.commit()
         await self.db.refresh(msg)
+
+        # Fan out to every subscriber's WebSocket connection. Patient
+        # conversations are visible to all active staff plus the
+        # patient (keyed by patient UUID for multi-tab consistency).
+        payload = {
+            "type": "message.created",
+            "conversation_id": str(conv.id),
+            "message_id": str(msg.id),
+            "sender_patient_id": str(patient_id),
+            "ts": msg.sent_at.isoformat(),
+        }
+        subscriber_ids: set[UUID] = {patient_id}
+        staff_rows = (
+            await self.db.execute(
+                select(User.id).where(User.is_active.is_(True))
+            )
+        ).scalars().all()
+        subscriber_ids.update(staff_rows)
+        for sub_id in subscriber_ids:
+            await ws_manager.send_to_user(str(sub_id), payload)
+
         return MessageOut(
             id=msg.id,
             conversation_id=conv.id,

@@ -10,6 +10,7 @@ export * from "./input";
 export * from "./pagination";
 export * from "./skeleton";
 export * from "./sortable-th";
+export * from "./stat-card";
 export * from "./summary-tile";
 export * from "./tabs";
 export * from "./textarea";

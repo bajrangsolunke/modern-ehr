@@ -1,5 +1,5 @@
-export const APP_NAME = "Padmavat";
-export const APP_TAGLINE = "Patient portal";
+export const APP_NAME = "Modern-EHR";
+export const APP_TAGLINE = "AI-Native";
 
 export const ROUTES = {
   dashboard: "/",

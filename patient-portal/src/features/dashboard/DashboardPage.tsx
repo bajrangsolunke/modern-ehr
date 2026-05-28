@@ -1,6 +1,8 @@
+import { useNavigate } from "react-router-dom";
 import {
   Bell,
   CalendarClock,
+  CheckCircle2,
   ClipboardList,
   FileText,
   Loader2,
@@ -8,9 +10,8 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Empty } from "@/components/ui/empty";
 import { ErrorBanner } from "@/components/ui/error-banner";
-import { SummaryTile } from "@/components/ui/summary-tile";
+import { StatCard } from "@/components/ui/stat-card";
 import { useDashboard } from "./hooks/use-dashboard";
 import { Greeting } from "./components/Greeting";
 import { NextAppointment } from "./components/NextAppointment";
@@ -19,6 +20,7 @@ import { RecentDocuments } from "./components/RecentDocuments";
 
 export function DashboardPage() {
   const { data, isLoading, isError, error, refetch, isFetching } = useDashboard();
+  const navigate = useNavigate();
 
   if (isLoading) {
     return (
@@ -59,118 +61,67 @@ export function DashboardPage() {
     <div className="space-y-6 max-w-6xl">
       <Greeting firstName={data.greeting.first_name} />
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 lg:gap-3">
-        <SummaryTile
+      {/* Top stat row — same shape as provider StatCard grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-5">
+        <StatCard
           label="Upcoming visits"
           value={upcomingCount}
           icon={<CalendarClock />}
-          tone="primary"
+          accent="primary"
+          hint={
+            upcomingCount > 0 ? "1 visit scheduled" : "Nothing on the calendar"
+          }
         />
-        <SummaryTile
+        <StatCard
           label="To do"
           value={todoCount}
           icon={<ClipboardList />}
-          tone={todoCount > 0 ? "warning" : "success"}
+          accent={todoCount > 0 ? "warning" : "success"}
+          hint={
+            todoCount > 0
+              ? `${data.pending_actions.forms_count} forms · ${data.pending_actions.tasks_count} tasks`
+              : "All caught up"
+          }
         />
-        <SummaryTile
+        <StatCard
           label="New messages"
           value={messageCount}
           icon={<MessageCircle />}
-          tone="info"
+          accent="info"
+          hint={
+            data.recent_message?.sender_name
+              ? `From ${data.recent_message.sender_name}`
+              : "No new replies"
+          }
         />
-        <SummaryTile
+        <StatCard
           label="Recent docs"
           value={docsCount}
           icon={<FileText />}
-          tone="success"
+          accent="success"
+          hint={docsCount > 0 ? "Shared by your care team" : "Nothing shared yet"}
         />
       </div>
 
-      <div className="grid gap-4 lg:gap-5 lg:grid-cols-2">
-        <Section title="Next appointment">
-          {data.next_appointment ? (
-            <NextAppointment appt={data.next_appointment} />
-          ) : (
-            <Empty
-              icon={<CalendarClock className="size-5" />}
-              title="No upcoming appointment"
-              description="When your provider schedules a visit, it'll appear here."
-            />
-          )}
-        </Section>
-
-        <Section title="Things to do">
-          <ActionsCard
-            total={data.pending_actions.total}
-            forms={data.pending_actions.forms_count}
-            tasks={data.pending_actions.tasks_count}
-          />
-        </Section>
-
-        <Section title="Latest message">
-          {data.recent_message ? (
-            <RecentMessage msg={data.recent_message} />
-          ) : (
-            <Empty
-              icon={<MessageCircle className="size-5" />}
-              title="No messages yet"
-              description="When your care team writes to you, it'll appear here."
-            />
-          )}
-        </Section>
-
-        <Section title="Updates">
-          <Card className="p-6">
-            <div className="flex items-start gap-4">
-              <div className="size-12 rounded-2xl bg-info/10 text-info grid place-items-center shrink-0">
-                <Bell className="size-5" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
-                  Notifications
-                </div>
-                <div className="text-base font-semibold">
-                  Check your activity feed
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Recent updates from your appointments, messages, and care plan.
-                </p>
-                <div className="mt-4">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => (window.location.href = "/notifications")}
-                  >
-                    Open notifications
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </Section>
+      {/* Two-column equal-height row — cards stretch via grid + h-full */}
+      <div className="grid gap-4 lg:gap-5 lg:grid-cols-2 items-stretch">
+        <NextAppointment appt={data.next_appointment} />
+        <ActionsCard
+          total={data.pending_actions.total}
+          forms={data.pending_actions.forms_count}
+          tasks={data.pending_actions.tasks_count}
+        />
+        <RecentMessage msg={data.recent_message} />
+        <UpdatesCard onOpen={() => navigate("/notifications")} />
       </div>
 
-      <Section title="Recent documents">
+      <section className="space-y-3">
+        <h2 className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+          Recent documents
+        </h2>
         <RecentDocuments docs={data.recent_documents} />
-      </Section>
+      </section>
     </div>
-  );
-}
-
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="space-y-3">
-      <h2 className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-        {title}
-      </h2>
-      {children}
-    </section>
   );
 }
 
@@ -183,49 +134,82 @@ function ActionsCard({
   forms: number;
   tasks: number;
 }) {
-  if (total === 0) {
-    return (
-      <Card className="p-6 border-primary/30 bg-primary/5">
-        <div className="flex items-center gap-3">
-          <div className="size-10 rounded-full bg-primary/15 text-primary grid place-items-center">
-            <ClipboardList className="size-5" />
-          </div>
-          <div>
-            <div className="font-semibold text-foreground">All caught up</div>
-            <div className="text-sm text-muted-foreground">
-              No pending actions right now.
-            </div>
-          </div>
-        </div>
-      </Card>
-    );
-  }
+  const navigate = useNavigate();
   return (
-    <Card className="p-6">
-      <div className="flex items-start gap-4">
-        <div className="size-12 rounded-2xl bg-warning/10 text-warning grid place-items-center shrink-0">
-          <ClipboardList className="size-5" />
+    <Card className="h-full p-6 flex flex-col">
+      <div className="flex items-start gap-4 flex-1">
+        <div
+          className={
+            "size-12 rounded-2xl grid place-items-center shrink-0 " +
+            (total > 0
+              ? "bg-warning/10 text-warning"
+              : "bg-success/10 text-success")
+          }
+        >
+          {total > 0 ? (
+            <ClipboardList className="size-5" />
+          ) : (
+            <CheckCircle2 className="size-5" />
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
             Things to do
           </div>
-          <div className="text-lg font-bold">
-            You have {total} {total === 1 ? "item" : "items"}
-          </div>
-          <div className="text-sm text-muted-foreground mt-0.5">
-            {forms} {forms === 1 ? "form" : "forms"} · {tasks}{" "}
-            {tasks === 1 ? "task" : "tasks"}
-          </div>
-          <div className="mt-4">
-            <Button
-              size="sm"
-              onClick={() => (window.location.href = "/tasks")}
-            >
-              Open your list
-            </Button>
-          </div>
+          {total > 0 ? (
+            <>
+              <div className="text-lg font-bold">
+                You have {total} {total === 1 ? "item" : "items"}
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">
+                {forms} {forms === 1 ? "form" : "forms"} · {tasks}{" "}
+                {tasks === 1 ? "task" : "tasks"}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-lg font-bold">All caught up</div>
+              <p className="text-sm text-muted-foreground mt-1">
+                No pending actions right now.
+              </p>
+            </>
+          )}
         </div>
+      </div>
+      <div className="pt-4 mt-auto">
+        <Button
+          size="sm"
+          variant={total > 0 ? "default" : "secondary"}
+          onClick={() => navigate("/tasks")}
+        >
+          {total > 0 ? "Open your list" : "Go to Tasks"}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+function UpdatesCard({ onOpen }: { onOpen: () => void }) {
+  return (
+    <Card className="h-full p-6 flex flex-col">
+      <div className="flex items-start gap-4 flex-1">
+        <div className="size-12 rounded-2xl bg-info/10 text-info grid place-items-center shrink-0">
+          <Bell className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
+            Updates
+          </div>
+          <div className="text-lg font-bold">Check your activity feed</div>
+          <p className="text-sm text-muted-foreground mt-1">
+            Recent updates from your appointments, messages, and care plan.
+          </p>
+        </div>
+      </div>
+      <div className="pt-4 mt-auto">
+        <Button size="sm" variant="secondary" onClick={onOpen}>
+          Open notifications
+        </Button>
       </div>
     </Card>
   );

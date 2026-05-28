@@ -1,5 +1,6 @@
 interface AppEnv {
   API_BASE_URL: string;
+  WS_URL: string;
   APP_NAME: string;
   MODE: "development" | "production" | "test";
 }
@@ -11,7 +12,8 @@ function read(key: string, fallback: string): string {
 
 export const env: AppEnv = {
   API_BASE_URL: read("VITE_API_BASE_URL", "http://localhost:8000/api/v1"),
-  APP_NAME: read("VITE_APP_NAME", "Padmavat"),
+  WS_URL: read("VITE_WS_URL", "ws://localhost:8000/api/v1/ws"),
+  APP_NAME: read("VITE_APP_NAME", "Modern-EHR"),
   MODE: (import.meta.env.MODE as AppEnv["MODE"]) ?? "development",
 };
 

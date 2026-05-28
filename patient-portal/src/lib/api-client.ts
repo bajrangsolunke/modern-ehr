@@ -1,5 +1,5 @@
 /**
- * Typed fetch wrapper for the Padmavat patient-portal backend.
+ * Typed fetch wrapper for the Modern-EHR patient-portal backend.
  * - Attaches the access token from localStorage
  * - On 401, attempts a single /patient-auth/refresh + retry; if that
  *   also fails, fires the registered logout listener.

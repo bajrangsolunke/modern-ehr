@@ -12,6 +12,7 @@ import { UserAvatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth-store";
 import { ROUTES } from "@/config/constants";
+import { useMessagesSocket } from "@/features/messages/hooks/use-messages-socket";
 import { cn } from "@/lib/utils";
 
 interface NavLeaf {
@@ -33,6 +34,9 @@ export function Topbar() {
   const me = useAuthStore((s) => s.me);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
+  // Keep a single WS connection alive while signed-in; new messages
+  // invalidate React Query so the UI updates without a refresh.
+  useMessagesSocket();
   const displayName = me ? `${me.first_name} ${me.last_name}`.trim() : "Patient";
   const displayEmail = me?.email ?? "";
 
@@ -50,8 +54,13 @@ export function Topbar() {
               />
             </svg>
           </div>
-          <div className="font-display text-[22px] font-bold tracking-tight">
-            Padmavat
+          <div className="flex flex-col leading-none">
+            <span className="font-display text-[20px] font-bold tracking-tight">
+              Modern-EHR
+            </span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary mt-0.5">
+              AI-Native
+            </span>
           </div>
         </div>
 

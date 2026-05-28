@@ -15,8 +15,13 @@ export function AuthFrame({ children }: { children: ReactNode }) {
               />
             </svg>
           </div>
-          <div className="font-display text-[26px] font-bold tracking-tight">
-            Padmavat
+          <div className="flex flex-col leading-none items-center">
+            <span className="font-display text-[26px] font-bold tracking-tight">
+              Modern-EHR
+            </span>
+            <span className="text-[12px] font-semibold uppercase tracking-[0.16em] text-primary mt-1">
+              AI-Native
+            </span>
           </div>
         </div>
         {children}

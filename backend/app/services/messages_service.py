@@ -422,11 +422,17 @@ class MessagesService:
     async def _subscriber_ids(self, conv: Conversation) -> set[UUID]:
         if conv.audience == "clinician":
             return {p.user_id for p in conv.participants}
-        # Patient conversations are visible to all active staff.
+        # Patient conversations are visible to all active staff. We
+        # also include the patient_id so the patient portal's WS
+        # connection (keyed by patient UUID) receives real-time
+        # notifications when a staff member replies.
         rows = (
             await self.db.execute(select(User.id).where(User.is_active.is_(True)))
         ).scalars().all()
-        return set(rows)
+        ids: set[UUID] = set(rows)
+        if conv.patient_id is not None:
+            ids.add(conv.patient_id)
+        return ids
 
     # ---------------------------------------------------------------- helpers
 
