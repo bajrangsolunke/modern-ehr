@@ -16,7 +16,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.patient import Patient
-from app.models.task import Task, TaskCategory, TaskPriority, TaskStatus
+from app.models.task import Task, TaskCategory, TaskPriority, TaskStatus, TaskType
 from app.models.user import User
 from app.schemas.task import TaskCreate, TaskOut, TaskUpdate
 
@@ -32,6 +32,7 @@ class TaskService:
         *,
         viewer_id: UUID,
         scope: str = "all",
+        audience: str = "all",
         q: str | None = None,
         status: TaskStatus | None = None,
         priority: TaskPriority | None = None,
@@ -61,6 +62,15 @@ class TaskService:
                     Task.assigned_to_user_id != viewer_id,
                 ),
             )
+
+        # Audience maps 1:1 onto the persisted task_type enum — no
+        # more inferring from FK presence.
+        if audience == "patients":
+            stmt = stmt.where(Task.task_type == TaskType.patient)
+            count_stmt = count_stmt.where(Task.task_type == TaskType.patient)
+        elif audience == "users":
+            stmt = stmt.where(Task.task_type == TaskType.user)
+            count_stmt = count_stmt.where(Task.task_type == TaskType.user)
 
         if q:
             like = f"%{q.strip()}%"
@@ -119,6 +129,7 @@ class TaskService:
             category=TaskCategory(payload.category),
             priority=TaskPriority(payload.priority),
             status=TaskStatus.new,
+            task_type=TaskType(payload.task_type),
             created_by_user_id=viewer_id,
             assigned_to_user_id=payload.assigned_to_user_id,
             patient_id=payload.patient_id,
@@ -146,6 +157,8 @@ class TaskService:
                 task.category = TaskCategory(v)
             elif k == "priority" and v is not None:
                 task.priority = TaskPriority(v)
+            elif k == "task_type" and v is not None:
+                task.task_type = TaskType(v)
             elif k == "status" and v is not None:
                 new_status = TaskStatus(v)
                 if (
@@ -199,6 +212,7 @@ class TaskService:
             category=task.category.value,
             priority=task.priority.value,
             status=task.status.value,
+            task_type=task.task_type.value,
             created_by_user_id=task.created_by_user_id,
             created_by_name=creator_name,
             assigned_to_user_id=task.assigned_to_user_id,
