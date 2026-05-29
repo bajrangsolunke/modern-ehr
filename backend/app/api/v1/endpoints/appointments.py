@@ -17,7 +17,9 @@ from app.schemas.appointment import (
     AppointmentOut,
     AppointmentStats,
     AppointmentUpdate,
+    attach_billing,
 )
+from app.services.appointment_service import AppointmentService
 from app.services.audit_service import AuditService
 
 # Staff, providers, and admins can write. Patients/readers stay open
@@ -288,6 +290,14 @@ async def get_appointment(
     ).scalar_one_or_none()
     if not appt:
         raise HTTPException(status_code=404, detail="Appointment not found")
+    extras = await AppointmentService(db).load_billing_extras(appt)
+    attach_billing(
+        appt,
+        service_code=extras[0],
+        invoice_id=extras[1],
+        invoice_total_cents=extras[2],
+        invoice_balance_cents=extras[3],
+    )
     return AppointmentOut.model_validate(appt)
 
 
@@ -309,15 +319,24 @@ async def create_appointment(
     if payload.physician_id and not await db.get(User, payload.physician_id):
         raise HTTPException(status_code=404, detail="Physician not found")
 
-    appt = Appointment(**payload.model_dump())
-    db.add(appt)
-    await db.flush()
+    svc = AppointmentService(db)
+    appt = await svc.create(payload, viewer_id=current.id)
+
     # Re-fetch with eager loads so the response can include names.
     appt = (
         await db.execute(
             select(Appointment).options(*_eager()).where(Appointment.id == appt.id)
         )
     ).scalar_one()
+
+    extras = await svc.load_billing_extras(appt)
+    attach_billing(
+        appt,
+        service_code=extras[0],
+        invoice_id=extras[1],
+        invoice_total_cents=extras[2],
+        invoice_balance_cents=extras[3],
+    )
 
     await AuditService(db).record_request(
         request,
@@ -330,6 +349,10 @@ async def create_appointment(
             "physician_id": str(appt.physician_id) if appt.physician_id else None,
             "starts_at": appt.starts_at.isoformat(),
             "status": appt.status.value,
+            "service_catalog_id": (
+                str(appt.service_catalog_id)
+                if appt.service_catalog_id else None
+            ),
         },
     )
     return AppointmentOut.model_validate(appt)

@@ -4,13 +4,15 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.models.appointment import AppointmentStatus, AppointmentType
+from app.models.appointment import AppointmentModality, AppointmentStatus, AppointmentType
 
 
 class AppointmentBase(BaseModel):
     patient_id: UUID
     physician_id: UUID | None = None
+    service_catalog_id: UUID | None = None
     type: AppointmentType = AppointmentType.consultation
+    modality: AppointmentModality = AppointmentModality.in_person
     starts_at: datetime
     duration_minutes: int = Field(30, ge=5, le=480)
     room: str | None = Field(default=None, max_length=64)
@@ -24,6 +26,7 @@ class AppointmentCreate(AppointmentBase):
 class AppointmentUpdate(BaseModel):
     physician_id: UUID | None = None
     type: AppointmentType | None = None
+    modality: AppointmentModality | None = None
     status: AppointmentStatus | None = None
     starts_at: datetime | None = None
     duration_minutes: int | None = Field(default=None, ge=5, le=480)
@@ -46,6 +49,10 @@ class AppointmentOut(AppointmentBase):
     patient_mrn: str | None = None
     patient_avatar_url: str | None = None
     physician_name: str | None = None
+    service_code: str | None = None
+    invoice_id: UUID | None = None
+    invoice_total_cents: int | None = None
+    invoice_balance_cents: int | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -90,3 +97,20 @@ class AppointmentStats(BaseModel):
     this_week: int
     cancellations_this_week: int
     no_shows_this_week: int
+
+
+def attach_billing(
+    row,
+    *,
+    service_code: str | None,
+    invoice_id: UUID | None,
+    invoice_total_cents: int | None,
+    invoice_balance_cents: int | None,
+):
+    """Attach billing extras onto a SQLAlchemy Appointment row so
+    AppointmentOut.model_validate picks them up."""
+    setattr(row, "service_code", service_code)
+    setattr(row, "invoice_id", invoice_id)
+    setattr(row, "invoice_total_cents", invoice_total_cents)
+    setattr(row, "invoice_balance_cents", invoice_balance_cents)
+    return row
