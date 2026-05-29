@@ -37,7 +37,11 @@ import {
 } from "@/features/appointments/hooks/use-appointments";
 import { useStartTelehealth } from "@/features/telehealth/hooks/use-telehealth";
 import { TelehealthModal } from "@/features/telehealth/components/TelehealthModal";
-import type { TelehealthSessionWithToken } from "@/features/telehealth/api/telehealth-api";
+import type {
+  SoapDraft,
+  TelehealthSessionWithToken,
+} from "@/features/telehealth/api/telehealth-api";
+import { SoapNoteDrawer } from "@/features/patients/components/SoapNoteDrawer";
 import { useAuthStore } from "@/stores/auth-store";
 import { cn, formatDate } from "@/lib/utils";
 import { toast } from "@/lib/toast";
@@ -84,6 +88,8 @@ export function AppointmentDetailsModal({
   const [tSession, setTSession] = useState<TelehealthSessionWithToken | null>(
     null,
   );
+  const [pendingDraft, setPendingDraft] = useState<SoapDraft | null>(null);
+  const [soapOpen, setSoapOpen] = useState(false);
   const start = useStartTelehealth();
   const currentUser = user;
 
@@ -255,10 +261,19 @@ export function AppointmentDetailsModal({
       viewerUserId={currentUser?.id}
       onClose={() => setTelehealthOpen(false)}
       onDraftGenerated={(draft) => {
-        // Task 17 wires this into SoapNoteDrawer. For now, log it so we
-        // can verify SOAP generation works end-to-end.
-        console.info("SOAP draft", draft);
+        setPendingDraft(draft);
+        setTelehealthOpen(false);
+        setSoapOpen(true);
       }}
+    />
+    <SoapNoteDrawer
+      open={soapOpen}
+      onOpenChange={(o) => {
+        setSoapOpen(o);
+        if (!o) setPendingDraft(null);
+      }}
+      patientId={a.patientId}
+      prefill={pendingDraft}
     />
     </>
   );
