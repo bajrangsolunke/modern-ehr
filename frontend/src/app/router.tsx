@@ -61,8 +61,16 @@ const FormEditorPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import("@/features/settings").then((m) => ({ default: m.SettingsPage }))
 );
+const ServicesCatalogPage = lazy(() =>
+  import("@/features/billing").then((m) => ({ default: m.ServicesCatalogPage }))
+);
 const SoapNotePage = lazy(() =>
   import("@/features/notes").then((m) => ({ default: m.SoapNotePage }))
+);
+const ProviderTelehealthPage = lazy(() =>
+  import("@/features/telehealth/ProviderTelehealthPage").then((m) => ({
+    default: m.ProviderTelehealthPage,
+  }))
 );
 
 function PageFallback() {
@@ -119,12 +127,19 @@ export function AppRouter() {
             <Route element={<AdminRoute />}>
               <Route path={ROUTES.users} element={<UsersPage />} />
               <Route path="/users/:userId" element={<UserDetailPage />} />
+              <Route path="/settings/services" element={<ServicesCatalogPage />} />
             </Route>
             <Route path={ROUTES.settings} element={<SettingsPage />} />
             {/* Legacy /team redirects to /users for bookmarked links. */}
             <Route path="/team" element={<Navigate to={ROUTES.users} replace />} />
             <Route path={ROUTES.tasks} element={<TasksPage />} />
           </Route>
+          {/* Telehealth lives OUTSIDE the Shell — full viewport, no
+              sidebar/topbar chrome. Auth still required. */}
+          <Route
+            path="/visits/telehealth/:appointmentId"
+            element={<ProviderTelehealthPage />}
+          />
         </Route>
 
         <Route path="*" element={<Navigate to={ROUTES.dashboard} replace />} />

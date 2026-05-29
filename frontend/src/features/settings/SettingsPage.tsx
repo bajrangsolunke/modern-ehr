@@ -10,11 +10,12 @@
  * Admins manage other users' availability from the user detail page,
  * not here.
  */
-import { Bell, CalendarRange, Shield, UserRound } from "lucide-react";
+import { Bell, CalendarRange, Receipt, Shield, UserRound } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth-store";
 import { ProfileTab } from "@/features/settings/components/ProfileTab";
 import { SecurityTab } from "@/features/settings/components/SecurityTab";
@@ -56,6 +57,31 @@ export function SettingsPage() {
         back
         onBack={() => navigate(-1)}
       />
+
+      {user?.role === "admin" && (
+        <Card className="mb-4">
+          <CardContent className="p-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="size-9 rounded-xl bg-primary/10 text-primary grid place-items-center">
+                <Receipt className="size-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-semibold">Services & Pricing</div>
+                <div className="text-xs text-muted-foreground">
+                  Manage the billable service catalog used by providers and the front desk.
+                </div>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => navigate("/settings/services")}
+            >
+              Open
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs value={activeTab} onValueChange={setTab} className="space-y-4">
         <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
