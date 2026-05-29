@@ -47,6 +47,28 @@ def create_app() -> FastAPI:
             {"detail": "Rate limit exceeded"}, status_code=429
         ),
     )
+
+    # Catch-all 500 handler. Without this, an unhandled exception in a
+    # route bubbles out before CORSMiddleware can attach its headers —
+    # the browser then reports the failure as a CORS error instead of
+    # the actual server error, which has historically masked real bugs.
+    # Logging the exception here also gives us a single funnel for
+    # 500-grade alerting.
+    async def _unhandled_exception_handler(request, exc):  # noqa: ANN001 — FastAPI types these as Any
+        log.error(
+            "unhandled_exception",
+            path=request.url.path,
+            method=request.method,
+            error=str(exc),
+            exc_type=type(exc).__name__,
+            exc_info=True,
+        )
+        return ORJSONResponse(
+            {"detail": "Internal server error"},
+            status_code=500,
+        )
+
+    app.add_exception_handler(Exception, _unhandled_exception_handler)
     app.add_middleware(SlowAPIMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
