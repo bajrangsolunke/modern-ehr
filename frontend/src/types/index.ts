@@ -71,6 +71,8 @@ export type AppointmentStatus =
   | "cancelled"
   | "no-show";
 
+export type AppointmentModality = "in_person" | "virtual";
+
 export interface Appointment {
   id: string;
   patientId: string;
@@ -80,6 +82,7 @@ export interface Appointment {
   physicianId?: string;
   physician: string;
   type: AppointmentType;
+  modality: AppointmentModality;
   status: AppointmentStatus;
   /** ISO timestamp of the slot start. */
   startsAt: string;
@@ -90,6 +93,11 @@ export interface Appointment {
   duration: number;
   room?: string;
   reason?: string;
+  serviceCatalogId?: string | null;
+  serviceCode?: string | null;
+  invoiceId?: string | null;
+  invoiceTotalCents?: number | null;
+  invoiceBalanceCents?: number | null;
 }
 
 export interface VitalSign {

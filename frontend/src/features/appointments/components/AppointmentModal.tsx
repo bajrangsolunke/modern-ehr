@@ -16,7 +16,7 @@
  * the provider's current schedule).
  */
 import { useMemo, useState } from "react";
-import { ChevronDown, Clock, Loader2, Search } from "lucide-react";
+import { ChevronDown, Clock, Loader2, MapPin, Search, Video } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ import {
   useUpdateAppointment,
 } from "@/features/appointments/hooks/use-appointments";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useServices } from "@/features/billing/hooks/use-services";
 import type { Appointment } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,8 @@ const TYPES = [
   "biopsy",
   "follow-up",
 ] as const;
+const MODALITIES = ["in_person", "virtual"] as const;
+type Modality = (typeof MODALITIES)[number];
 const STATUSES = [
   "scheduled",
   "confirmed",
@@ -56,6 +59,7 @@ const editSchema = z.object({
   patient_id: z.string().min(1, "Pick a patient"),
   physician_id: z.string().optional().or(z.literal("")),
   type: z.enum(TYPES),
+  modality: z.enum(MODALITIES),
   status: z.enum(STATUSES),
   date: z.string().min(1, "Date is required"),
   time: z.string().min(1, "Time is required"),
@@ -111,11 +115,15 @@ function BookAppointmentModal({
   const create = useCreateAppointment();
   const [patientId, setPatientId] = useState<string>(defaultPatientId ?? "");
   const [type, setType] = useState<(typeof TYPES)[number]>("consultation");
+  const [modality, setModality] = useState<Modality>("in_person");
   const [duration, setDuration] = useState<number>(30);
   const [date, setDate] = useState<string>(toDateInput(new Date()));
   const [physicianId, setPhysicianId] = useState<string>(""); // empty = any
   const [room, setRoom] = useState("");
   const [reason, setReason] = useState("");
+  const [serviceCatalogId, setServiceCatalogId] = useState<string>("");
+  const { data: services } = useServices(true);
+  const selectedService = services?.items.find((s) => s.id === serviceCatalogId);
   const [selectedSlot, setSelectedSlot] = useState<{
     startsAt: string;
     physicianId: string;
@@ -163,17 +171,22 @@ function BookAppointmentModal({
         patient_id: patientId,
         physician_id: selectedSlot.physicianId,
         type,
+        modality,
         status: "scheduled",
         starts_at: selectedSlot.startsAt,
         duration_minutes: duration,
-        room: room || null,
+        // Virtual visits don't occupy a physical room — drop the field
+        // so we don't accidentally save "OR-04" on a Daily.co visit.
+        room: modality === "virtual" ? null : room || null,
         reason: reason || null,
+        service_catalog_id: serviceCatalogId || undefined,
       });
       onOpenChange(false);
       // Reset for next opening.
       setSelectedSlot(null);
       setReason("");
       setRoom("");
+      setServiceCatalogId("");
     } catch {
       /* error toast handled in hook */
     }
@@ -215,8 +228,11 @@ function BookAppointmentModal({
 
         {/* Step 2: type + duration */}
         <Section title="2 · Visit type">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormField label="Type" htmlFor="modal-type">
+          <FormField label="Appointment type" htmlFor="modal-modality">
+            <ModalityRadio value={modality} onChange={setModality} />
+          </FormField>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+            <FormField label="Visit reason" htmlFor="modal-type">
               <Select
                 id="modal-type"
                 value={type}
@@ -280,6 +296,36 @@ function BookAppointmentModal({
               />
             </FormField>
           </div>
+          <div className="mt-3">
+            <FormField
+              label="Service (optional)"
+              htmlFor="modal-service"
+              hint="If selected, an invoice will be auto-issued for the patient to pay."
+            >
+              <select
+                id="modal-service"
+                value={serviceCatalogId}
+                onChange={(e) => setServiceCatalogId(e.target.value)}
+                className="h-10 w-full rounded-full border border-border bg-white px-4 text-sm shadow-soft"
+              >
+                <option value="">No charge — book only</option>
+                {services?.items.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.code} · {s.name} · ${(s.priceCents / 100).toFixed(2)}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            {selectedService && (
+              <div className="text-xs text-muted-foreground -mt-2">
+                The patient will see an invoice for{" "}
+                <span className="font-semibold tabular-nums">
+                  ${(selectedService.priceCents / 100).toFixed(2)}
+                </span>{" "}
+                on their patient portal.
+              </div>
+            )}
+          </div>
         </Section>
 
         {/* Step 4: slot picker */}
@@ -294,15 +340,24 @@ function BookAppointmentModal({
 
         {/* Step 5: optional context */}
         <Section title="5 · Details (optional)">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormField label="Room" htmlFor="modal-room">
-              <Input
-                id="modal-room"
-                placeholder="OR-04"
-                value={room}
-                onChange={(e) => setRoom(e.target.value)}
-              />
-            </FormField>
+          <div
+            className={cn(
+              "grid gap-3",
+              modality === "virtual"
+                ? "grid-cols-1"
+                : "grid-cols-1 sm:grid-cols-2"
+            )}
+          >
+            {modality === "in_person" && (
+              <FormField label="Room" htmlFor="modal-room">
+                <Input
+                  id="modal-room"
+                  placeholder="OR-04"
+                  value={room}
+                  onChange={(e) => setRoom(e.target.value)}
+                />
+              </FormField>
+            )}
             <FormField label="Reason" htmlFor="modal-reason">
               <Input
                 id="modal-reason"
@@ -338,6 +393,7 @@ function EditAppointmentModal({
     patient_id: appointment.patientId,
     physician_id: appointment.physicianId ?? "",
     type: appointment.type as (typeof TYPES)[number],
+    modality: (appointment.modality ?? "in_person") as Modality,
     status: appointment.status as (typeof STATUSES)[number],
     date: toDateInput(d),
     time: toTimeInput(d),
@@ -360,6 +416,7 @@ function EditAppointmentModal({
   });
 
   const physicianId = watch("physician_id");
+  const modality = watch("modality");
 
   const onSubmit = handleSubmit(async (values) => {
     const startsAt = new Date(`${values.date}T${values.time}`).toISOString();
@@ -369,10 +426,11 @@ function EditAppointmentModal({
         input: {
           physician_id: values.physician_id || null,
           type: values.type,
+          modality: values.modality,
           status: values.status,
           starts_at: startsAt,
           duration_minutes: Number(values.duration_minutes),
-          room: values.room || null,
+          room: values.modality === "virtual" ? null : values.room || null,
           reason: values.reason || null,
         },
       });
@@ -437,8 +495,18 @@ function EditAppointmentModal({
           <input type="hidden" {...register("physician_id")} />
         </FormField>
 
+        <FormField label="Appointment type" required error={errors.modality?.message}>
+          <ModalityRadio
+            value={modality}
+            onChange={(m) =>
+              setValue("modality", m, { shouldDirty: true, shouldValidate: true })
+            }
+          />
+          <input type="hidden" {...register("modality")} />
+        </FormField>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <FormField label="Type" required htmlFor="edit-type" error={errors.type?.message}>
+          <FormField label="Visit reason" required htmlFor="edit-type" error={errors.type?.message}>
             <Select id="edit-type" {...register("type")}>
               {TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -481,10 +549,19 @@ function EditAppointmentModal({
           </FormField>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <FormField label="Room" htmlFor="edit-room" error={errors.room?.message}>
-            <Input id="edit-room" placeholder="OR-04" {...register("room")} />
-          </FormField>
+        <div
+          className={cn(
+            "grid gap-3",
+            modality === "virtual"
+              ? "grid-cols-1"
+              : "grid-cols-1 md:grid-cols-2"
+          )}
+        >
+          {modality === "in_person" && (
+            <FormField label="Room" htmlFor="edit-room" error={errors.room?.message}>
+              <Input id="edit-room" placeholder="OR-04" {...register("room")} />
+            </FormField>
+          )}
           <FormField label="Reason" htmlFor="edit-reason" error={errors.reason?.message}>
             <Input
               id="edit-reason"
@@ -735,6 +812,81 @@ function Section({
       </h3>
       {children}
     </section>
+  );
+}
+
+function ModalityRadio({
+  value,
+  onChange,
+}: {
+  value: Modality;
+  onChange: (m: Modality) => void;
+}) {
+  const opts: Array<{
+    value: Modality;
+    label: string;
+    hint: string;
+    icon: typeof MapPin;
+  }> = [
+    {
+      value: "in_person",
+      label: "In-person",
+      hint: "Patient comes to the clinic",
+      icon: MapPin,
+    },
+    {
+      value: "virtual",
+      label: "Virtual",
+      hint: "Daily.co video visit with live transcript",
+      icon: Video,
+    },
+  ];
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Appointment type"
+      className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+    >
+      {opts.map((opt) => {
+        const selected = value === opt.value;
+        const Icon = opt.icon;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(opt.value)}
+            className={cn(
+              "flex items-start gap-3 rounded-2xl border bg-white px-3 py-2.5 text-left transition shadow-soft ring-focus",
+              selected
+                ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                : "border-border hover:border-foreground/30"
+            )}
+          >
+            <span
+              className={cn(
+                "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border",
+                selected
+                  ? "border-primary bg-primary text-white"
+                  : "border-border bg-white"
+              )}
+            >
+              {selected && <span className="size-2 rounded-full bg-white" />}
+            </span>
+            <span className="min-w-0">
+              <span className="flex items-center gap-1.5 text-sm font-semibold">
+                <Icon className="size-3.5" />
+                {opt.label}
+              </span>
+              <span className="block text-xs text-muted-foreground mt-0.5">
+                {opt.hint}
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

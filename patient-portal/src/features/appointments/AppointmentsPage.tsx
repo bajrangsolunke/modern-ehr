@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   CalendarClock,
   LayoutGrid,
   List as ListIcon,
   Loader2,
   MapPin,
+  Receipt,
   Stethoscope,
   Video,
 } from "lucide-react";
@@ -21,6 +23,8 @@ import { useAppointments } from "./hooks/use-appointments";
 import { humanWhen } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import type { PatientAppointment } from "./api/appointments-api";
+import { PayInvoiceModal } from "@/features/billing/components/PayInvoiceModal";
+import type { Invoice } from "@/features/billing/api/billing-api";
 
 type View = "cards" | "list";
 
@@ -42,15 +46,12 @@ function typeLabel(t: string): string {
 
 /**
  * Returns true when the appointment is within the join window:
- * 10 minutes before start through 60 minutes after start, and
- * the status is one that allows joining (not completed/cancelled/no-show).
- *
- * NOTE: The current AppointmentType enum has no telehealth/video kind, so
- * this helper does not gate on type — the Join button will appear on any
- * appointment in the joinable window. When a telehealth type is added,
- * extend this check accordingly.
+ * 10 minutes before start through 60 minutes after start, the
+ * status allows joining, and the appointment is a virtual visit.
+ * In-person visits never show the Join button.
  */
 function isJoinable(appt: PatientAppointment): boolean {
+  if (appt.modality !== "virtual") return false;
   const blocked = new Set(["completed", "cancelled", "no-show"]);
   if (blocked.has(appt.status)) return false;
   const now = Date.now();
@@ -203,7 +204,35 @@ function CardsView({ items }: { items: PatientAppointment[] }) {
 
 function AppointmentCard({ appt }: { appt: PatientAppointment }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const joinable = isJoinable(appt);
+  const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
+  const owed =
+    appt.invoice_balance_cents && appt.invoice_balance_cents > 0
+      ? appt.invoice_balance_cents
+      : 0;
+
+  const openPay = () => {
+    if (!appt.invoice_id || !owed) return;
+    // The PayInvoiceModal's `Invoice` type wants more fields than we have
+    // here; only id/number/balanceCents matter for triggering the flow.
+    setPayingInvoice({
+      id: appt.invoice_id,
+      number: appt.service_name ?? "appointment",
+      status: "open",
+      totalCents: appt.invoice_total_cents ?? owed,
+      paidCents: (appt.invoice_total_cents ?? owed) - owed,
+      balanceCents: owed,
+      issuedAt: null,
+      dueAt: null,
+    });
+  };
+
+  const handleCloseModal = () => {
+    setPayingInvoice(null);
+    queryClient.invalidateQueries({ queryKey: ["appointments", "me"] });
+  };
+
   return (
     <Card className="p-5 h-full flex flex-col">
       <div className="flex items-start gap-3 mb-3">
@@ -250,6 +279,25 @@ function AppointmentCard({ appt }: { appt: PatientAppointment }) {
         )}
       </dl>
 
+      {owed > 0 && (
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Receipt className="size-3.5 text-amber-600 shrink-0" />
+            <div className="text-xs min-w-0">
+              <div className="font-semibold text-amber-900 tabular-nums">
+                Owed: ${(owed / 100).toFixed(2)}
+              </div>
+              {appt.service_name && (
+                <div className="text-amber-800 truncate">{appt.service_name}</div>
+              )}
+            </div>
+          </div>
+          <Button size="sm" onClick={openPay}>
+            Pay now
+          </Button>
+        </div>
+      )}
+
       {joinable && (
         <div className="pt-4 mt-auto">
           <Button
@@ -261,6 +309,11 @@ function AppointmentCard({ appt }: { appt: PatientAppointment }) {
           </Button>
         </div>
       )}
+
+      <PayInvoiceModal
+        invoice={payingInvoice}
+        onClose={handleCloseModal}
+      />
     </Card>
   );
 }
@@ -295,70 +348,111 @@ function ListView({ items }: { items: PatientAppointment[] }) {
 
 function AppointmentRow({ appt }: { appt: PatientAppointment }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const joinable = isJoinable(appt);
+  const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
+  const owed =
+    appt.invoice_balance_cents && appt.invoice_balance_cents > 0
+      ? appt.invoice_balance_cents
+      : 0;
+
+  const openPay = () => {
+    if (!appt.invoice_id || !owed) return;
+    setPayingInvoice({
+      id: appt.invoice_id,
+      number: appt.service_name ?? "appointment",
+      status: "open",
+      totalCents: appt.invoice_total_cents ?? owed,
+      paidCents: (appt.invoice_total_cents ?? owed) - owed,
+      balanceCents: owed,
+      issuedAt: null,
+      dueAt: null,
+    });
+  };
+
+  const handleCloseModal = () => {
+    setPayingInvoice(null);
+    queryClient.invalidateQueries({ queryKey: ["appointments", "me"] });
+  };
+
   return (
-    <tr className="hover:[&_td]:bg-[#EEF2F8] transition">
-      <td
-        className="px-4 py-2 first:rounded-l-full"
-        style={{ background: TABLE_ROW_BG }}
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="size-9 rounded-xl bg-primary/10 text-primary grid place-items-center shrink-0">
-            <CalendarClock className="size-4" />
-          </div>
-          <div className="min-w-0">
-            <div className="font-semibold tabular-nums truncate">
-              {humanWhen(appt.starts_at)}
+    <>
+      <tr className="hover:[&_td]:bg-[#EEF2F8] transition">
+        <td
+          className="px-4 py-2 first:rounded-l-full"
+          style={{ background: TABLE_ROW_BG }}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="size-9 rounded-xl bg-primary/10 text-primary grid place-items-center shrink-0">
+              <CalendarClock className="size-4" />
             </div>
-            <div className="text-[11px] text-muted-foreground mt-0.5">
-              {appt.duration_minutes} min
-              {appt.reason ? ` · ${appt.reason}` : ""}
+            <div className="min-w-0">
+              <div className="font-semibold tabular-nums truncate">
+                {humanWhen(appt.starts_at)}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">
+                {appt.duration_minutes} min
+                {appt.reason ? ` · ${appt.reason}` : ""}
+              </div>
             </div>
           </div>
-        </div>
-      </td>
-      <td className="px-4 py-2 text-foreground/80" style={{ background: TABLE_ROW_BG }}>
-        {typeLabel(appt.type)}
-      </td>
-      <td className="px-4 py-2 text-foreground/80" style={{ background: TABLE_ROW_BG }}>
-        {appt.provider_name ?? (
-          <span className="text-muted-foreground italic">—</span>
-        )}
-        {appt.provider_specialty && (
-          <div className="text-[11px] text-muted-foreground mt-0.5">
-            {appt.provider_specialty}
-          </div>
-        )}
-      </td>
-      <td className="px-4 py-2" style={{ background: TABLE_ROW_BG }}>
-        {appt.room ? (
-          <span className="inline-flex items-center gap-1.5 text-foreground/80">
-            <MapPin className="size-3.5 text-muted-foreground" />
-            {appt.room}
-          </span>
-        ) : (
-          <span className="text-muted-foreground italic">—</span>
-        )}
-      </td>
-      <td
-        className="px-4 py-2 last:rounded-r-full"
-        style={{ background: TABLE_ROW_BG }}
-      >
-        <div className="flex items-center justify-end gap-2">
-          <Badge variant={STATUS_VARIANT[appt.status] ?? "neutral"} size="sm">
-            {appt.status}
-          </Badge>
-          {joinable && (
-            <Button
-              size="xs"
-              onClick={() => navigate(`/telehealth/${appt.id}`)}
-            >
-              <Video className="size-3.5" />
-              Join
-            </Button>
+        </td>
+        <td className="px-4 py-2 text-foreground/80" style={{ background: TABLE_ROW_BG }}>
+          {typeLabel(appt.type)}
+        </td>
+        <td className="px-4 py-2 text-foreground/80" style={{ background: TABLE_ROW_BG }}>
+          {appt.provider_name ?? (
+            <span className="text-muted-foreground italic">—</span>
           )}
-        </div>
-      </td>
-    </tr>
+          {appt.provider_specialty && (
+            <div className="text-[11px] text-muted-foreground mt-0.5">
+              {appt.provider_specialty}
+            </div>
+          )}
+        </td>
+        <td className="px-4 py-2" style={{ background: TABLE_ROW_BG }}>
+          {appt.room ? (
+            <span className="inline-flex items-center gap-1.5 text-foreground/80">
+              <MapPin className="size-3.5 text-muted-foreground" />
+              {appt.room}
+            </span>
+          ) : (
+            <span className="text-muted-foreground italic">—</span>
+          )}
+        </td>
+        <td
+          className="px-4 py-2 last:rounded-r-full"
+          style={{ background: TABLE_ROW_BG }}
+        >
+          <div className="flex items-center justify-end gap-2">
+            {owed > 0 && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900 tabular-nums">
+                <Receipt className="size-3.5 text-amber-600" />
+                Owed ${(owed / 100).toFixed(2)}
+                <Button size="xs" onClick={openPay}>
+                  Pay
+                </Button>
+              </span>
+            )}
+            <Badge variant={STATUS_VARIANT[appt.status] ?? "neutral"} size="sm">
+              {appt.status}
+            </Badge>
+            {joinable && (
+              <Button
+                size="xs"
+                onClick={() => navigate(`/telehealth/${appt.id}`)}
+              >
+                <Video className="size-3.5" />
+                Join
+              </Button>
+            )}
+          </div>
+        </td>
+      </tr>
+      <PayInvoiceModal
+        invoice={payingInvoice}
+        onClose={handleCloseModal}
+      />
+    </>
   );
 }

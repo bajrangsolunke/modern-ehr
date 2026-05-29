@@ -2,6 +2,7 @@ import { api } from "@/lib/api-client";
 import { stripUndefined } from "@/lib/api-utils";
 import type {
   Appointment,
+  AppointmentModality,
   AppointmentStatus,
   AppointmentType,
 } from "@/types";
@@ -11,6 +12,7 @@ interface BackendAppointmentDto {
   patient_id: string;
   physician_id: string | null;
   type: AppointmentType;
+  modality: AppointmentModality;
   status: AppointmentStatus;
   starts_at: string;
   duration_minutes: number;
@@ -20,22 +22,30 @@ interface BackendAppointmentDto {
   patient_mrn?: string | null;
   patient_avatar_url?: string | null;
   physician_name?: string | null;
+  service_catalog_id: string | null;
+  service_code: string | null;
+  invoice_id: string | null;
+  invoice_total_cents: number | null;
+  invoice_balance_cents: number | null;
 }
 
 export interface AppointmentInput {
   patient_id: string;
   physician_id?: string | null;
   type?: AppointmentType;
+  modality?: AppointmentModality;
   status?: AppointmentStatus;
   starts_at: string;
   duration_minutes?: number;
   room?: string | null;
   reason?: string | null;
+  service_catalog_id?: string | null;
 }
 
 export interface AppointmentPatch {
   physician_id?: string | null;
   type?: AppointmentType;
+  modality?: AppointmentModality;
   status?: AppointmentStatus;
   starts_at?: string;
   duration_minutes?: number;
@@ -80,6 +90,7 @@ function mapAppointment(dto: BackendAppointmentDto): Appointment {
     physicianId: dto.physician_id ?? undefined,
     physician: dto.physician_name ?? "Unassigned",
     type: dto.type,
+    modality: dto.modality ?? "in_person",
     status: dto.status,
     startsAt: dto.starts_at,
     date: d.toLocaleDateString(undefined, {
@@ -94,6 +105,11 @@ function mapAppointment(dto: BackendAppointmentDto): Appointment {
     duration: dto.duration_minutes,
     room: dto.room ?? undefined,
     reason: dto.reason ?? undefined,
+    serviceCatalogId: dto.service_catalog_id,
+    serviceCode: dto.service_code,
+    invoiceId: dto.invoice_id,
+    invoiceTotalCents: dto.invoice_total_cents,
+    invoiceBalanceCents: dto.invoice_balance_cents,
   };
 }
 
