@@ -300,7 +300,13 @@ function BookAppointmentModal({
             <FormField
               label="Service (optional)"
               htmlFor="modal-service"
-              hint="If selected, an invoice will be auto-issued for the patient to pay."
+              hint={
+                selectedService
+                  ? `The patient will see an invoice for $${(
+                      selectedService.priceCents / 100
+                    ).toFixed(2)} on their patient portal.`
+                  : "If selected, an invoice will be auto-issued for the patient to pay."
+              }
             >
               <select
                 id="modal-service"
@@ -316,15 +322,6 @@ function BookAppointmentModal({
                 ))}
               </select>
             </FormField>
-            {selectedService && (
-              <div className="text-xs text-muted-foreground -mt-2">
-                The patient will see an invoice for{" "}
-                <span className="font-semibold tabular-nums">
-                  ${(selectedService.priceCents / 100).toFixed(2)}
-                </span>{" "}
-                on their patient portal.
-              </div>
-            )}
           </div>
         </Section>
 
