@@ -429,3 +429,15 @@
     color: #64748b;
   }
 }
+
+/* Hide Stripe.js test-mode developer inspector widget that pins to the
+ * bottom-right on localhost. Never appears in prod (live keys + HTTPS). */
+iframe[name^="__privateStripeMetricsController"],
+iframe[src*="js.stripe.com/v3/m-outer"],
+iframe[src*="m.stripe.network"],
+.stripe-developer-tools,
+[id^="stripe-developer-tools"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
