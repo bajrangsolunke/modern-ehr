@@ -57,7 +57,7 @@ export function PayInvoiceModal({ invoice, onClose }: Props) {
     >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 animate-fade-in" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white shadow-elev border border-border max-h-[90vh] overflow-y-auto">
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white shadow-elev border border-border max-h-[92vh] overflow-y-auto">
           <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-white z-10">
             <Dialog.Title className="text-lg font-semibold">
               Pay invoice {invoice?.number}
@@ -131,6 +131,14 @@ function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
         options={{
           layout: "tabs",
           wallets: { applePay: "never", googlePay: "never" },
+          fields: {
+            billingDetails: {
+              email: "never",
+              phone: "never",
+              name: "never",
+              address: "never",
+            },
+          },
         }}
       />
       <Button type="submit" className="w-full" disabled={!stripe || submitting}>
