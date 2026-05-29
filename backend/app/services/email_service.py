@@ -55,8 +55,8 @@ async def send_email(
         return False
 
     msg = EmailMessage()
-    from_name = settings.SMTP_FROM_NAME or "Padmavat Health"
-    from_email = settings.SMTP_FROM_EMAIL or "no-reply@padmavat.health"
+    from_name = settings.SMTP_FROM_NAME or "Modern EHR"
+    from_email = settings.SMTP_FROM_EMAIL or "no-reply@modern-ehr.health"
     msg["From"] = f"{from_name} <{from_email}>"
     msg["To"] = ", ".join(to_list)
     msg["Subject"] = subject

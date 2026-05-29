@@ -89,8 +89,8 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_USE_TLS: bool = True
-    SMTP_FROM_EMAIL: str = "no-reply@padmavat.health"
-    SMTP_FROM_NAME: str = "Padmavat Health"
+    SMTP_FROM_EMAIL: str = "no-reply@modern-ehr.health"
+    SMTP_FROM_NAME: str = "Modern EHR"
 
     @computed_field
     @property
