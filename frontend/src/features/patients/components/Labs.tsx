@@ -1,11 +1,19 @@
 /**
  * Recent lab results panel for the Vitals & Labs tab. Pulls structured
- * values from the labs API. A small "Imaging studies" footer counts
- * documents categorized as imaging — the actual files live in the
- * Documents tab.
+ * values from the labs API. Each row that was AI-extracted shows the
+ * source-report filename inline so providers can tell at a glance
+ * which PDF a value came from (a patient may have multiple reports).
+ *
+ * The whole card is collapsible — chevron toggle in the header.
  */
-import { useMemo } from "react";
-import { ChevronRight, FlaskConical, Loader2, ScanLine, Sparkles } from "lucide-react";
+import { useState } from "react";
+import {
+  ChevronDown,
+  ChevronRight,
+  FlaskConical,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Card,
@@ -14,15 +22,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { Empty } from "@/components/ui/empty";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { useLabResults } from "../hooks/use-lab-results";
-import { usePatientDocuments } from "@/features/docs/hooks/use-documents";
 import { cn, formatDate } from "@/lib/utils";
 
 const flagMap = {
@@ -38,6 +40,7 @@ interface Props {
 export function Labs({ patientId }: Props) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [collapsed, setCollapsed] = useState(false);
   const {
     data: labs,
     isLoading,
@@ -45,13 +48,6 @@ export function Labs({ patientId }: Props) {
     error,
     refetch,
   } = useLabResults(patientId);
-  const { data: documents } = usePatientDocuments(patientId);
-
-  const imagingCount = useMemo(
-    () =>
-      (documents ?? []).filter((d) => d.category === "imaging").length,
-    [documents],
-  );
 
   const goToDocuments = () => {
     const next = new URLSearchParams(searchParams);
@@ -64,133 +60,134 @@ export function Labs({ patientId }: Props) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle>Labs &amp; Imaging</CardTitle>
+      <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
+          aria-controls={`labs-body-${patientId}`}
+          className="flex items-center gap-2 min-w-0 text-left rounded-lg -m-1 p-1 hover:bg-surface-subtle/60 transition flex-1"
+        >
+          <ChevronDown
+            className={cn(
+              "size-4 text-muted-foreground shrink-0 transition-transform",
+              collapsed && "-rotate-90",
+            )}
+            aria-hidden
+          />
+          <CardTitle>Labs &amp; Imaging</CardTitle>
+          {labs && labs.length > 0 && (
+            <span className="text-xs text-muted-foreground font-normal">
+              · {labs.length} result{labs.length === 1 ? "" : "s"}
+            </span>
+          )}
+        </button>
         <button
           type="button"
           onClick={goToDocuments}
-          className="text-xs text-primary hover:underline flex items-center gap-0.5"
+          className="text-xs text-primary hover:underline flex items-center gap-0.5 shrink-0"
         >
           View all <ChevronRight className="size-3" />
         </button>
       </CardHeader>
-      <CardContent className="pb-5 space-y-4">
-        {isLoading && (
-          <div className="flex items-center gap-2 justify-center py-8 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            Loading lab results…
-          </div>
-        )}
 
-        {isError && !isLoading && (
-          <ErrorBanner
-            title="Couldn't load labs"
-            message={
-              error instanceof Error ? error.message : "Please try again."
-            }
-            onRetry={() => refetch()}
-          />
-        )}
+      {!collapsed && (
+        <CardContent id={`labs-body-${patientId}`} className="pb-5">
+          {isLoading && (
+            <div className="flex items-center gap-2 justify-center py-8 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Loading lab results…
+            </div>
+          )}
 
-        {!isLoading && !isError && labs && labs.length === 0 && (
-          <Empty
-            icon={<FlaskConical className="size-6" />}
-            title="No lab results yet"
-            description="Lab values will appear here as they're recorded for this patient."
-          />
-        )}
+          {isError && !isLoading && (
+            <ErrorBanner
+              title="Couldn't load labs"
+              message={
+                error instanceof Error ? error.message : "Please try again."
+              }
+              onRetry={() => refetch()}
+            />
+          )}
 
-        {!isLoading && !isError && labs && labs.length > 0 && (
-          <div className="overflow-hidden rounded-xl border border-border">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-subtle text-xs text-muted-foreground">
-                <tr className="text-left">
-                  <th className="px-3 py-2 font-medium">Test</th>
-                  <th className="px-3 py-2 font-medium">Value</th>
-                  <th className="px-3 py-2 font-medium">Range</th>
-                  <th className="px-3 py-2 font-medium">Date</th>
-                  <th className="px-3 py-2 font-medium">Flag</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {labs.map((l) => (
-                  <tr key={l.id} className="hover:bg-surface-subtle/70">
-                    <td className="px-3 py-2 font-medium">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="truncate">{l.name}</span>
-                        {l.sourceDocumentName && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary font-medium cursor-default">
-                                <Sparkles className="size-2.5" />
-                                AI
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              Extracted from {l.sourceDocumentName}
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">
-                      {l.value}{" "}
-                      {l.unit && (
-                        <span className="text-muted-foreground text-xs">
-                          {l.unit}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {l.referenceRange ?? "—"}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {formatDate(l.collectedAt)}
-                    </td>
-                    <td className="px-3 py-2">
-                      {l.flag ? (
-                        <Badge size="sm" className={cn(flagMap[l.flag].cls)}>
-                          {flagMap[l.flag].label}
-                        </Badge>
-                      ) : (
-                        <Badge variant="success" size="sm">
-                          Normal
-                        </Badge>
-                      )}
-                    </td>
+          {!isLoading && !isError && labs && labs.length === 0 && (
+            <Empty
+              icon={<FlaskConical className="size-6" />}
+              title="No lab results yet"
+              description="Upload a lab-report PDF below and use ✨ Extract with AI to populate this panel automatically."
+            />
+          )}
+
+          {!isLoading && !isError && labs && labs.length > 0 && (
+            <div className="overflow-hidden rounded-xl border border-border">
+              <table className="w-full text-sm">
+                <thead className="bg-surface-subtle text-xs text-muted-foreground">
+                  <tr className="text-left">
+                    <th className="px-3 py-2 font-medium">Test</th>
+                    <th className="px-3 py-2 font-medium">Value</th>
+                    <th className="px-3 py-2 font-medium">Range</th>
+                    <th className="px-3 py-2 font-medium">Date</th>
+                    <th className="px-3 py-2 font-medium">Flag</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Imaging-studies footer: actual imaging files live in the
-            Documents tab; this is just a quick "you have N on file" so
-            the panel earns its "Labs & Imaging" title. */}
-        <button
-          type="button"
-          onClick={goToDocuments}
-          className="w-full flex items-center justify-between gap-3 rounded-xl bg-surface-subtle hover:bg-surface-subtle/70 px-4 py-3 transition text-left"
-        >
-          <div className="flex items-center gap-3">
-            <div className="size-8 rounded-lg bg-sky-100 text-sky-700 grid place-items-center">
-              <ScanLine className="size-4" />
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {labs.map((l) => (
+                    <tr
+                      key={l.id}
+                      className="hover:bg-surface-subtle/70 align-top"
+                    >
+                      <td className="px-3 py-2 font-medium">
+                        <div className="min-w-0">
+                          <div className="truncate">{l.name}</div>
+                          {l.sourceDocumentName && (
+                            <div
+                              className="text-[11px] text-muted-foreground font-normal mt-0.5 inline-flex items-center gap-1 max-w-full"
+                              title={`Extracted from ${l.sourceDocumentName}`}
+                            >
+                              <Sparkles className="size-2.5 text-primary shrink-0" />
+                              <span className="truncate">
+                                from {l.sourceDocumentName}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        {l.value}{" "}
+                        {l.unit && (
+                          <span className="text-muted-foreground text-xs">
+                            {l.unit}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {l.referenceRange ?? "—"}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {formatDate(l.collectedAt)}
+                      </td>
+                      <td className="px-3 py-2">
+                        {l.flag ? (
+                          <Badge
+                            size="sm"
+                            className={cn(flagMap[l.flag].cls)}
+                          >
+                            {flagMap[l.flag].label}
+                          </Badge>
+                        ) : (
+                          <Badge variant="success" size="sm">
+                            Normal
+                          </Badge>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div>
-              <div className="text-sm font-semibold">Imaging studies</div>
-              <div className="text-xs text-muted-foreground">
-                {imagingCount === 0
-                  ? "No imaging on file"
-                  : `${imagingCount} image${imagingCount === 1 ? "" : "s"} on file`}
-              </div>
-            </div>
-          </div>
-          <span className="text-xs text-primary inline-flex items-center gap-0.5">
-            View <ChevronRight className="size-3" />
-          </span>
-        </button>
-      </CardContent>
+          )}
+        </CardContent>
+      )}
     </Card>
   );
 }
