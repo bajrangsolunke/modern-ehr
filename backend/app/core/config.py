@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "padmavat"
     POSTGRES_PASSWORD: str = "padmavat"
 
+    # Async engine pool. Scale `DB_POOL_SIZE` with uvicorn worker
+    # count; max_overflow gives burst capacity for spike traffic.
+    DB_POOL_SIZE: int = 10
+    DB_POOL_MAX_OVERFLOW: int = 20
+
     REDIS_URL: str = "redis://localhost:6379/0"
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"

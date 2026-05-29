@@ -8,6 +8,56 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.audit_log import AuditLog
 
 
+# Field names whose values must never reach the audit_logs table.
+# Match is case-insensitive, anywhere in the path. Conservative on
+# purpose — the audit log must never become a second credential
+# store. If a legitimate field name collides, alias it server-side.
+_REDACT_KEYS = frozenset(
+    {
+        "password",
+        "new_password",
+        "current_password",
+        "confirm_password",
+        "token",
+        "refresh_token",
+        "access_token",
+        "setup_token",
+        "reset_token",
+        "secret",
+        "api_key",
+        "authorization",
+        "ssn",
+        "hashed_password",
+        # Free-form PHI containers — we keep the *fact* that data was
+        # submitted but never the content.
+        "data",
+        "body",
+        "content",
+        "signature",
+    }
+)
+
+_REDACTED = "***REDACTED***"
+
+
+def _scrub(value: Any) -> Any:
+    """Walk a JSON-shaped value, replacing sensitive fields with a
+    marker. Strings and other scalars pass through unchanged — only
+    *keys* trigger redaction so we don't ruin neutral identifiers like
+    `email` that we want to keep for forensics."""
+    if isinstance(value, dict):
+        out: dict[str, Any] = {}
+        for k, v in value.items():
+            if isinstance(k, str) and k.lower() in _REDACT_KEYS:
+                out[k] = _REDACTED
+            else:
+                out[k] = _scrub(v)
+        return out
+    if isinstance(value, list):
+        return [_scrub(v) for v in value]
+    return value
+
+
 class AuditService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
@@ -25,8 +75,11 @@ class AuditService:
     ) -> AuditLog:
         # JSONB can't hold native date/datetime/UUID/Enum/etc. — endpoints
         # often pass model_dump() output that contains them. Encode to
-        # plain JSON-safe values up front so callers never have to think
-        # about it.
+        # plain JSON-safe values up front, then scrub credentials/PHI
+        # field-by-field so audit_logs never becomes a secondary
+        # credential store.
+        encoded = jsonable_encoder(payload) if payload is not None else None
+        scrubbed = _scrub(encoded) if encoded is not None else None
         log = AuditLog(
             user_id=user_id,
             action=action,
@@ -34,7 +87,7 @@ class AuditService:
             resource_id=resource_id,
             ip_address=ip_address,
             user_agent=user_agent,
-            payload=jsonable_encoder(payload) if payload is not None else None,
+            payload=scrubbed,
         )
         self.db.add(log)
         await self.db.flush()

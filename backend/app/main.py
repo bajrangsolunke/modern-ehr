@@ -3,10 +3,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
-from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
+
+from app.core.rate_limit import limiter
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -23,12 +23,6 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     log.info("startup", env=settings.ENVIRONMENT, project=settings.PROJECT_NAME)
     yield
     log.info("shutdown")
-
-
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=[f"{settings.RATE_LIMIT_PER_MINUTE}/minute"],
-)
 
 
 def create_app() -> FastAPI:
@@ -57,13 +51,29 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
 
+    # CORS — keep dev permissive (any localhost port for Vite HMR),
+    # narrow in non-dev to the explicit verbs + headers we actually use.
+    # `allow_credentials=True` REQUIRES an explicit origin list (no wildcards).
     cors_kwargs: dict = {
         "allow_credentials": True,
-        "allow_methods": ["*"],
-        "allow_headers": ["*"],
+        "allow_methods": (
+            ["*"]
+            if settings.ENVIRONMENT == "development"
+            else ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"]
+        ),
+        "allow_headers": (
+            ["*"]
+            if settings.ENVIRONMENT == "development"
+            else [
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "X-Request-ID",
+            ]
+        ),
+        "expose_headers": ["X-Request-ID"],
     }
     if settings.ENVIRONMENT == "development":
-        # In dev, accept any localhost / 127.0.0.1 port (Vite picks a free port).
         cors_kwargs["allow_origin_regex"] = r"http://(localhost|127\.0\.0\.1):\d+"
     else:
         cors_kwargs["allow_origins"] = settings.cors_origins

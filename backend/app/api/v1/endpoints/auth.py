@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from app.api.deps import CurrentUser, DbSession, require_roles
 from app.core.security import hash_password, verify_password
+from app.core.rate_limit import limiter
 from app.models.user import UserRole
 from app.schemas.common import Token
 from app.schemas.user import (
@@ -55,7 +56,9 @@ async def register(
 
 
 @router.post("/login", response_model=Token)
+@limiter.limit("10/minute")
 async def login(
+    request: Request,
     db: DbSession,
     form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> Token:
@@ -65,14 +68,20 @@ async def login(
 
 
 @router.post("/login/json", response_model=Token)
-async def login_json(payload: LoginRequest, db: DbSession) -> Token:
+@limiter.limit("10/minute")
+async def login_json(
+    request: Request, payload: LoginRequest, db: DbSession
+) -> Token:
     service = AuthService(db)
     user = await service.authenticate(payload.email, payload.password)
     return Token(**service.issue_tokens(user))
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh(payload: RefreshRequest, db: DbSession) -> Token:
+@limiter.limit("30/minute")
+async def refresh(
+    request: Request, payload: RefreshRequest, db: DbSession
+) -> Token:
     """Exchange a valid refresh token for a fresh access + refresh token pair."""
     from jose import JWTError, jwt
     from fastapi import HTTPException, status as http_status

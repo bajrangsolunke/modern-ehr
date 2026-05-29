@@ -54,21 +54,49 @@ class PatientMessagesService:
                 .order_by(Conversation.last_message_at.desc())
             )
         ).scalars().all()
+        if not rows:
+            return ConversationListOut(items=[])
+
+        # Batch-load all participants across every conversation in TWO
+        # queries (participant rows + user rows by IN clause) instead
+        # of running `_participants_names` per row. Same shape, ~Nx
+        # fewer round-trips.
+        conv_ids = [c.id for c in rows]
+        participant_rows = (
+            await self.db.execute(
+                select(
+                    ConversationParticipant.conversation_id,
+                    ConversationParticipant.user_id,
+                ).where(
+                    ConversationParticipant.conversation_id.in_(conv_ids)
+                )
+            )
+        ).all()
+        user_ids = {uid for _conv_id, uid in participant_rows}
+        user_names: dict[UUID, str] = {}
+        if user_ids:
+            user_rows = (
+                await self.db.execute(
+                    select(User.id, User.full_name).where(User.id.in_(user_ids))
+                )
+            ).all()
+            user_names = {uid: name for uid, name in user_rows}
+
+        names_by_conv: dict[UUID, list[str]] = {}
+        for conv_id, user_id in participant_rows:
+            names_by_conv.setdefault(conv_id, []).append(
+                user_names.get(user_id, "")
+            )
 
         items: list[ConversationOut] = []
         for conv in rows:
-            names = await self._participants_names(conv.id)
-            # Patient "unread" heuristic: the latest message is from a
-            # staff user and it's newer than the patient's last view of
-            # this conversation. We don't track last-read per patient
-            # yet — keep it false until that lands.
             items.append(
                 ConversationOut(
                     id=conv.id,
                     title=conv.title,
                     last_message_at=conv.last_message_at,
                     last_message_preview=conv.last_message_preview,
-                    participants=names,
+                    participants=names_by_conv.get(conv.id, []),
                     unread=False,
                 )
             )

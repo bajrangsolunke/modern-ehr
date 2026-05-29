@@ -4,6 +4,7 @@ for the flow."""
 from fastapi import APIRouter, Request, status
 
 from app.api.deps import DbSession
+from app.core.rate_limit import limiter
 from app.schemas.patient_auth import (
     LoginIn,
     RefreshIn,
@@ -22,8 +23,9 @@ router = APIRouter(prefix="/patient-auth", tags=["patient-auth"])
 
 
 @router.post("/setup-verify", response_model=SetupVerifyOut)
+@limiter.limit("30/minute")
 async def setup_verify(
-    payload: SetupVerifyIn, db: DbSession
+    request: Request, payload: SetupVerifyIn, db: DbSession
 ) -> SetupVerifyOut:
     first_name, masked_email = await PatientAuthService(db).verify_setup_token(
         payload.token
@@ -36,6 +38,7 @@ async def setup_verify(
     response_model=TokensOut,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("10/minute")
 async def setup(
     request: Request, payload: SetupIn, db: DbSession
 ) -> TokensOut:
@@ -53,6 +56,7 @@ async def setup(
 
 
 @router.post("/login", response_model=TokensOut)
+@limiter.limit("10/minute")
 async def login(
     request: Request, payload: LoginIn, db: DbSession
 ) -> TokensOut:
@@ -82,7 +86,10 @@ async def login(
 
 
 @router.post("/refresh", response_model=TokensOut)
-async def refresh(payload: RefreshIn, db: DbSession) -> TokensOut:
+@limiter.limit("30/minute")
+async def refresh(
+    request: Request, payload: RefreshIn, db: DbSession
+) -> TokensOut:
     return await PatientAuthService(db).refresh(
         refresh_token=payload.refresh_token
     )
@@ -92,6 +99,7 @@ async def refresh(payload: RefreshIn, db: DbSession) -> TokensOut:
     "/request-reset",
     status_code=status.HTTP_204_NO_CONTENT,
 )
+@limiter.limit("5/minute")
 async def request_reset(
     request: Request, payload: RequestResetIn, db: DbSession
 ) -> None:
@@ -107,6 +115,7 @@ async def request_reset(
 
 
 @router.post("/reset", response_model=TokensOut)
+@limiter.limit("10/minute")
 async def reset(
     request: Request, payload: ResetIn, db: DbSession
 ) -> TokensOut:

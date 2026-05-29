@@ -2,10 +2,11 @@
 enforces token_type=='patient' so staff tokens can't reach here."""
 from uuid import UUID
 
-from fastapi import APIRouter, Form, UploadFile
+from fastapi import APIRouter, Form, Request, UploadFile
 from fastapi.responses import Response
 
 from app.api.deps import CurrentPatient, DbSession
+from app.core.rate_limit import limiter
 from app.schemas.patient_auth import PatientMeOut
 from app.schemas.patient_dashboard import DashboardOut
 from app.schemas.patient_portal_appointments import PatientAppointmentListOut
@@ -201,8 +202,12 @@ async def ping_my_conversation_typing(
 
 
 @router.post("/me/conversations/{conv_id}/ai-suggest")
+@limiter.limit("10/minute")
 async def my_ai_suggest_replies(
-    conv_id: UUID, db: DbSession, current: CurrentPatient
+    request: Request,
+    conv_id: UUID,
+    db: DbSession,
+    current: CurrentPatient,
 ) -> dict[str, list[str]]:
     suggestions = await PatientAIService(db).suggest_replies(
         conv_id, current.id

@@ -52,26 +52,48 @@ class PatientNotificationsService:
         if not conv_rows:
             return []
 
-        # Look up the most recent incoming message in each conversation
-        # so the notification surfaces "X sent you a message" rather than
-        # a generic stamp.
+        # Batch-fetch the latest message per conversation in ONE query
+        # using a DISTINCT ON. Then batch-fetch every sender user in
+        # one IN clause. Drops what was N+1 (up to 30 queries for 10
+        # conversations) down to 3 queries total.
+        from sqlalchemy import distinct  # noqa: F401 — kept for clarity
+
+        conv_ids = [c.id for c in conv_rows]
+        latest_rows = (
+            await self.db.execute(
+                select(Message)
+                .where(Message.conversation_id.in_(conv_ids))
+                .order_by(
+                    Message.conversation_id,
+                    Message.sent_at.desc(),
+                )
+                .distinct(Message.conversation_id)
+            )
+        ).scalars().all()
+        latest_by_conv: dict[UUID, Message] = {
+            m.conversation_id: m for m in latest_rows
+        }
+
+        sender_ids = {
+            m.sender_user_id for m in latest_rows if m.sender_user_id
+        }
+        senders: dict[UUID, User] = {}
+        if sender_ids:
+            sender_rows = (
+                await self.db.execute(
+                    select(User).where(User.id.in_(sender_ids))
+                )
+            ).scalars().all()
+            senders = {u.id: u for u in sender_rows}
+
         out: list[PatientNotificationOut] = []
         for conv in conv_rows:
-            latest = (
-                await self.db.execute(
-                    select(Message)
-                    .where(Message.conversation_id == conv.id)
-                    .order_by(Message.sent_at.desc())
-                    .limit(1)
-                )
-            ).scalar_one_or_none()
+            latest = latest_by_conv.get(conv.id)
             if latest is None or latest.sender_patient_id == patient_id:
-                # Skip outbound — we only notify on inbound messages.
                 continue
             sender_name = None
-            if latest.sender_user_id:
-                sender = await self.db.get(User, latest.sender_user_id)
-                sender_name = sender.full_name if sender else None
+            if latest.sender_user_id and latest.sender_user_id in senders:
+                sender_name = senders[latest.sender_user_id].full_name
             out.append(
                 PatientNotificationOut(
                     id=f"message:{conv.id}",
@@ -107,12 +129,23 @@ class PatientNotificationsService:
                 .order_by(Appointment.starts_at.asc())
             )
         ).scalars().all()
+        # Batch-fetch every provider on these appointments in one IN
+        # clause instead of one SELECT per row.
+        provider_ids = {r.physician_id for r in rows if r.physician_id}
+        providers: dict[UUID, User] = {}
+        if provider_ids:
+            prov_rows = (
+                await self.db.execute(
+                    select(User).where(User.id.in_(provider_ids))
+                )
+            ).scalars().all()
+            providers = {u.id: u for u in prov_rows}
+
         out: list[PatientNotificationOut] = []
         for r in rows:
             provider_name = None
-            if r.physician_id:
-                provider = await self.db.get(User, r.physician_id)
-                provider_name = provider.full_name if provider else None
+            if r.physician_id and r.physician_id in providers:
+                provider_name = providers[r.physician_id].full_name
             out.append(
                 PatientNotificationOut(
                     id=f"appointment:{r.id}",
