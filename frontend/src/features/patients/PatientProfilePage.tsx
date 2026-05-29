@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { MessageCircle } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -18,6 +19,7 @@ import { MedicationsCard } from "@/features/patients/components/Medications";
 import { Labs } from "@/features/patients/components/Labs";
 import { LabReports } from "@/features/patients/components/LabReports";
 import { ClinicalActions } from "@/features/patients/components/ClinicalActions";
+import { PatientChatDrawer } from "@/features/patients/components/chat/PatientChatDrawer";
 import { useDeletePatient } from "@/features/patients/hooks/use-delete-patient";
 import { usePatient } from "@/features/patients/hooks/use-patient";
 
@@ -53,6 +55,7 @@ export function PatientProfilePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const remove = useDeletePatient();
   const { data: patient, isLoading, isError, error, refetch, isFetching } =
     usePatient(patientId);
@@ -166,6 +169,18 @@ export function PatientProfilePage() {
         </div>
       )}
 
+      {/* Floating Ask-AI FAB — visible on every tab of the patient chart */}
+      {patient && (
+        <button
+          type="button"
+          onClick={() => setChatOpen(true)}
+          className="fixed bottom-6 right-6 z-30 size-14 rounded-full bg-primary text-white shadow-elev hover:scale-105 transition grid place-items-center"
+          aria-label="Ask AI about this patient"
+        >
+          <MessageCircle className="size-6" />
+        </button>
+      )}
+
       <ConfirmDialog
         open={confirmingDelete}
         onOpenChange={setConfirmingDelete}
@@ -187,6 +202,15 @@ export function PatientProfilePage() {
         onOpenChange={setEditOpen}
         patientId={patient?.id}
       />
+
+      {patient && (
+        <PatientChatDrawer
+          open={chatOpen}
+          onOpenChange={setChatOpen}
+          patientId={patient.id}
+          patientName={patient.name}
+        />
+      )}
     </>
   );
 }

@@ -1,8 +1,48 @@
 /**
  * AI endpoints scoped to the patient chart — summary + risk + the
  * aggregator that powers the auto-on-open AI panel.
+ * Also contains ICD-suggest (Feature B) and patient Q&A ask (Feature C).
  */
 import { api } from "@/lib/api-client";
+
+// ---------------------------------------------------------------------------
+// Feature B — ICD-suggest types
+// ---------------------------------------------------------------------------
+
+export interface IcdSuggestion {
+  code: string;
+  description: string;
+  confidence: number;
+  reasoning: string | null;
+  isValidated: boolean;
+}
+
+export interface IcdSuggestResponse {
+  suggestions: IcdSuggestion[];
+  model: string;
+  generatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Feature C — Patient Q&A chat types
+// ---------------------------------------------------------------------------
+
+export interface ChatCitation {
+  type?: string;
+  ref_id?: string;
+  snippet?: string;
+  [k: string]: unknown;
+}
+
+export interface ChatAnswer {
+  question: string;
+  answer: string;
+  citations: ChatCitation[];
+  model: string;
+  generatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
 
 export type RiskLevel = "low" | "moderate" | "high" | "critical";
 
@@ -188,6 +228,66 @@ export const patientsAiApi = {
       objective: res.objective ?? "",
       assessment: res.assessment ?? "",
       plan: res.plan ?? "",
+    };
+  },
+
+  /** Feature B — suggest ICD-10 codes from free-form SOAP text. */
+  suggestIcd: async (input: {
+    text: string;
+    patientId?: string;
+    noteId?: string;
+  }): Promise<IcdSuggestResponse> => {
+    const dto = await api.post<{
+      suggestions: Array<{
+        code: string;
+        description: string;
+        confidence: number;
+        reasoning: string | null;
+        is_validated: boolean;
+      }>;
+      model: string;
+      generated_at: string;
+    }>("/ai/icd-suggest", {
+      text: input.text,
+      patient_id: input.patientId ?? null,
+      note_id: input.noteId ?? null,
+    });
+    return {
+      suggestions: dto.suggestions.map((s) => ({
+        code: s.code,
+        description: s.description,
+        confidence: s.confidence,
+        reasoning: s.reasoning,
+        isValidated: s.is_validated,
+      })),
+      model: dto.model,
+      generatedAt: dto.generated_at,
+    };
+  },
+
+  /** Feature C — patient chart Q&A via RAG. */
+  ask: async (input: {
+    question: string;
+    patientId?: string;
+    topK?: number;
+  }): Promise<ChatAnswer> => {
+    const dto = await api.post<{
+      question: string;
+      answer: string;
+      citations: ChatCitation[];
+      model: string;
+      generated_at: string;
+    }>("/ai/ask", {
+      question: input.question,
+      patient_id: input.patientId ?? null,
+      top_k: input.topK ?? 4,
+    });
+    return {
+      question: dto.question,
+      answer: dto.answer,
+      citations: dto.citations ?? [],
+      model: dto.model,
+      generatedAt: dto.generated_at,
     };
   },
 };

@@ -36,6 +36,7 @@ import { SummaryCard } from "@/features/scribe/components/SummaryCard";
 import type { ScribeSessionFull } from "@/features/scribe/api/scribe-api";
 
 import { AssistPicker, type AssistMode } from "./components/AssistPicker";
+import { IcdSuggestPanel } from "./components/IcdSuggestPanel";
 import { RecordingPanel } from "./components/RecordingPanel";
 import { SoapEditor, type SoapValues } from "./components/SoapEditor";
 
@@ -495,6 +496,13 @@ export function SoapNotePage() {
         </div>
 
         <div className="lg:col-span-5 space-y-4">
+          {/* ICD-suggest panel — always visible (create + edit) */}
+          <IcdSuggestPanel
+            patientId={patientId}
+            soapText={`${soapValues.subjective}\n\n${soapValues.objective}\n\n${soapValues.assessment}\n\n${soapValues.plan}`}
+            noteId={isEdit ? noteId : undefined}
+          />
+
           {scribeSession && (
             <>
               <ScribeIcdSection session={scribeSession} />

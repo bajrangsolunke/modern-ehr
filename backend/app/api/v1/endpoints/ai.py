@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Query, Request
@@ -5,6 +6,7 @@ from pydantic import BaseModel
 
 from app.ai.chart_context import ChartContextService
 from app.ai.llm import llm_client
+from app.ai.prompts.icd import ICD_SYSTEM_PROMPT
 from app.ai.rag import RagService
 from app.ai.risk import RiskService
 from app.ai.scribe import ScribeService
@@ -12,6 +14,9 @@ from app.ai.summary import SummaryService
 from app.api.deps import CurrentUser, DbSession
 from app.schemas.ai import (
     AiChartContextResponse,
+    AiIcdSuggestRequest,
+    AiIcdSuggestResponse,
+    AiIcdSuggestionItem,
     AiIntakeSummaryRequest,
     AiIntakeSummaryResponse,
     AiQuestionRequest,
@@ -21,7 +26,9 @@ from app.schemas.ai import (
     AiSummaryRequest,
     AiSummaryResponse,
 )
+from app.schemas.scribe import LlmIcdOutput
 from app.services.audit_service import AuditService
+from app.services.icd_validator import validate_codes
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -119,10 +126,94 @@ async def chart_context(
 
 @router.post("/ask", response_model=AiQuestionResponse)
 async def ask(
-    payload: AiQuestionRequest, db: DbSession, current: CurrentUser
+    payload: AiQuestionRequest,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
 ) -> AiQuestionResponse:
-    return await RagService(db).ask(
+    res = await RagService(db).ask(
         payload.question, patient_id=payload.patient_id, top_k=payload.top_k
+    )
+    resource_type = "patient" if payload.patient_id else "general"
+    resource_id = str(payload.patient_id) if payload.patient_id else ""
+    await AuditService(db).record_request(
+        request,
+        user_id=current.id,
+        action="ai.ask",
+        resource_type=resource_type,
+        resource_id=resource_id,
+        payload={
+            "model": res.model,
+            "question_chars": len(payload.question),
+            "citation_count": len(res.citations),
+        },
+    )
+    return res
+
+
+@router.post("/icd-suggest", response_model=AiIcdSuggestResponse)
+async def icd_suggest(
+    payload: AiIcdSuggestRequest,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
+) -> AiIcdSuggestResponse:
+    """Suggest ICD-10-CM codes for a free-form SOAP note or clinical text.
+    Suggestions are ephemeral — the FE may persist them onto the note later."""
+    # 1. Call LLM with ICD system prompt
+    messages = [
+        {"role": "system", "content": ICD_SYSTEM_PROMPT},
+        {"role": "user", "content": payload.text},
+    ]
+    raw = await llm_client.chat(messages, json_mode=True, max_tokens=600)
+
+    # 2. Safe-parse via LlmIcdOutput
+    try:
+        parsed = LlmIcdOutput.model_validate_json(raw)
+    except Exception:
+        parsed = LlmIcdOutput()
+
+    # 3. Validate codes against the catalog
+    validated = await validate_codes(db, parsed.suggestions)
+
+    # 4. Audit log
+    if payload.patient_id is not None:
+        resource_type = "patient"
+        resource_id = str(payload.patient_id)
+    elif payload.note_id is not None:
+        resource_type = "soap_note"
+        resource_id = str(payload.note_id)
+    else:
+        resource_type = "text"
+        resource_id = ""
+
+    await AuditService(db).record_request(
+        request,
+        user_id=current.id,
+        action="ai.icd.suggest",
+        resource_type=resource_type,
+        resource_id=resource_id,
+        payload={
+            "model": llm_client.chat_model,
+            "text_chars": len(payload.text),
+            "suggestion_count": len(validated),
+        },
+    )
+
+    # 5. Return response
+    return AiIcdSuggestResponse(
+        suggestions=[
+            AiIcdSuggestionItem(
+                code=v.code,
+                description=v.description,
+                confidence=v.confidence,
+                reasoning=v.reasoning,
+                is_validated=v.is_validated,
+            )
+            for v in validated
+        ],
+        model=llm_client.chat_model,
+        generated_at=datetime.now(timezone.utc),
     )
 
 

@@ -92,6 +92,30 @@ class AiChartContextResponse(BaseModel):
     ai_alerts_count: int
 
 
+class AiIcdSuggestRequest(BaseModel):
+    """Free-form SOAP-note text (or just assessment + plan) for which
+    to suggest ICD-10 codes. Optional patient_id for audit-log scope.
+    Optional note_id for traceability."""
+
+    text: str = Field(..., min_length=1, max_length=20000)
+    patient_id: UUID | None = None
+    note_id: UUID | None = None
+
+
+class AiIcdSuggestionItem(BaseModel):
+    code: str
+    description: str
+    confidence: float
+    reasoning: str | None
+    is_validated: bool
+
+
+class AiIcdSuggestResponse(BaseModel):
+    suggestions: list[AiIcdSuggestionItem]
+    model: str
+    generated_at: datetime
+
+
 class AiSoapDraftResponse(BaseModel):
     """SOAP-note draft synthesized from a submitted intake form. Used by
     the SoapNoteDrawer's 'Fill from intake' affordance — the provider
