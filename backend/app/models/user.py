@@ -108,9 +108,11 @@ class User(Base, UUIDMixin, TimestampMixin):
         "ProviderEducation",
         back_populates="user",
         cascade="all, delete-orphan",
+        lazy="selectin",
     )
     licenses: Mapped[list["ProviderLicense"]] = relationship(
         "ProviderLicense",
         back_populates="user",
         cascade="all, delete-orphan",
+        lazy="selectin",
     )
