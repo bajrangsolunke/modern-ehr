@@ -22,6 +22,7 @@ import { ClinicalActions } from "@/features/patients/components/ClinicalActions"
 import { PatientChatDrawer } from "@/features/patients/components/chat/PatientChatDrawer";
 import { useDeletePatient } from "@/features/patients/hooks/use-delete-patient";
 import { usePatient } from "@/features/patients/hooks/use-patient";
+import { PatientBillingTab } from "@/features/billing/components/PatientBillingTab";
 
 /**
  * Tab-based patient profile. URL syncs ?tab= so links are shareable.
@@ -44,6 +45,7 @@ const TABS = [
   { value: "medications", label: "Medications" },
   { value: "forms", label: "Forms" },
   { value: "documents", label: "Documents" },
+  { value: "billing", label: "Billing" },
   { value: "care-plan", label: "Care plan" },
 ] as const;
 
@@ -153,6 +155,10 @@ export function PatientProfilePage() {
 
             <TabsContent value="documents" className="mt-0">
               <PatientDocuments patientId={patient.id} />
+            </TabsContent>
+
+            <TabsContent value="billing" className="mt-0">
+              {patientId && <PatientBillingTab patientId={patientId} />}
             </TabsContent>
 
             <TabsContent value="care-plan" className="mt-0">
