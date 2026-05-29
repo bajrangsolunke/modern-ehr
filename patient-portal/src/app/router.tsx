@@ -35,6 +35,11 @@ const NotificationsPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import("@/features/settings").then((m) => ({ default: m.SettingsPage }))
 );
+const PatientTelehealthPage = lazy(() =>
+  import("@/features/telehealth/PatientTelehealthPage").then((m) => ({
+    default: m.PatientTelehealthPage,
+  }))
+);
 
 function PageFallback() {
   return (
@@ -65,6 +70,10 @@ export function AppRouter() {
             <Route path={ROUTES.tasks} element={<TasksPage />} />
             <Route path={ROUTES.notifications} element={<NotificationsPage />} />
             <Route path={ROUTES.settings} element={<SettingsPage />} />
+            <Route
+              path="/telehealth/:appointmentId"
+              element={<PatientTelehealthPage />}
+            />
           </Route>
         </Route>
 
