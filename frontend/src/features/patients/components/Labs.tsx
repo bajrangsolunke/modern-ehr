@@ -12,6 +12,7 @@ import {
   ChevronRight,
   FlaskConical,
   Loader2,
+  Plus,
   Sparkles,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -22,9 +23,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { useLabResults } from "../hooks/use-lab-results";
+import { AddLabValueModal } from "./AddLabValueModal";
 import { cn, formatDate } from "@/lib/utils";
 
 const flagMap = {
@@ -41,6 +44,7 @@ export function Labs({ patientId }: Props) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [collapsed, setCollapsed] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const {
     data: labs,
     isLoading,
@@ -82,13 +86,23 @@ export function Labs({ patientId }: Props) {
             </span>
           )}
         </button>
-        <button
-          type="button"
-          onClick={goToDocuments}
-          className="text-xs text-primary hover:underline flex items-center gap-0.5 shrink-0"
-        >
-          View all <ChevronRight className="size-3" />
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-7 text-xs"
+            onClick={() => setAddOpen(true)}
+          >
+            <Plus className="size-3" /> Add value
+          </Button>
+          <button
+            type="button"
+            onClick={goToDocuments}
+            className="text-xs text-primary hover:underline flex items-center gap-0.5"
+          >
+            View all <ChevronRight className="size-3" />
+          </button>
+        </div>
       </CardHeader>
 
       {!collapsed && (
@@ -114,7 +128,12 @@ export function Labs({ patientId }: Props) {
             <Empty
               icon={<FlaskConical className="size-6" />}
               title="No lab results yet"
-              description="Upload a lab-report PDF below and use ✨ Extract with AI to populate this panel automatically."
+              description="Upload a lab-report PDF below and use ✨ Extract with AI, or click Add value to enter a single result manually."
+              action={
+                <Button size="sm" onClick={() => setAddOpen(true)}>
+                  <Plus className="size-3.5" /> Add value
+                </Button>
+              }
             />
           )}
 
@@ -188,6 +207,12 @@ export function Labs({ patientId }: Props) {
           )}
         </CardContent>
       )}
+
+      <AddLabValueModal
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        patientId={patientId}
+      />
     </Card>
   );
 }
