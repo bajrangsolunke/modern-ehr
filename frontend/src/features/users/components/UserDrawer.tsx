@@ -352,7 +352,7 @@ export function UserDrawer({ open, onOpenChange, user }: Props) {
           ? `Update profile and access for ${user?.fullName}.`
           : "Invite a new teammate. They'll sign in with the password you set."
       }
-      size={isProviderCreate ? "xl" : "lg"}
+      size="xl"
     >
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         <div className="flex items-start gap-5">
