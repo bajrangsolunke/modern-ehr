@@ -1,4 +1,6 @@
 import pytest
+from fastapi import HTTPException
+from pydantic import ValidationError
 
 from app.schemas.service_catalog import ServiceCatalogCreate
 from app.services.service_catalog_service import ServiceCatalogService
@@ -46,12 +48,12 @@ async def test_list_filters_to_active_by_default(db_session):
     assert a.id in ids
     assert b.id not in ids
     # `total` is the count of active rows seen — at minimum our `a`.
-    assert total >= 1
+    assert total == 1
 
 
 @pytest.mark.asyncio
 async def test_create_rejects_negative_price(db_session):
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         ServiceCatalogCreate(code="X", name="X", category="visit", price_cents=-1)
 
 
@@ -61,7 +63,7 @@ async def test_create_duplicate_code_is_conflict(db_session):
     await svc.create(
         ServiceCatalogCreate(code="DUP-1", name="A", category="visit", price_cents=100)
     )
-    with pytest.raises(Exception):
+    with pytest.raises(HTTPException):
         await svc.create(
             ServiceCatalogCreate(code="DUP-1", name="B", category="visit", price_cents=200)
         )

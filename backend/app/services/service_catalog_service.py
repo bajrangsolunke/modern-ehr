@@ -4,6 +4,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.service_catalog import ServiceCatalog
@@ -31,14 +32,21 @@ class ServiceCatalogService:
             )
         row = ServiceCatalog(**payload.model_dump())
         self.db.add(row)
-        await self.db.commit()
+        try:
+            await self.db.flush()
+        except IntegrityError as exc:
+            await self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Service code '{payload.code}' already exists",
+            ) from exc
         await self.db.refresh(row)
         return ServiceCatalogOut.model_validate(row)
 
     async def get(self, service_id: UUID) -> ServiceCatalogOut:
         row = await self.db.get(ServiceCatalog, service_id)
         if row is None:
-            raise HTTPException(404, "Service not found")
+            raise HTTPException(status_code=404, detail="Service not found")
         return ServiceCatalogOut.model_validate(row)
 
     async def update(
@@ -46,19 +54,19 @@ class ServiceCatalogService:
     ) -> ServiceCatalogOut:
         row = await self.db.get(ServiceCatalog, service_id)
         if row is None:
-            raise HTTPException(404, "Service not found")
+            raise HTTPException(status_code=404, detail="Service not found")
         for k, v in payload.model_dump(exclude_unset=True).items():
             setattr(row, k, v)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(row)
         return ServiceCatalogOut.model_validate(row)
 
     async def deactivate(self, service_id: UUID) -> None:
         row = await self.db.get(ServiceCatalog, service_id)
         if row is None:
-            raise HTTPException(404, "Service not found")
+            raise HTTPException(status_code=404, detail="Service not found")
         row.is_active = False
-        await self.db.commit()
+        await self.db.flush()
 
     async def list(
         self,

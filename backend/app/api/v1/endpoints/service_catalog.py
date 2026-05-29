@@ -1,7 +1,7 @@
 from math import ceil
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 
 from app.api.deps import CurrentUser, DbSession, require_roles
 from app.models.user import UserRole
@@ -40,7 +40,7 @@ async def list_services(
     )
 
 
-@router.post("", response_model=ServiceCatalogOut, status_code=201, dependencies=[admin_only])
+@router.post("", response_model=ServiceCatalogOut, status_code=status.HTTP_201_CREATED, dependencies=[admin_only])
 async def create_service(
     payload: ServiceCatalogCreate, db: DbSession, current: CurrentUser  # noqa: ARG001
 ) -> ServiceCatalogOut:
@@ -57,7 +57,7 @@ async def update_service(
     return await ServiceCatalogService(db).update(service_id, payload)
 
 
-@router.delete("/{service_id}", status_code=204, dependencies=[admin_only])
+@router.delete("/{service_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[admin_only])
 async def deactivate_service(
     service_id: UUID, db: DbSession, current: CurrentUser  # noqa: ARG001
 ) -> None:
