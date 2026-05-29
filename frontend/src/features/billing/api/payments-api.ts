@@ -57,6 +57,13 @@ export interface CashPaymentInput {
   reference?: string;
 }
 
+export interface StripeInit {
+  paymentIntentId: string;
+  clientSecret: string;
+  publishableKey: string;
+  amountCents: number;
+}
+
 export const paymentsApi = {
   listForInvoice: async (invoiceId: string): Promise<Payment[]> => {
     const data = await api.get<BackendDto[]>(
@@ -66,4 +73,18 @@ export const paymentsApi = {
   },
   recordCash: async (input: CashPaymentInput): Promise<Payment> =>
     map(await api.post<BackendDto>("/billing/payments/cash", input)),
+  initStripe: async (invoiceId: string): Promise<StripeInit> => {
+    const d = await api.post<{
+      payment_intent_id: string;
+      client_secret: string;
+      publishable_key: string;
+      amount_cents: number;
+    }>("/billing/payments/stripe/init", { invoice_id: invoiceId });
+    return {
+      paymentIntentId: d.payment_intent_id,
+      clientSecret: d.client_secret,
+      publishableKey: d.publishable_key,
+      amountCents: d.amount_cents,
+    };
+  },
 };

@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field
 
 from app.ai.rag import RagService
 from app.api.deps import CurrentPatient, DbSession
-from app.core.config import settings
 from app.core.rate_limit import limiter
 from app.schemas.ai import AiQuestionResponse
 from app.schemas.patient_auth import PatientMeOut
@@ -240,7 +239,6 @@ async def consent_to_telehealth(
     )
     return PatientConsentOut(
         session_id=session.id,
-        provider=settings.VIDEO_PROVIDER,  # type: ignore[arg-type]
         daily_room_url=session.daily_room_url,
         meeting_token=token,
     )
@@ -313,8 +311,7 @@ async def download_my_document(
 async def my_invoices(
     db: DbSession, current: CurrentPatient
 ) -> list[InvoiceOut]:
-    """List the signed-in patient's invoices. CurrentPatient is the only
-    auth — staff JWTs can't reach here (token_type='patient' is required)."""
+    """List the signed-in patient's invoices."""
     return await InvoiceService(db).list_for_patient(current.id)
 
 

@@ -17,6 +17,7 @@ import { useInvoicePayments } from "@/features/billing/hooks/use-payments";
 import { useOpenCharges } from "@/features/billing/hooks/use-charges";
 import { AddChargeModal } from "./AddChargeModal";
 import { TakeCashPaymentModal } from "./TakeCashPaymentModal";
+import { ChargeCardModal } from "./ChargeCardModal";
 
 const dollar = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -40,6 +41,7 @@ export function PatientBillingTab({ patientId }: Props) {
   const openRows = openCharges.data ?? [];
   const [addOpen, setAddOpen] = useState(false);
   const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
+  const [cardInvoice, setCardInvoice] = useState<Invoice | null>(null);
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
 
   const handleIssue = async () => {
@@ -154,6 +156,7 @@ export function PatientBillingTab({ patientId }: Props) {
                     setExpandedInvoice((prev) => (prev === inv.id ? null : inv.id))
                   }
                   onTakeCash={() => setPayingInvoice(inv)}
+                  onChargeCard={() => setCardInvoice(inv)}
                   onReceipt={() => invoicesApi.openReceipt(inv.id)}
                 />
               ))}
@@ -174,6 +177,19 @@ export function PatientBillingTab({ patientId }: Props) {
         invoiceId={payingInvoice?.id ?? ""}
         balanceCents={payingInvoice?.balanceCents ?? 0}
       />
+
+      <ChargeCardModal
+        invoice={
+          cardInvoice
+            ? {
+                id: cardInvoice.id,
+                number: cardInvoice.number,
+                balanceCents: cardInvoice.balanceCents,
+              }
+            : null
+        }
+        onClose={() => setCardInvoice(null)}
+      />
     </div>
   );
 }
@@ -183,12 +199,14 @@ function InvoiceRow({
   expanded,
   onToggle,
   onTakeCash,
+  onChargeCard,
   onReceipt,
 }: {
   inv: Invoice;
   expanded: boolean;
   onToggle: () => void;
   onTakeCash: () => void;
+  onChargeCard: () => void;
   onReceipt: () => void;
 }) {
   return (
@@ -215,9 +233,14 @@ function InvoiceRow({
           {inv.balanceCents > 0 &&
             inv.status !== "void" &&
             inv.status !== "refunded" && (
-              <Button size="sm" onClick={onTakeCash}>
-                Take cash
-              </Button>
+              <>
+                <Button size="sm" variant="secondary" onClick={onChargeCard}>
+                  Charge card
+                </Button>
+                <Button size="sm" onClick={onTakeCash}>
+                  Take cash
+                </Button>
+              </>
             )}
         </td>
       </tr>
