@@ -12,6 +12,7 @@ from app.api.v1.endpoints import (
     documents,
     form_requests,
     health,
+    invoices,
     labs,
     medications,
     messages,
@@ -37,6 +38,7 @@ api_router.include_router(patient_portal.router)
 api_router.include_router(users.router)
 api_router.include_router(availability.router)
 api_router.include_router(charges.router)
+api_router.include_router(invoices.router)
 api_router.include_router(patients.router)
 api_router.include_router(appointments.router)
 api_router.include_router(notes.router)
