@@ -3,7 +3,7 @@
  * in docs/superpowers/specs/2026-05-27-workflow-user-stories.md.
  */
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Briefcase,
   Copy,
@@ -77,6 +77,7 @@ export function UsersPage() {
     emailQueued: boolean;
   } | null>(null);
 
+  const navigate = useNavigate();
   const { data, isLoading, isError, error, refetch, isFetching } = useUsers(filters);
   const reactivate = useReactivateUser();
   const deactivate = useDeactivateUser();
@@ -99,8 +100,7 @@ export function UsersPage() {
     (filters.role ? 1 : 0) + (filters.is_active !== undefined ? 1 : 0);
 
   const openCreate = () => {
-    setEditing(null);
-    setDrawerOpen(true);
+    navigate("/users/new");
   };
   const openEdit = (u: AppUser) => {
     setEditing(u);

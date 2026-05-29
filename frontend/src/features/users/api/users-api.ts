@@ -52,13 +52,64 @@ export interface UserFilters {
   page_size?: number;
 }
 
+export interface ProviderEducationInput {
+  kind: "education" | "work";
+  institution: string;
+  title?: string;
+  field_or_specialty?: string;
+  start_year?: number;
+  end_year?: number;
+  notes?: string;
+}
+
+export interface ProviderLicenseInput {
+  license_type: string;
+  license_number: string;
+  issuing_state?: string;
+  issuing_authority?: string;
+  issued_date?: string;
+  expires_date?: string;
+  notes?: string;
+}
+
 export interface UserCreateInput {
   email: string;
   full_name: string;
   role: Role;
-  password: string;
+  /** Optional — omit to create an invited user (no password set). */
+  password?: string;
   specialty?: string | null;
   avatar_url?: string | null;
+  // Basic
+  credential?: string;
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+  date_of_birth?: string;
+  gender?: string;
+  npi?: string;
+  taxonomy_code?: string;
+  languages_spoken?: string;
+  ssn?: string;
+  // Contact
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  zip_code?: string;
+  telephone?: string;
+  mobile?: string;
+  fax?: string;
+  time_zone?: string;
+  // Other
+  federal_tax_id?: string;
+  tax_id_type?: string;
+  registration_date?: string;
+  primary_service_location?: string;
+  supervising_provider_id?: string;
+  is_non_billing?: boolean;
+  // Sub-rows
+  education?: ProviderEducationInput[];
+  licenses?: ProviderLicenseInput[];
 }
 
 export interface UserUpdateInput {
