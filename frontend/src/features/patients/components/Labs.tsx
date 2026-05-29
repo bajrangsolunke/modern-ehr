@@ -1,12 +1,13 @@
 /**
  * Recent lab results panel for the Vitals & Labs tab. Pulls structured
- * values from the labs API. Each row that was AI-extracted shows the
- * source-report filename inline so providers can tell at a glance
- * which PDF a value came from (a patient may have multiple reports).
+ * values from the labs API. Source PDFs (when results were AI-
+ * extracted) are summarised once in the card header rather than
+ * repeated on every row — keeps rows single-line so more results
+ * fit on screen.
  *
  * The whole card is collapsible — chevron toggle in the header.
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -53,6 +54,23 @@ export function Labs({ patientId }: Props) {
     refetch,
   } = useLabResults(patientId);
 
+  // Collapse all source PDFs into a single chip row in the header.
+  // Most patients have 1-2 reports; if there are more we show the
+  // first two and a "+N more" with a tooltip listing the rest.
+  const sources = useMemo(() => {
+    if (!labs) return [] as string[];
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const l of labs) {
+      const name = l.sourceDocumentName;
+      if (name && !seen.has(name)) {
+        seen.add(name);
+        ordered.push(name);
+      }
+    }
+    return ordered;
+  }, [labs]);
+
   const goToDocuments = () => {
     const next = new URLSearchParams(searchParams);
     next.set("tab", "documents");
@@ -64,45 +82,51 @@ export function Labs({ patientId }: Props) {
 
   return (
     <Card>
-      <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => setCollapsed((c) => !c)}
-          aria-expanded={!collapsed}
-          aria-controls={`labs-body-${patientId}`}
-          className="flex items-center gap-2 min-w-0 text-left rounded-lg -m-1 p-1 hover:bg-surface-subtle/60 transition flex-1"
-        >
-          <ChevronDown
-            className={cn(
-              "size-4 text-muted-foreground shrink-0 transition-transform",
-              collapsed && "-rotate-90",
-            )}
-            aria-hidden
-          />
-          <CardTitle>Labs &amp; Imaging</CardTitle>
-          {labs && labs.length > 0 && (
-            <span className="text-xs text-muted-foreground font-normal">
-              · {labs.length} result{labs.length === 1 ? "" : "s"}
-            </span>
-          )}
-        </button>
-        <div className="flex items-center gap-2 shrink-0">
-          <Button
-            size="sm"
-            variant="secondary"
-            className="h-7 text-xs"
-            onClick={() => setAddOpen(true)}
-          >
-            <Plus className="size-3" /> Add value
-          </Button>
+      <CardHeader className="pb-2">
+        <div className="flex flex-row items-center justify-between gap-2">
           <button
             type="button"
-            onClick={goToDocuments}
-            className="text-xs text-primary hover:underline flex items-center gap-0.5"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-expanded={!collapsed}
+            aria-controls={`labs-body-${patientId}`}
+            className="flex items-center gap-2 min-w-0 text-left rounded-lg -m-1 p-1 hover:bg-surface-subtle/60 transition flex-1"
           >
-            View all <ChevronRight className="size-3" />
+            <ChevronDown
+              className={cn(
+                "size-4 text-muted-foreground shrink-0 transition-transform",
+                collapsed && "-rotate-90",
+              )}
+              aria-hidden
+            />
+            <CardTitle>Labs &amp; Imaging</CardTitle>
+            {labs && labs.length > 0 && (
+              <span className="text-xs text-muted-foreground font-normal">
+                · {labs.length} result{labs.length === 1 ? "" : "s"}
+              </span>
+            )}
           </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-7 text-xs"
+              onClick={() => setAddOpen(true)}
+            >
+              <Plus className="size-3" /> Add value
+            </Button>
+            <button
+              type="button"
+              onClick={goToDocuments}
+              className="text-xs text-primary hover:underline flex items-center gap-0.5"
+            >
+              View all <ChevronRight className="size-3" />
+            </button>
+          </div>
         </div>
+
+        {!collapsed && sources.length > 0 && (
+          <SourceStrip sources={sources} />
+        )}
       </CardHeader>
 
       {!collapsed && (
@@ -151,27 +175,11 @@ export function Labs({ patientId }: Props) {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {labs.map((l) => (
-                    <tr
-                      key={l.id}
-                      className="hover:bg-surface-subtle/70 align-top"
-                    >
-                      <td className="px-3 py-2 font-medium">
-                        <div className="min-w-0">
-                          <div className="truncate">{l.name}</div>
-                          {l.sourceDocumentName && (
-                            <div
-                              className="text-[11px] text-muted-foreground font-normal mt-0.5 inline-flex items-center gap-1 max-w-full"
-                              title={`Extracted from ${l.sourceDocumentName}`}
-                            >
-                              <Sparkles className="size-2.5 text-primary shrink-0" />
-                              <span className="truncate">
-                                from {l.sourceDocumentName}
-                              </span>
-                            </div>
-                          )}
-                        </div>
+                    <tr key={l.id} className="hover:bg-surface-subtle/70">
+                      <td className="px-3 py-1.5 font-medium truncate max-w-[280px]">
+                        {l.name}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-1.5 tabular-nums">
                         {l.value}{" "}
                         {l.unit && (
                           <span className="text-muted-foreground text-xs">
@@ -179,13 +187,13 @@ export function Labs({ patientId }: Props) {
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-muted-foreground">
+                      <td className="px-3 py-1.5 text-muted-foreground tabular-nums">
                         {l.referenceRange ?? "—"}
                       </td>
-                      <td className="px-3 py-2 text-muted-foreground">
+                      <td className="px-3 py-1.5 text-muted-foreground whitespace-nowrap">
                         {formatDate(l.collectedAt)}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-1.5">
                         {l.flag ? (
                           <Badge
                             size="sm"
@@ -214,5 +222,42 @@ export function Labs({ patientId }: Props) {
         patientId={patientId}
       />
     </Card>
+  );
+}
+
+/**
+ * One-line strip under the card title summarising which PDFs the
+ * extracted values came from. Shows the first two filenames inline
+ * and rolls additional sources into a "+N more" with a tooltip so
+ * the line never grows past one row.
+ */
+function SourceStrip({ sources }: { sources: string[] }) {
+  const visible = sources.slice(0, 2);
+  const overflow = sources.length - visible.length;
+  return (
+    <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground min-w-0">
+      <Sparkles className="size-3 text-primary shrink-0" aria-hidden />
+      <span className="shrink-0">Extracted from</span>
+      <div className="flex items-center gap-1 min-w-0 flex-wrap">
+        {visible.map((name, i) => (
+          <span
+            key={name}
+            className="truncate max-w-[260px] rounded-full bg-primary/5 border border-primary/15 text-primary px-2 py-0.5"
+            title={name}
+          >
+            {name}
+            {i < visible.length - 1 && overflow === 0 ? "," : ""}
+          </span>
+        ))}
+        {overflow > 0 && (
+          <span
+            className="rounded-full bg-surface-subtle border border-border px-2 py-0.5"
+            title={sources.slice(2).join("\n")}
+          >
+            +{overflow} more
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
