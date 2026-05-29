@@ -37,6 +37,11 @@ from app.models.scribe_session import ScribeSession, ScribeSessionStatus
 from app.models.scribe_transcript import ScribeTranscript
 from app.models.scribe_soap_note import ScribeSoapNote
 from app.models.scribe_icd_suggestion import ScribeIcdSuggestion
+from app.models.service_catalog import ServiceCatalog, ServiceCategory
+from app.models.invoice import Invoice, InvoiceStatus
+from app.models.charge import Charge
+from app.models.payment import Payment, PaymentMethod, PaymentStatus
+from app.models.refund import Refund
 
 __all__ = [
     "User",
@@ -80,4 +85,13 @@ __all__ = [
     "ScribeTranscript",
     "ScribeSoapNote",
     "ScribeIcdSuggestion",
+    "ServiceCatalog",
+    "ServiceCategory",
+    "Invoice",
+    "InvoiceStatus",
+    "Charge",
+    "Payment",
+    "PaymentMethod",
+    "PaymentStatus",
+    "Refund",
 ]

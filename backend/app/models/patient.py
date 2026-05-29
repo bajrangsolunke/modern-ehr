@@ -14,11 +14,14 @@ from app.db.base import Base, TimestampMixin, UUIDMixin
 if TYPE_CHECKING:
     from app.models.allergy import Allergy
     from app.models.appointment import Appointment
+    from app.models.charge import Charge
     from app.models.condition import Condition
     from app.models.document import Document
     from app.models.encounter import Encounter
+    from app.models.invoice import Invoice
     from app.models.lab_result import LabResult
     from app.models.medication import Medication
+    from app.models.payment import Payment
     from app.models.soap_note import SoapNote
     from app.models.user import User
     from app.models.vital import VitalSign
@@ -51,6 +54,7 @@ class Patient(Base, UUIDMixin, TimestampMixin):
     email: Mapped[str | None] = mapped_column(String(255))
     phone: Mapped[str | None] = mapped_column(String(64))
     city: Mapped[str | None] = mapped_column(String(255))
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(64))
     # Holds either an http(s) URL or a data URL (small inline photo).
     avatar_url: Mapped[str | None] = mapped_column(Text)
 
@@ -124,6 +128,9 @@ class Patient(Base, UUIDMixin, TimestampMixin):
     documents: Mapped[list[Document]] = relationship(
         back_populates="patient", cascade="all, delete-orphan"
     )
+    charges: Mapped[list["Charge"]] = relationship(back_populates="patient")
+    invoices: Mapped[list["Invoice"]] = relationship(back_populates="patient")
+    payments: Mapped[list["Payment"]] = relationship(back_populates="patient")
 
     @property
     def full_name(self) -> str:
