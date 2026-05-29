@@ -95,7 +95,7 @@ async def create_payment_intent(
             currency="usd",
             customer=customer_id,
             description=description,
-            automatic_payment_methods={"enabled": True},
+            payment_method_types=["card"],
             metadata={"invoice_id": invoice_id},
             idempotency_key=f"pi:{invoice_id}",
         )
