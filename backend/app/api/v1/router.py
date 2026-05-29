@@ -21,6 +21,7 @@ from app.api.v1.endpoints import (
     patient_auth,
     patient_portal,
     patients,
+    payments,
     scribe,
     service_catalog,
     tasks,
@@ -56,5 +57,6 @@ api_router.include_router(tasks.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(telehealth.router)
 api_router.include_router(ws.router)
+api_router.include_router(payments.router)
 api_router.include_router(scribe.router)
 api_router.include_router(service_catalog.router)
