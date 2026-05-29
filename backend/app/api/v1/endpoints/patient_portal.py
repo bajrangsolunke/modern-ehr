@@ -28,6 +28,7 @@ from app.schemas.patient_portal_tasks import (
     PatientTaskListOut,
     SubmitFormIn,
 )
+from app.schemas.telehealth import PatientConsentOut
 from app.services.patient_ai_service import PatientAIService
 from app.services.patient_appointments_service import PatientAppointmentsService
 from app.services.patient_dashboard_service import PatientDashboardService
@@ -35,6 +36,7 @@ from app.services.patient_documents_service import PatientDocumentsService
 from app.services.patient_messages_service import PatientMessagesService
 from app.services.patient_notifications_service import PatientNotificationsService
 from app.services.patient_tasks_service import PatientTasksService
+from app.services.telehealth_service import TelehealthService
 
 
 router = APIRouter(prefix="/patient-portal", tags=["patient-portal"])
@@ -199,6 +201,31 @@ async def ping_my_conversation_typing(
     """Transient typing ping — broadcasts to every active staff user
     on the conversation. No DB write."""
     await PatientMessagesService(db).ping_typing(conv_id, current.id)
+
+
+@router.post(
+    "/me/telehealth/{appointment_id}/consent",
+    response_model=PatientConsentOut,
+)
+async def consent_to_telehealth(
+    appointment_id: UUID,
+    db: DbSession,
+    current: CurrentPatient,
+) -> PatientConsentOut:
+    """Patient accepts the consent banner. Records the timestamp and
+    mints a Daily join token. The frontend then opens the iframe
+    with `daily_room_url` + `meeting_token`."""
+    name = f"{current.first_name} {current.last_name}".strip() or "Patient"
+    session, token = await TelehealthService(db).consent_and_mint_patient_token(
+        appointment_id=appointment_id,
+        patient_id=current.id,
+        patient_name=name,
+    )
+    return PatientConsentOut(
+        session_id=session.id,
+        daily_room_url=session.daily_room_url,
+        meeting_token=token,
+    )
 
 
 @router.post("/me/conversations/{conv_id}/ai-suggest")
