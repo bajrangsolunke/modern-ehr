@@ -232,3 +232,125 @@ async def test_init_stripe_persists_customer_id_on_patient(
     # The second call's captured tuple overwrote the first — at the second call,
     # existing was the just-saved value.
     assert existing == "cus_test_NEW"
+
+
+@pytest.mark.asyncio
+async def test_init_stripe_on_void_invoice_409(
+    db_session, sample_patient, provider_user, monkeypatch
+):
+    from app.integrations import stripe_client
+    from app.schemas.payment import StripeInitIn
+
+    async def fake_ensure_customer(**_):
+        return "cus_test"
+
+    async def fake_create_payment_intent(**_):
+        return {"id": "pi_void_test", "client_secret": "s", "status": "x"}
+
+    monkeypatch.setattr(stripe_client, "ensure_customer", fake_ensure_customer)
+    monkeypatch.setattr(stripe_client, "create_payment_intent", fake_create_payment_intent)
+    monkeypatch.setattr(
+        "app.core.config.settings.STRIPE_PUBLISHABLE_KEY", "pk_test", raising=False
+    )
+
+    inv = await _open_invoice(db_session, sample_patient, provider_user, 1000)
+    row = await db_session.get(Invoice, inv.id)
+    row.status = "void"
+    await db_session.flush()
+
+    with pytest.raises(HTTPException) as exc:
+        await PaymentService(db_session).init_stripe(StripeInitIn(invoice_id=inv.id))
+    assert exc.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_cash_rejected_when_pending_stripe_covers_balance(
+    db_session, sample_patient, provider_user, monkeypatch
+):
+    """If a Stripe PaymentIntent is already pending for the full balance,
+    a same-amount cash receipt would double-pay once the webhook fires.
+    record_cash must refuse and tell the operator about the pending
+    intent."""
+    from app.integrations import stripe_client
+    from app.schemas.payment import StripeInitIn
+
+    async def fake_ensure_customer(**_):
+        return "cus_test_dbl"
+
+    async def fake_create_payment_intent(**kwargs):
+        return {
+            "id": f"pi_dbl_{kwargs['invoice_id']}",
+            "client_secret": "secret",
+            "status": "x",
+        }
+
+    monkeypatch.setattr(stripe_client, "ensure_customer", fake_ensure_customer)
+    monkeypatch.setattr(stripe_client, "create_payment_intent", fake_create_payment_intent)
+    monkeypatch.setattr(
+        "app.core.config.settings.STRIPE_PUBLISHABLE_KEY", "pk_test", raising=False
+    )
+
+    inv = await _open_invoice(db_session, sample_patient, provider_user, 5000)
+    # Open a pending Stripe row for the full balance.
+    await PaymentService(db_session).init_stripe(StripeInitIn(invoice_id=inv.id))
+
+    # Now try to take cash for the same amount — should 409.
+    with pytest.raises(HTTPException) as exc:
+        await PaymentService(db_session).record_cash(
+            CashPaymentIn(invoice_id=inv.id, amount_cents=5000),
+            viewer_id=provider_user.id,
+        )
+    assert exc.value.status_code == 409
+    assert "pending" in exc.value.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_cash_partial_allowed_when_pending_stripe_partial(
+    db_session, sample_patient, provider_user, monkeypatch
+):
+    """If a pending Stripe row is for $50 and the invoice is $100, a
+    cash receipt for $30 leaves $20 headroom over pending — allowed."""
+    from app.integrations import stripe_client
+    from app.schemas.payment import StripeInitIn
+
+    async def fake_ensure_customer(**_):
+        return "cus_test_partial"
+
+    async def fake_create_payment_intent(**kwargs):
+        return {
+            "id": f"pi_part_{kwargs['invoice_id']}",
+            "client_secret": "secret",
+            "status": "x",
+        }
+
+    monkeypatch.setattr(stripe_client, "ensure_customer", fake_ensure_customer)
+    monkeypatch.setattr(stripe_client, "create_payment_intent", fake_create_payment_intent)
+    monkeypatch.setattr(
+        "app.core.config.settings.STRIPE_PUBLISHABLE_KEY", "pk_test", raising=False
+    )
+
+    inv = await _open_invoice(db_session, sample_patient, provider_user, 10000)
+
+    # Manually create a pending Stripe row for $5000 instead of going
+    # through init_stripe (so the pending amount is partial and we
+    # control it directly).
+    from app.models.payment import Payment as P
+    db_session.add(
+        P(
+            invoice_id=inv.id,
+            patient_id=sample_patient.id,
+            method="stripe",
+            amount_cents=5000,
+            status="pending",
+            stripe_payment_intent_id="pi_partial_manual",
+        )
+    )
+    await db_session.flush()
+
+    # Cash for $3000: 3000 + 5000 = 8000 < 10000 → allowed.
+    out = await PaymentService(db_session).record_cash(
+        CashPaymentIn(invoice_id=inv.id, amount_cents=3000),
+        viewer_id=provider_user.id,
+    )
+    assert out.status == "succeeded"
+    assert out.amount_cents == 3000

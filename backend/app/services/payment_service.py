@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -61,6 +61,33 @@ class PaymentService:
     ) -> PaymentOut:
         """Take a cash (or check / adjustment) receipt at the desk."""
         inv = await self._load_locked_invoice(payload.invoice_id)
+        # Defensive guard: a pending Stripe PaymentIntent reserves the
+        # patient's intent to pay online, but doesn't reduce
+        # balance_cents (which only counts SUCCEEDED rows). Without
+        # this check the patient could pay cash AND complete the
+        # Stripe screen, then the webhook would push paid_cents above
+        # total_cents (clamp + double-pay). Reject the cash receipt
+        # so the front desk knows to deal with the pending intent
+        # first (cancel it in the portal or wait for it to expire).
+        pending_total = (
+            await self.db.execute(
+                select(func.coalesce(func.sum(Payment.amount_cents), 0)).where(
+                    Payment.invoice_id == inv.id,
+                    Payment.status == PaymentStatus.pending.value,
+                )
+            )
+        ).scalar_one()
+        if (
+            int(pending_total) > 0
+            and payload.amount_cents + int(pending_total) > inv.balance_cents
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Invoice has a pending online payment of {int(pending_total)} cents. "
+                    "Cancel or complete it before recording cash."
+                ),
+            )
         if payload.amount_cents > inv.balance_cents:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
