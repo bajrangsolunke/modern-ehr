@@ -20,6 +20,7 @@ from app.api.v1.endpoints import (
     patient_portal,
     patients,
     scribe,
+    service_catalog,
     tasks,
     telehealth,
     users,
@@ -52,3 +53,4 @@ api_router.include_router(dashboard.router)
 api_router.include_router(telehealth.router)
 api_router.include_router(ws.router)
 api_router.include_router(scribe.router)
+api_router.include_router(service_catalog.router)
