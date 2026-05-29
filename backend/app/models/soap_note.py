@@ -28,6 +28,12 @@ class SoapNote(Base, UUIDMixin, TimestampMixin):
     plan: Mapped[str | None] = mapped_column(Text)
     ai_summary: Mapped[str | None] = mapped_column(Text)
     version: Mapped[int] = mapped_column(Integer, default=1)
+    # Set when this SOAP note was generated from a telehealth visit's
+    # transcript. Lets us trace the draft back to its source.
+    telehealth_session_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("telehealth_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     patient: Mapped[Patient] = relationship(back_populates="notes")
     author: Mapped[User | None] = relationship(back_populates="notes")
