@@ -22,6 +22,7 @@ from app.api.v1.endpoints import (
     patient_portal,
     patients,
     payments,
+    reports,
     scribe,
     service_catalog,
     stripe_webhook,
@@ -59,6 +60,7 @@ api_router.include_router(dashboard.router)
 api_router.include_router(telehealth.router)
 api_router.include_router(ws.router)
 api_router.include_router(payments.router)
+api_router.include_router(reports.router)
 api_router.include_router(scribe.router)
 api_router.include_router(service_catalog.router)
 api_router.include_router(stripe_webhook.router)

@@ -14,6 +14,11 @@ export const ROUTES = {
   messages: "/messages",
   reports: "/reports",
   reportsInsights: "/reports/insights",
+  reportsPayments: "/reports/payments",
+  reportsAppointments: "/reports/appointments",
+  reportsPatientVolume: "/reports/patient-volume",
+  reportsClinical: "/reports/clinical",
+  reportsProductivity: "/reports/productivity",
   tasks: "/tasks",
 } as const;
 
@@ -39,6 +44,16 @@ export const QUERY_KEYS = {
     byId: (id: string) => ["users", id] as const,
   },
   analytics: { snapshot: ["analytics", "snapshot"] as const },
+  reports: {
+    payments: (range?: unknown) => ["reports", "payments", range] as const,
+    appointments: (range?: unknown, providerId?: unknown) =>
+      ["reports", "appointments", range, providerId] as const,
+    patientVolume: (range?: unknown) => ["reports", "patient-volume", range] as const,
+    clinical: (range?: unknown) => ["reports", "clinical", range] as const,
+    productivity: (range?: unknown, providerId?: unknown) =>
+      ["reports", "productivity", range, providerId] as const,
+    insights: ["reports", "insights"] as const,
+  },
   ai: {
     summary: (patientId: string) => ["ai", "summary", patientId] as const,
     risk: (patientId: string) => ["ai", "risk", patientId] as const,

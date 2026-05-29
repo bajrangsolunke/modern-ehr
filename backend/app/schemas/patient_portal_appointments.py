@@ -16,6 +16,7 @@ class PatientAppointmentOut(BaseModel):
     reason: str | None = None
     provider_name: str | None = None
     provider_specialty: str | None = None
+    provider_avatar_url: str | None = None
     service_name: str | None = None
     invoice_id: UUID | None = None
     invoice_balance_cents: int | None = None

@@ -35,7 +35,23 @@ import {
   telehealthApi,
 } from "../api/telehealth-api";
 import { LiveTranscript } from "./LiveTranscript";
+import {
+  isWebSpeechSupported,
+  startWebSpeechTranscription,
+} from "../lib/web-speech";
 import { toast } from "@/lib/toast";
+
+/**
+ * "daily" → use Daily.co's built-in `startTranscription()` (requires
+ *           Scale/HIPAA plan with the Transcription add-on).
+ * "web-speech" → use the browser's SpeechRecognition API. Free, dev-mode.
+ *
+ * Default is "web-speech" so the free Daily plan still gets a working
+ * SOAP-generation pipeline. Flip to "daily" via env once on a paid plan.
+ */
+const TRANSCRIPTION_MODE: "daily" | "web-speech" =
+  (import.meta.env.VITE_TRANSCRIPTION_MODE as "daily" | "web-speech") ??
+  "web-speech";
 
 interface Props {
   open: boolean;
@@ -63,6 +79,7 @@ export function TelehealthModal({
   const bufferRef = useRef<TranscriptSegmentIn[]>([]);
   const flushTimerRef = useRef<number | null>(null);
   const ownParticipantIdRef = useRef<string | null>(null);
+  const webSpeechRef = useRef<{ stop: () => void } | null>(null);
   const [joining, setJoining] = useState(false);
 
   const end = useEndTelehealth();
@@ -78,6 +95,15 @@ export function TelehealthModal({
 
     const iframeContainer = document.getElementById("daily-iframe-mount");
     if (!iframeContainer) return;
+
+    // DailyIframe is a strict singleton — a stale instance (from a
+    // StrictMode double-mount, HMR, or a previous open/close cycle)
+    // makes `createFrame` throw "Duplicate DailyIframe instances are
+    // not allowed". Destroy whatever's left over before we mount.
+    const stale = DailyIframe.getCallInstance();
+    if (stale) {
+      void stale.destroy();
+    }
 
     setJoining(true);
     const call = DailyIframe.createFrame(iframeContainer, {
@@ -96,14 +122,40 @@ export function TelehealthModal({
     call.on("joined-meeting", (evt) => {
       setJoining(false);
       ownParticipantIdRef.current = evt?.participants?.local?.session_id ?? null;
-      // Start Deepgram-backed transcription. Only owners can do this;
-      // the provider's token is_owner=true.
-      try {
-        call.startTranscription({ tier: "nova" });
-      } catch (e) {
-        toast.error("Couldn't start transcription", {
-          description: e instanceof Error ? e.message : undefined,
-        });
+      if (TRANSCRIPTION_MODE === "daily") {
+        // Daily-Deepgram path — only owners can start; provider's token is_owner=true.
+        try {
+          call.startTranscription({ tier: "nova" });
+        } catch (e) {
+          toast.error("Couldn't start transcription", {
+            description: e instanceof Error ? e.message : undefined,
+          });
+        }
+      } else {
+        // Web Speech dev fallback — captures the local mic only, so we
+        // tag everything as `unknown` and let the LLM infer roles from
+        // the content during SOAP generation.
+        if (!isWebSpeechSupported()) {
+          toast.error("Browser doesn't support speech recognition", {
+            description:
+              "Live transcript needs Chrome or Edge. Use Daily plan with Transcription for cross-browser support.",
+          });
+        } else {
+          webSpeechRef.current = startWebSpeechTranscription({
+            onFinal: (text) => {
+              const offset = Math.max(0, Date.now() - startedAtRef.current);
+              bufferRef.current.push({
+                speaker_role: "unknown",
+                daily_participant_id: null,
+                text,
+                start_offset_ms: offset,
+              });
+            },
+            onError: (msg) => {
+              toast.error("Transcription error", { description: msg });
+            },
+          });
+        }
       }
     });
 
@@ -119,7 +171,9 @@ export function TelehealthModal({
         start_offset_ms: offset,
       });
     };
-    call.on("transcription-message", onTranscript);
+    if (TRANSCRIPTION_MODE === "daily") {
+      call.on("transcription-message", onTranscript);
+    }
 
     call
       .join({ url: session.dailyRoomUrl, token: session.meetingToken })
@@ -148,7 +202,11 @@ export function TelehealthModal({
         window.clearInterval(flushTimerRef.current);
         flushTimerRef.current = null;
       }
-      call.off("transcription-message", onTranscript);
+      webSpeechRef.current?.stop();
+      webSpeechRef.current = null;
+      if (TRANSCRIPTION_MODE === "daily") {
+        call.off("transcription-message", onTranscript);
+      }
       call.leave().catch(() => {});
       call.destroy().catch(() => {});
       callRef.current = null;
@@ -160,11 +218,15 @@ export function TelehealthModal({
 
   const handleEnd = async () => {
     if (!session) return;
-    try {
-      callRef.current?.stopTranscription();
-    } catch {
-      /* swallow */
+    if (TRANSCRIPTION_MODE === "daily") {
+      try {
+        callRef.current?.stopTranscription();
+      } catch {
+        /* swallow */
+      }
     }
+    webSpeechRef.current?.stop();
+    webSpeechRef.current = null;
     // Flush any buffered chunks one last time.
     const buf = bufferRef.current;
     if (buf.length > 0) {
@@ -195,7 +257,7 @@ export function TelehealthModal({
       open={open}
       onOpenChange={(o) => !o && onClose()}
       title="Telehealth visit"
-      size="xl"
+      size="full"
       footer={
         <div className="flex items-center justify-between gap-2 w-full">
           <Button
@@ -231,16 +293,26 @@ export function TelehealthModal({
         </div>
       }
     >
-      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-3 h-[60vh] min-h-[420px]">
-        <div className="relative rounded-2xl overflow-hidden bg-slate-900">
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_1fr] gap-3 h-[calc(94vh-140px)] min-h-[480px]">
+        <div className="relative rounded-2xl overflow-hidden bg-slate-900 min-h-[480px]">
           <div id="daily-iframe-mount" className="absolute inset-0" />
           {joining && (
-            <div className="absolute inset-0 grid place-items-center bg-slate-900/80 text-white">
+            <div className="absolute inset-0 grid place-items-center bg-slate-900/80 text-white pointer-events-none">
               <Loader2 className="size-6 animate-spin" />
             </div>
           )}
         </div>
-        <LiveTranscript segments={transcript} />
+        <div className="flex flex-col gap-2 min-h-0">
+          {TRANSCRIPTION_MODE === "web-speech" && (
+            <div className="text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 leading-snug">
+              Dev transcription · single-speaker, Chrome/Edge only.
+              Upgrade your Daily plan for multi-speaker Deepgram.
+            </div>
+          )}
+          <div className="flex-1 min-h-0">
+            <LiveTranscript segments={transcript} />
+          </div>
+        </div>
       </div>
     </Modal>
   );

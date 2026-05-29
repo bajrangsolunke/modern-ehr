@@ -1,20 +1,25 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   CalendarClock,
+  CalendarX2,
   LayoutGrid,
   List as ListIcon,
   Loader2,
   MapPin,
   Receipt,
+  ShieldCheck,
+  Sparkles,
   Stethoscope,
+  Timer,
   Video,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { UserAvatar } from "@/components/ui/avatar";
 import { Empty } from "@/components/ui/empty";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { SortableTh, TABLE_ROW_BG } from "@/components/ui/sortable-th";
@@ -27,6 +32,7 @@ import { PayInvoiceModal } from "@/features/billing/components/PayInvoiceModal";
 import type { Invoice } from "@/features/billing/api/billing-api";
 
 type View = "cards" | "list";
+type Filter = "all" | "virtual" | "in_person" | "owed" | "today";
 
 const STATUS_VARIANT: Record<
   string,
@@ -40,16 +46,19 @@ const STATUS_VARIANT: Record<
   "no-show": "danger",
 };
 
+const STATUS_ACCENT: Record<string, string> = {
+  scheduled: "bg-primary",
+  confirmed: "bg-success",
+  pending: "bg-warning",
+  completed: "bg-slate-300",
+  cancelled: "bg-danger",
+  "no-show": "bg-danger",
+};
+
 function typeLabel(t: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1).replace("-", " ");
 }
 
-/**
- * Returns true when the appointment is within the join window:
- * 10 minutes before start through 60 minutes after start, the
- * status allows joining, and the appointment is a virtual visit.
- * In-person visits never show the Join button.
- */
 function isJoinable(appt: PatientAppointment): boolean {
   if (appt.modality !== "virtual") return false;
   const blocked = new Set(["completed", "cancelled", "no-show"]);
@@ -60,9 +69,41 @@ function isJoinable(appt: PatientAppointment): boolean {
   return start - now <= 10 * 60_000 && now - start <= 60 * 60_000;
 }
 
+function isToday(iso: string): boolean {
+  const d = new Date(iso);
+  const n = new Date();
+  return (
+    d.getFullYear() === n.getFullYear() &&
+    d.getMonth() === n.getMonth() &&
+    d.getDate() === n.getDate()
+  );
+}
+
+function useCountdown(iso: string): string | null {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const target = new Date(iso).getTime();
+  if (Number.isNaN(target)) return null;
+  const diff = target - now;
+  if (diff <= 0) return null;
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 60) return `in ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    const m = minutes % 60;
+    return m ? `in ${hours}h ${m}m` : `in ${hours}h`;
+  }
+  const days = Math.floor(hours / 24);
+  return days === 1 ? `in 1 day` : `in ${days} days`;
+}
+
 export function AppointmentsPage() {
   const { data, isLoading, isError, error, refetch, isFetching } = useAppointments();
   const [view, setView] = useState<View>("cards");
+  const [filter, setFilter] = useState<Filter>("all");
 
   return (
     <>
@@ -89,16 +130,19 @@ export function AppointmentsPage() {
 
       {!isLoading && !isError && data && (
         <Tabs defaultValue="upcoming">
-          <TabsList>
-            <TabsTrigger value="upcoming">
-              Upcoming · {data.upcoming.length}
-            </TabsTrigger>
-            <TabsTrigger value="past">Past · {data.past.length}</TabsTrigger>
-          </TabsList>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <TabsList>
+              <TabsTrigger value="upcoming">
+                Upcoming · {data.upcoming.length}
+              </TabsTrigger>
+              <TabsTrigger value="past">Past · {data.past.length}</TabsTrigger>
+            </TabsList>
+            <FilterRow filter={filter} onChange={setFilter} />
+          </div>
 
           <TabsContent value="upcoming">
             <AppointmentsSection
-              items={data.upcoming}
+              items={applyFilter(data.upcoming, filter)}
               view={view}
               emptyTitle="No upcoming appointments"
               emptyHint="When your provider schedules a visit, it'll appear here."
@@ -107,7 +151,7 @@ export function AppointmentsPage() {
 
           <TabsContent value="past">
             <AppointmentsSection
-              items={data.past}
+              items={applyFilter(data.past, filter)}
               view={view}
               emptyTitle="No past appointments"
               emptyHint="Your visit history will appear here."
@@ -119,6 +163,63 @@ export function AppointmentsPage() {
   );
 }
 
+function applyFilter(items: PatientAppointment[], filter: Filter): PatientAppointment[] {
+  switch (filter) {
+    case "virtual":
+      return items.filter((a) => a.modality === "virtual");
+    case "in_person":
+      return items.filter((a) => a.modality === "in_person");
+    case "owed":
+      return items.filter(
+        (a) => (a.invoice_balance_cents ?? 0) > 0
+      );
+    case "today":
+      return items.filter((a) => isToday(a.starts_at));
+    default:
+      return items;
+  }
+}
+
+function FilterRow({
+  filter,
+  onChange,
+}: {
+  filter: Filter;
+  onChange: (f: Filter) => void;
+}) {
+  const chips: { value: Filter; label: string; icon?: React.ReactNode }[] = [
+    { value: "all", label: "All" },
+    { value: "virtual", label: "Video", icon: <Video className="size-3.5" /> },
+    { value: "in_person", label: "In person", icon: <MapPin className="size-3.5" /> },
+    { value: "owed", label: "Pending payment", icon: <Receipt className="size-3.5" /> },
+    { value: "today", label: "Today", icon: <Sparkles className="size-3.5" /> },
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {chips.map((c) => {
+        const active = filter === c.value;
+        return (
+          <button
+            key={c.value}
+            type="button"
+            onClick={() => onChange(c.value)}
+            aria-pressed={active}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-medium border transition ring-focus",
+              active
+                ? "bg-slate-900 text-white border-slate-900 shadow-soft"
+                : "bg-white text-slate-600 border-slate-200 hover:text-slate-900 hover:border-slate-300"
+            )}
+          >
+            {c.icon}
+            {c.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ViewToggle({
   mode,
   onChange,
@@ -127,7 +228,7 @@ function ViewToggle({
   onChange: (m: View) => void;
 }) {
   return (
-    <div className="inline-flex items-center gap-1 rounded-full bg-[#F1F4F9] p-1">
+    <div className="inline-flex items-center gap-1 rounded-full bg-white/70 backdrop-blur p-1 border border-slate-200 shadow-soft">
       <ToggleBtn active={mode === "cards"} onClick={() => onChange("cards")}>
         <LayoutGrid className="size-4" />
         Cards
@@ -157,7 +258,7 @@ function ToggleBtn({
         "inline-flex items-center gap-1.5 rounded-full px-3 h-8 text-xs font-semibold transition ring-focus",
         active
           ? "bg-slate-900 text-white shadow-soft"
-          : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+          : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
       )}
     >
       {children}
@@ -179,7 +280,7 @@ function AppointmentsSection({
   if (items.length === 0) {
     return (
       <Empty
-        icon={<CalendarClock className="size-5" />}
+        icon={<CalendarX2 className="size-5" />}
         title={emptyTitle}
         description={emptyHint}
       />
@@ -194,7 +295,7 @@ function AppointmentsSection({
 
 function CardsView({ items }: { items: PatientAppointment[] }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
       {items.map((a) => (
         <AppointmentCard key={a.id} appt={a} />
       ))}
@@ -206,16 +307,18 @@ function AppointmentCard({ appt }: { appt: PatientAppointment }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const joinable = isJoinable(appt);
+  const countdown = useCountdown(appt.starts_at);
   const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
   const owed =
     appt.invoice_balance_cents && appt.invoice_balance_cents > 0
       ? appt.invoice_balance_cents
       : 0;
+  const isVirtual = appt.modality === "virtual";
+  const accent = STATUS_ACCENT[appt.status] ?? "bg-slate-300";
+  const providerName = appt.provider_name ?? "Care team";
 
   const openPay = () => {
     if (!appt.invoice_id || !owed) return;
-    // The PayInvoiceModal's `Invoice` type wants more fields than we have
-    // here; only id/number/balanceCents matter for triggering the flow.
     setPayingInvoice({
       id: appt.invoice_id,
       number: appt.service_name ?? "appointment",
@@ -234,93 +337,141 @@ function AppointmentCard({ appt }: { appt: PatientAppointment }) {
   };
 
   return (
-    <Card className="p-5 h-full flex flex-col">
-      <div className="flex items-start gap-3 mb-3">
-        <div className="size-11 rounded-2xl bg-primary/10 text-primary grid place-items-center shrink-0">
-          <CalendarClock className="size-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold tabular-nums truncate">
-            {humanWhen(appt.starts_at)}
+    <Card
+      className={cn(
+        "relative overflow-hidden p-0 h-full flex flex-col",
+        "rounded-[24px] border-slate-200/70 bg-white",
+        "shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_30px_-12px_rgba(15,23,42,0.12)]",
+        "transition-all duration-200 hover:-translate-y-0.5",
+        "hover:shadow-[0_2px_4px_rgba(15,23,42,0.06),0_20px_50px_-12px_rgba(15,23,42,0.18)]"
+      )}
+    >
+      {/* Left status accent */}
+      <span
+        aria-hidden
+        className={cn("absolute left-0 top-0 bottom-0 w-1 rounded-l-[24px]", accent)}
+      />
+
+      <div className="p-4 lg:p-5 flex flex-col h-full gap-3">
+        {/* Header: when + status pill */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[18px] font-semibold tracking-tight text-slate-900 tabular-nums truncate">
+              {humanWhen(appt.starts_at)}
+            </div>
+            <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-slate-500">
+              <span className="font-medium text-slate-700">
+                {typeLabel(appt.type)}
+              </span>
+              <span className="size-1 rounded-full bg-slate-300" />
+              <span>{appt.duration_minutes} min</span>
+              {countdown && (
+                <>
+                  <span className="size-1 rounded-full bg-slate-300" />
+                  <span className="inline-flex items-center gap-1 text-primary font-medium">
+                    <Timer className="size-3" />
+                    {countdown}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
-          <div className="text-xs text-muted-foreground mt-0.5">
-            {typeLabel(appt.type)} · {appt.duration_minutes} min
+          <Badge variant={STATUS_VARIANT[appt.status] ?? "neutral"} size="sm" dot>
+            {appt.status}
+          </Badge>
+        </div>
+
+        {/* Doctor section */}
+        <div className="flex items-center gap-2.5 py-2 px-2.5 rounded-2xl bg-slate-50/70 border border-slate-100">
+          <UserAvatar name={providerName} src={appt.provider_avatar_url ?? undefined} size="md" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[13px] font-semibold text-slate-900 truncate">
+                {providerName}
+              </span>
+              <ShieldCheck className="size-3 text-success shrink-0" aria-label="Insurance verified" />
+            </div>
+            <div className="text-[11px] text-slate-500 truncate flex items-center gap-1.5">
+              {appt.provider_specialty && (
+                <>
+                  <Stethoscope className="size-3" />
+                  <span className="truncate">{appt.provider_specialty}</span>
+                </>
+              )}
+              {(appt.room || isVirtual) && (
+                <>
+                  {appt.provider_specialty && <span className="size-1 rounded-full bg-slate-300 shrink-0" />}
+                  {isVirtual ? <Video className="size-3 shrink-0" /> : <MapPin className="size-3 shrink-0" />}
+                  <span className="truncate">{isVirtual ? "Video" : appt.room}</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
-        <Badge variant={STATUS_VARIANT[appt.status] ?? "neutral"} size="sm">
-          {appt.status}
-        </Badge>
+
+        {owed > 0 && (
+          <div className="flex items-center justify-between gap-2 rounded-2xl border border-amber-200/70 bg-gradient-to-r from-amber-50 to-orange-50 px-3 py-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="size-7 rounded-lg bg-white border border-amber-200 grid place-items-center shrink-0">
+                <Receipt className="size-3.5 text-amber-600" />
+              </div>
+              <div className="text-[11px] min-w-0 leading-tight">
+                <div className="font-semibold text-amber-900 tabular-nums">
+                  ${(owed / 100).toFixed(2)} outstanding
+                </div>
+                <div className="text-amber-700/80">Due before visit</div>
+              </div>
+            </div>
+            <Button
+              size="xs"
+              onClick={openPay}
+              className="bg-amber-500 hover:bg-amber-600 text-white shadow-none"
+            >
+              Pay now
+            </Button>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="mt-auto flex items-center gap-1.5 pt-0.5">
+          {joinable ? (
+            <Button
+              size="sm"
+              onClick={() => navigate(`/telehealth/${appt.id}`)}
+              className="flex-1"
+            >
+              <Video className="size-3.5" />
+              Join visit
+            </Button>
+          ) : (
+            isVirtual && appt.status !== "completed" && appt.status !== "cancelled" && (
+              <Button size="sm" variant="soft" disabled className="flex-1">
+                <Video className="size-3.5" />
+                Opens 10 min before
+              </Button>
+            )
+          )}
+          {appt.status !== "completed" && appt.status !== "cancelled" && (
+            <>
+              <Button size="sm" variant="secondary">
+                Reschedule
+              </Button>
+              <Button size="sm" variant="ghost">
+                Cancel
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      <dl className="space-y-2 text-sm">
-        {appt.provider_name && (
-          <div className="flex items-start gap-2">
-            <Stethoscope className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
-            <div className="min-w-0">
-              <div className="text-foreground/90 truncate">{appt.provider_name}</div>
-              {appt.provider_specialty && (
-                <div className="text-[11px] text-muted-foreground">
-                  {appt.provider_specialty}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        {appt.room && (
-          <div className="flex items-center gap-2">
-            <MapPin className="size-3.5 text-muted-foreground shrink-0" />
-            <span className="text-foreground/90">{appt.room}</span>
-          </div>
-        )}
-        {appt.reason && (
-          <div className="text-sm text-muted-foreground mt-1 line-clamp-2">
-            {appt.reason}
-          </div>
-        )}
-      </dl>
-
-      {owed > 0 && (
-        <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <Receipt className="size-3.5 text-amber-600 shrink-0" />
-            <div className="text-xs min-w-0">
-              <div className="font-semibold text-amber-900 tabular-nums">
-                Owed: ${(owed / 100).toFixed(2)}
-              </div>
-              {appt.service_name && (
-                <div className="text-amber-800 truncate">{appt.service_name}</div>
-              )}
-            </div>
-          </div>
-          <Button size="sm" onClick={openPay}>
-            Pay now
-          </Button>
-        </div>
-      )}
-
-      {joinable && (
-        <div className="pt-4 mt-auto">
-          <Button
-            size="sm"
-            onClick={() => navigate(`/telehealth/${appt.id}`)}
-          >
-            <Video className="size-3.5" />
-            Join video visit
-          </Button>
-        </div>
-      )}
-
-      <PayInvoiceModal
-        invoice={payingInvoice}
-        onClose={handleCloseModal}
-      />
+      <PayInvoiceModal invoice={payingInvoice} onClose={handleCloseModal} />
     </Card>
   );
 }
 
 function ListView({ items }: { items: PatientAppointment[] }) {
   return (
-    <Card className="overflow-hidden p-3 sm:p-4">
+    <Card className="overflow-hidden p-3 sm:p-4 rounded-3xl">
       <div className="overflow-x-auto">
         <table
           className="w-full text-sm border-separate"
@@ -355,6 +506,7 @@ function AppointmentRow({ appt }: { appt: PatientAppointment }) {
     appt.invoice_balance_cents && appt.invoice_balance_cents > 0
       ? appt.invoice_balance_cents
       : 0;
+  const providerName = appt.provider_name ?? null;
 
   const openPay = () => {
     if (!appt.invoice_id || !owed) return;
@@ -398,16 +550,30 @@ function AppointmentRow({ appt }: { appt: PatientAppointment }) {
           </div>
         </td>
         <td className="px-4 py-2 text-foreground/80" style={{ background: TABLE_ROW_BG }}>
-          {typeLabel(appt.type)}
+          <span className="inline-flex items-center gap-1.5">
+            {appt.modality === "virtual" ? (
+              <Video className="size-3.5 text-primary" />
+            ) : (
+              <MapPin className="size-3.5 text-slate-400" />
+            )}
+            {typeLabel(appt.type)}
+          </span>
         </td>
         <td className="px-4 py-2 text-foreground/80" style={{ background: TABLE_ROW_BG }}>
-          {appt.provider_name ?? (
-            <span className="text-muted-foreground italic">—</span>
-          )}
-          {appt.provider_specialty && (
-            <div className="text-[11px] text-muted-foreground mt-0.5">
-              {appt.provider_specialty}
+          {providerName ? (
+            <div className="flex items-center gap-2 min-w-0">
+              <UserAvatar name={providerName} src={appt.provider_avatar_url ?? undefined} size="xs" />
+              <div className="min-w-0">
+                <div className="truncate">{providerName}</div>
+                {appt.provider_specialty && (
+                  <div className="text-[11px] text-muted-foreground truncate">
+                    {appt.provider_specialty}
+                  </div>
+                )}
+              </div>
             </div>
+          ) : (
+            <span className="text-muted-foreground italic">—</span>
           )}
         </td>
         <td className="px-4 py-2" style={{ background: TABLE_ROW_BG }}>

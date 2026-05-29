@@ -35,7 +35,7 @@ export function ConversationList({ items, activeId, onSelect }: Props) {
                   : "hover:bg-secondary text-foreground"
               )}
             >
-              <UserAvatar name={headline} size="md" />
+              <UserAvatar name={headline} src={c.headline_avatar_url ?? undefined} size="md" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold truncate">

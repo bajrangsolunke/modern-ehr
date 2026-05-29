@@ -7,6 +7,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy import ARRAY, Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDMixin
@@ -57,6 +58,42 @@ class Patient(Base, UUIDMixin, TimestampMixin):
     stripe_customer_id: Mapped[str | None] = mapped_column(String(64))
     # Holds either an http(s) URL or a data URL (small inline photo).
     avatar_url: Mapped[str | None] = mapped_column(Text)
+
+    # --- Extended demographics (patient-portal editable) ---
+    blood_group: Mapped[str | None] = mapped_column(String(8))
+    gender_identity: Mapped[str | None] = mapped_column(String(32))
+    preferred_pronouns: Mapped[str | None] = mapped_column(String(32))
+
+    # --- Mailing address ---
+    mailing_address_line1: Mapped[str | None] = mapped_column(String(255))
+    mailing_address_line2: Mapped[str | None] = mapped_column(String(255))
+    mailing_city: Mapped[str | None] = mapped_column(String(120))
+    mailing_state: Mapped[str | None] = mapped_column(String(64))
+    mailing_postal_code: Mapped[str | None] = mapped_column(String(20))
+    mailing_country: Mapped[str | None] = mapped_column(String(64))
+
+    # --- Physical address (defaults to "same as mailing") ---
+    physical_same_as_mailing: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=sa.true()
+    )
+    physical_address_line1: Mapped[str | None] = mapped_column(String(255))
+    physical_address_line2: Mapped[str | None] = mapped_column(String(255))
+    physical_city: Mapped[str | None] = mapped_column(String(120))
+    physical_state: Mapped[str | None] = mapped_column(String(64))
+    physical_postal_code: Mapped[str | None] = mapped_column(String(20))
+    physical_country: Mapped[str | None] = mapped_column(String(64))
+
+    # --- Emergency contact ---
+    emergency_contact_name: Mapped[str | None] = mapped_column(String(255))
+    emergency_contact_phone: Mapped[str | None] = mapped_column(String(64))
+    emergency_contact_relationship: Mapped[str | None] = mapped_column(String(64))
+
+    # --- Notification + healthcare preferences (single JSON blob) ---
+    # Strict shape enforced by `PatientPreferences` Pydantic model;
+    # reads merge with defaults so older rows without keys still work.
+    preferences: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=sa.text("'{}'::jsonb")
+    )
 
     procedure: Mapped[str | None] = mapped_column(String(255))
     procedure_date: Mapped[date | None] = mapped_column(Date, index=True)

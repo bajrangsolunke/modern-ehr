@@ -182,6 +182,7 @@ export function Topbar() {
               <button className="flex items-center gap-2.5 pl-2 ml-1 h-10 ring-focus rounded-full">
                 <UserAvatar
                   name={user.name}
+                  src={user.avatarUrl}
                   size="md"
                   className="bg-amber-100 ring-2 ring-amber-50"
                 />

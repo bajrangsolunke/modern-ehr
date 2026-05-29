@@ -74,29 +74,41 @@ class PatientMessagesService:
         ).all()
         user_ids = {uid for _conv_id, uid in participant_rows}
         user_names: dict[UUID, str] = {}
+        user_avatars: dict[UUID, str | None] = {}
         if user_ids:
             user_rows = (
                 await self.db.execute(
-                    select(User.id, User.full_name).where(User.id.in_(user_ids))
+                    select(User.id, User.full_name, User.avatar_url).where(
+                        User.id.in_(user_ids)
+                    )
                 )
             ).all()
-            user_names = {uid: name for uid, name in user_rows}
+            user_names = {uid: name for uid, name, _ in user_rows}
+            user_avatars = {uid: avatar for uid, _, avatar in user_rows}
 
-        names_by_conv: dict[UUID, list[str]] = {}
+        names_by_conv: dict[UUID, list[tuple[str, str | None]]] = {}
         for conv_id, user_id in participant_rows:
             names_by_conv.setdefault(conv_id, []).append(
-                user_names.get(user_id, "")
+                (user_names.get(user_id, ""), user_avatars.get(user_id))
             )
 
         items: list[ConversationOut] = []
         for conv in rows:
+            entries = names_by_conv.get(conv.id, [])
+            # Headline = first non-empty name (matches the FE's display rule).
+            headline_avatar: str | None = None
+            for name, avatar in entries:
+                if name and name.strip():
+                    headline_avatar = avatar
+                    break
             items.append(
                 ConversationOut(
                     id=conv.id,
                     title=conv.title,
                     last_message_at=conv.last_message_at,
                     last_message_preview=conv.last_message_preview,
-                    participants=names_by_conv.get(conv.id, []),
+                    participants=[n for n, _ in entries],
+                    headline_avatar_url=headline_avatar,
                     unread=False,
                 )
             )
@@ -141,12 +153,14 @@ class PatientMessagesService:
 
         messages: list[MessageOut] = []
         for m in msg_rows:
+            avatar: str | None = None
             if m.sender_patient_id == patient_id:
                 kind, name = "patient", None
             elif m.sender_user_id is not None:
                 kind = "user"
                 user = users.get(m.sender_user_id)
                 name = user.full_name if user else None
+                avatar = user.avatar_url if user else None
             else:
                 kind, name = "user", None
             messages.append(
@@ -158,6 +172,7 @@ class PatientMessagesService:
                     sent_at=m.sent_at,
                     sender_kind=kind,
                     sender_name=name,
+                    sender_avatar_url=avatar,
                 )
             )
         # Highest staff `last_read_at` — drives the patient-side

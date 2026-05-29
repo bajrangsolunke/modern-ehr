@@ -62,8 +62,12 @@ class DailyClient:
                 "enable_chat": False,
                 "enable_screenshare": True,
                 "enable_knocking": True,
-                "enable_transcription_storage": False,
-                "transcription_provider": "deepgram",
+                # `transcription_provider` + `enable_transcription_storage`
+                # are Scale/HIPAA-plan properties — Daily's free tier
+                # rejects them with "invalid property name". We start
+                # transcription from the client via startTranscription()
+                # instead; that call silently no-ops on plans without
+                # the Transcription add-on.
             },
         }
         async with httpx.AsyncClient(timeout=10) as client:

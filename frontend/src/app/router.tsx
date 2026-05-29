@@ -34,6 +34,27 @@ const InsightsPage = lazy(() =>
 const ReportsLayout = lazy(() =>
   import("@/features/reports").then((m) => ({ default: m.ReportsLayout }))
 );
+const PaymentsPage = lazy(() =>
+  import("@/features/reports/pages/PaymentsPage").then((m) => ({ default: m.PaymentsPage }))
+);
+const AppointmentsReportPage = lazy(() =>
+  import("@/features/reports/pages/AppointmentsReportPage").then((m) => ({
+    default: m.AppointmentsReportPage,
+  }))
+);
+const PatientVolumePage = lazy(() =>
+  import("@/features/reports/pages/PatientVolumePage").then((m) => ({
+    default: m.PatientVolumePage,
+  }))
+);
+const ClinicalPage = lazy(() =>
+  import("@/features/reports/pages/ClinicalPage").then((m) => ({ default: m.ClinicalPage }))
+);
+const ProductivityPage = lazy(() =>
+  import("@/features/reports/pages/ProductivityPage").then((m) => ({
+    default: m.ProductivityPage,
+  }))
+);
 const MessagesPage = lazy(() =>
   import("@/features/messages").then((m) => ({ default: m.MessagesPage }))
 );
@@ -114,6 +135,11 @@ export function AppRouter() {
                 element={<Navigate to={ROUTES.reportsInsights} replace />}
               />
               <Route path="insights" element={<InsightsPage />} />
+              <Route path="payments" element={<PaymentsPage />} />
+              <Route path="appointments" element={<AppointmentsReportPage />} />
+              <Route path="patient-volume" element={<PatientVolumePage />} />
+              <Route path="clinical" element={<ClinicalPage />} />
+              <Route path="productivity" element={<ProductivityPage />} />
             </Route>
             {/* Legacy /insights bookmark → reports/insights. */}
             <Route

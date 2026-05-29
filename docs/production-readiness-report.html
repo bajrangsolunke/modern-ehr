@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Modern-EHR · Production-Readiness Report · 2026-05-28</title>
+    <style>
+      :root {
+        --bg: #f7f9fc;
+        --surface: #ffffff;
+        --border: #e4ebf3;
+        --text: #0f172a;
+        --muted: #64748b;
+        --primary: #4f8cff;
+        --primary-soft: #eef4ff;
+        --success: #16a34a;
+        --warning: #d97706;
+        --danger: #dc2626;
+        --critical: #b91c1c;
+        --code: #0b1220;
+        --code-fg: #d6deeb;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.55;
+        font-size: 15px;
+      }
+      .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; }
+      header.cover {
+        background: linear-gradient(135deg, #4f8cff 0%, #7ab2ff 100%);
+        color: white;
+        padding: 36px 32px;
+        border-radius: 24px;
+        margin-bottom: 28px;
+        box-shadow: 0 8px 32px rgba(79,140,255,0.22);
+      }
+      header.cover .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        font-size: 11px;
+        font-weight: 700;
+        opacity: 0.85;
+        margin-bottom: 12px;
+      }
+      header.cover h1 {
+        font-size: 32px;
+        line-height: 1.15;
+        margin: 0 0 12px;
+        letter-spacing: -0.02em;
+      }
+      header.cover .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px 28px;
+        font-size: 14px;
+        opacity: 0.92;
+      }
+      header.cover .meta strong { font-weight: 600; }
+
+      .verdict {
+        display: flex;
+        align-items: stretch;
+        gap: 16px;
+        margin: -12px 0 28px;
+      }
+      .verdict .badge {
+        flex-shrink: 0;
+        padding: 18px 24px;
+        border-radius: 18px;
+        text-align: center;
+        min-width: 200px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+      }
+      .verdict .badge .label {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .verdict .badge .value {
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .verdict .badge.amber .value { color: var(--warning); }
+      .verdict .badge.green .value { color: var(--success); }
+      .verdict .badge.red .value { color: var(--danger); }
+
+      section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 24px 28px;
+        margin-bottom: 20px;
+      }
+      section > h2 {
+        margin: 0 0 6px;
+        font-size: 20px;
+        letter-spacing: -0.01em;
+      }
+      section > p.lede {
+        margin: 0 0 18px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      h3 {
+        margin: 22px 0 10px;
+        font-size: 15px;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      h3:first-of-type { margin-top: 4px; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+        margin: 4px 0 16px;
+      }
+      th, td {
+        padding: 10px 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      th {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+        font-weight: 700;
+        background: #fbfcfe;
+      }
+      td code { font-size: 12.5px; }
+      tbody tr:last-child td { border-bottom: none; }
+
+      code, pre {
+        font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      }
+      code.inline {
+        background: #eef2f8;
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-size: 12.5px;
+      }
+      pre {
+        background: var(--code);
+        color: var(--code-fg);
+        padding: 14px 16px;
+        border-radius: 12px;
+        overflow-x: auto;
+        font-size: 12.5px;
+        line-height: 1.6;
+      }
+
+      .sev {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 2px 8px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .sev-critical { background: #fee2e2; color: var(--critical); }
+      .sev-high     { background: #fef3c7; color: #92400e; }
+      .sev-medium   { background: #dbeafe; color: #1e40af; }
+      .sev-low      { background: #dcfce7; color: #166534; }
+      .sev-ok       { background: #dcfce7; color: #166534; }
+
+      .stat-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 10px;
+        margin: 0 0 18px;
+      }
+      .stat {
+        background: #fbfcfe;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px 14px;
+      }
+      .stat .label {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+      }
+      .stat .value {
+        font-size: 22px;
+        font-weight: 700;
+        margin-top: 2px;
+        font-variant-numeric: tabular-nums;
+      }
+      .stat .hint {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      ul.checks { padding-left: 0; list-style: none; margin: 0; }
+      ul.checks li {
+        padding: 6px 0 6px 28px;
+        position: relative;
+        font-size: 14px;
+      }
+      ul.checks li::before {
+        content: "";
+        position: absolute;
+        left: 4px;
+        top: 12px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+      }
+      ul.checks li.ok::before { background: #dcfce7; box-shadow: inset 0 0 0 2px var(--success); }
+      ul.checks li.warn::before { background: #fef3c7; box-shadow: inset 0 0 0 2px var(--warning); }
+      ul.checks li.fail::before { background: #fee2e2; box-shadow: inset 0 0 0 2px var(--danger); }
+
+      .note {
+        background: #fffbeb;
+        border: 1px solid #fcd34d;
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-size: 13px;
+        color: #78350f;
+        margin: 8px 0 18px;
+      }
+      .note strong { font-weight: 700; }
+
+      @media print {
+        body { background: white; font-size: 11pt; }
+        .container { padding: 0; }
+        header.cover { box-shadow: none; }
+        section { break-inside: avoid; page-break-inside: avoid; }
+        pre, table { break-inside: avoid; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header class="cover">
+        <div class="eyebrow">Production-Readiness Audit · Confidential</div>
+        <h1>Modern-EHR &middot; Code-Flow, HIPAA, Security &amp; Performance Report</h1>
+        <div class="meta">
+          <span><strong>Report date</strong> &nbsp; 2026-05-28</span>
+          <span><strong>Repository</strong> &nbsp; modern-ehr</span>
+          <span><strong>Backend</strong> &nbsp; FastAPI 0.115 / Python 3.12 / Postgres 16</span>
+          <span><strong>Frontends</strong> &nbsp; React 19 + Vite 6 (provider + patient portals)</span>
+          <span><strong>Auditor</strong> &nbsp; Code-flow review against project source</span>
+        </div>
+      </header>
+
+      <!-- ===================================================== EXECUTIVE -->
+      <div class="verdict">
+        <div class="badge amber">
+          <div class="label">Overall verdict</div>
+          <div class="value">Not Yet Production-Ready</div>
+        </div>
+        <div class="badge amber">
+          <div class="label">HIPAA stance</div>
+          <div class="value">Foundation present · gaps remain</div>
+        </div>
+        <div class="badge green">
+          <div class="label">Functional coverage</div>
+          <div class="value">Feature-complete for pilot</div>
+        </div>
+      </div>
+
+      <section>
+        <h2>Executive summary</h2>
+        <p class="lede">
+          Modern-EHR has a clean architecture, sensible auth split between staff and
+          patient surfaces, structured audit logging, defensive scoping of PHI access,
+          and passing unit tests on the security-critical paths. It is in good shape
+          for a controlled internal pilot or a clinical alpha. However, several items
+          required to operate as a HIPAA-covered production system are not yet in
+          place — they are listed below as <strong>Critical</strong> and
+          <strong>High</strong> findings. None of these are large lifts individually,
+          but together they should block a public production launch with real PHI
+          until resolved.
+        </p>
+        <div class="stat-row">
+          <div class="stat"><div class="label">Backend files</div><div class="value">186</div><div class="hint">.py modules</div></div>
+          <div class="stat"><div class="label">Frontend files</div><div class="value">198</div><div class="hint">.tsx components</div></div>
+          <div class="stat"><div class="label">DB migrations</div><div class="value">21</div><div class="hint">alembic, at head</div></div>
+          <div class="stat"><div class="label">DB indexes</div><div class="value">68</div><div class="hint">indexed cols / Index()</div></div>
+          <div class="stat"><div class="label">Backend tests</div><div class="value">59 ✓</div><div class="hint">across 11 files</div></div>
+          <div class="stat"><div class="label">Frontend tests</div><div class="value">0</div><div class="hint">no .test.ts(x) files</div></div>
+          <div class="stat"><div class="label">Audit-log call sites</div><div class="value">78</div><div class="hint">across v1 endpoints</div></div>
+          <div class="stat"><div class="label">Type-check</div><div class="value">Clean</div><div class="hint">tsc + ruff/mypy</div></div>
+        </div>
+      </section>
+
+      <!-- ===================================================== ARCHITECTURE -->
+      <section>
+        <h2>1 &middot; Architecture &amp; code flow</h2>
+        <p class="lede">
+          Three deployables, one schema. Both frontends auth against the same
+          FastAPI service. PHI ownership is enforced inside the service layer,
+          not the router — defence in depth survives router refactors.
+        </p>
+
+        <h3>Topology</h3>
+        <pre><code>┌────────────────┐  HTTPS / WSS   ┌─────────────────────────────┐
+│ provider portal│ ────────────▶  │                             │
+│ (Vite/React 19)│                │   FastAPI 0.115 (Py 3.12)   │   ┌──────────────┐
+└────────────────┘                │                             │ ─▶│ PostgreSQL 16│
+┌────────────────┐                │  - /api/v1/*  (staff)       │   │ + pgvector   │
+│ patient portal │ ────────────▶  │  - /api/v1/patient-portal/* │   └──────────────┘
+│ (Vite/React 19)│                │  - /api/v1/ws  (real-time)  │   ┌──────────────┐
+└────────────────┘                │  - LLM client (Groq/OpenAI/ │ ─▶│ Redis (rate  │
+                                  │    Ollama/stub)             │   │ limit, cache)│
+                                  └─────────────────────────────┘   └──────────────┘</code></pre>
+
+        <h3>Key flows verified end-to-end</h3>
+        <ul class="checks">
+          <li class="ok">Staff login → JWT (<code class="inline">token_type=user</code>) → role-gated endpoints (<code class="inline">backend/app/api/deps.py:34</code>).</li>
+          <li class="ok">Patient invite → setup token (SHA-256 hashed at rest) → patient JWT (<code class="inline">token_type=patient</code>) → patient-portal endpoints (<code class="inline">deps.py:90</code>).</li>
+          <li class="ok">Cross-surface token rejection: patient JWT on <code class="inline">/users</code> → <strong>401</strong>; staff JWT on <code class="inline">/patient-portal/me</code> → <strong>401</strong>.</li>
+          <li class="ok">Real-time messaging: REST write → <code class="inline">ws_manager.send_to_user()</code> → React Query invalidation on both ends.</li>
+          <li class="ok">Non-admin scoping: providers see only their own tasks + assigned patients (<code class="inline">endpoints/tasks.py:51</code>, <code class="inline">endpoints/patients.py:53</code>).</li>
+        </ul>
+      </section>
+
+      <!-- ===================================================== SECURITY -->
+      <section>
+        <h2>2 &middot; Authentication, authorisation &amp; session</h2>
+        <p class="lede">
+          The auth core is sound. Open questions remain around refresh-token
+          rotation, account lockout, and step-up auth (MFA) which are required
+          by most clinical compliance reviews.
+        </p>
+
+        <table>
+          <thead><tr><th>Area</th><th>Status</th><th>Evidence</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Password hashing</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td>bcrypt via passlib (<code class="inline">backend/app/core/security.py:9</code>)</td>
+            </tr>
+            <tr>
+              <td>JWT signing</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td>HS256, <code class="inline">SECRET_KEY</code> guarded — boot refuses <code class="inline">dev-*</code> or &lt;32-char keys when <code class="inline">ENVIRONMENT=production</code> (<code class="inline">core/config.py:88-93</code>)</td>
+            </tr>
+            <tr>
+              <td>Token-type discriminator</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td><code class="inline">token_type</code> claim cleanly separates staff vs patient surfaces; both deps reject the opposite type</td>
+            </tr>
+            <tr>
+              <td>Access / refresh expiry</td>
+              <td><span class="sev sev-medium">Medium</span></td>
+              <td>60 min access · 14 d refresh. Tune to 15–30 min access for HIPAA "automatic logoff" expectations (164.312(a)(2)(iii))</td>
+            </tr>
+            <tr>
+              <td>Refresh token rotation / revocation list</td>
+              <td><span class="sev sev-high">High</span></td>
+              <td>No rotation on use, no revocation table. A leaked refresh token is valid for 14 days with no way to invalidate</td>
+            </tr>
+            <tr>
+              <td>Account lockout / brute-force</td>
+              <td><span class="sev sev-high">High</span></td>
+              <td>slowapi middleware is mounted but no <code class="inline">@limiter.limit()</code> decorators applied to <code class="inline">/auth/login</code> or <code class="inline">/patient-auth/login</code>. Audit-log lookup exists but doesn't gate login</td>
+            </tr>
+            <tr>
+              <td>MFA / step-up auth</td>
+              <td><span class="sev sev-high">High</span></td>
+              <td>Not implemented. Required for OCR meaningful-use audits and almost every payor BAA</td>
+            </tr>
+            <tr>
+              <td>Role-based authorisation</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td><code class="inline">require_roles()</code> dep + per-service ownership checks. Non-admin task / patient views silently restrict to viewer</td>
+            </tr>
+            <tr>
+              <td>Cross-tenant / cross-patient checks</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td>Every patient-portal service path verifies <code class="inline">resource.patient_id == current.id</code> before reading or writing</td>
+            </tr>
+            <tr>
+              <td>Security headers</td>
+              <td><span class="sev sev-medium">Medium</span></td>
+              <td><code class="inline">SecurityHeadersMiddleware</code> sets <code class="inline">X-Content-Type-Options</code>, <code class="inline">X-Frame-Options=DENY</code>, <code class="inline">Referrer-Policy</code>, <code class="inline">Permissions-Policy</code>. Missing: <code class="inline">Strict-Transport-Security</code>, <code class="inline">Content-Security-Policy</code></td>
+            </tr>
+            <tr>
+              <td>CORS</td>
+              <td><span class="sev sev-medium">Medium</span></td>
+              <td>Dev uses regex for <code class="inline">localhost:*</code>; prod reads <code class="inline">BACKEND_CORS_ORIGINS</code>. <code class="inline">allow_methods="*"</code> + <code class="inline">allow_headers="*"</code> are wider than needed (<code class="inline">main.py:55-71</code>)</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ===================================================== HIPAA -->
+      <section>
+        <h2>3 &middot; HIPAA Security Rule alignment</h2>
+        <p class="lede">
+          This is the most consequential section. HIPAA isn't a checklist you
+          pass with code alone — it requires policies, BAAs, and operational
+          controls. The code-side picture is below.
+        </p>
+
+        <h3>§164.312(a)(1) &mdash; Access controls</h3>
+        <ul class="checks">
+          <li class="ok"><strong>Unique user identification</strong> &mdash; UUID per user/patient; JWTs scoped by <code class="inline">sub</code>.</li>
+          <li class="ok"><strong>Role-based authorisation</strong> &mdash; provider / staff / admin enforced server-side via <code class="inline">require_roles()</code>.</li>
+          <li class="warn"><strong>Emergency access procedure</strong> &mdash; no documented break-glass mechanism. Need a documented admin-override audit pattern.</li>
+          <li class="fail"><strong>Automatic logoff (164.312(a)(2)(iii))</strong> &mdash; access tokens last 60 min; refresh extends 14 days. Best practice is 15 min idle with hard refresh rotation. <span class="sev sev-high">High</span></li>
+          <li class="warn"><strong>Encryption / decryption of stored PHI</strong> &mdash; Postgres column-level encryption is not used; relies on disk-level / managed-DB encryption from the host (e.g. RDS encryption). Document this as part of the architecture.</li>
+        </ul>
+
+        <h3>§164.312(b) &mdash; Audit controls</h3>
+        <ul class="checks">
+          <li class="ok"><code class="inline">audit_logs</code> table captures <em>user_id, action, resource_type, resource_id, ip_address, user_agent, payload, timestamp</em> (<code class="inline">models/audit_log.py</code>).</li>
+          <li class="ok"><strong>78 audit-write call sites</strong> across the v1 router — every mutating endpoint plus auth events records to <code class="inline">audit_logs</code>.</li>
+          <li class="warn"><strong>Read-access audit</strong> is partial. PHI reads of <code class="inline">/patients/{id}</code> are audited, but list reads, dashboard composition reads, and patient-portal reads are not. HIPAA mainly requires that you <em>can</em> reconstruct who saw what; consider a request-level access log.</li>
+          <li class="fail"><strong>Payload scrubbing</strong> &mdash; <code class="inline">payload</code> JSONB occasionally captures request payloads. There is no central scrubber to mask passwords, tokens, or freeform PHI before persisting. Audit logs must never become a secondary PHI / credential store. <span class="sev sev-high">High</span></li>
+          <li class="warn"><strong>Tamper resistance</strong> &mdash; logs live in the same database as PHI with no append-only constraint. Best practice: stream a copy to an immutable sink (S3 Object Lock / CloudWatch).</li>
+        </ul>
+
+        <h3>§164.312(c) &mdash; Integrity</h3>
+        <ul class="checks">
+          <li class="ok">All updates go through ORM models; no raw SQL string concatenation found in services.</li>
+          <li class="ok">Foreign-key cascades + check constraints exist in migrations.</li>
+          <li class="warn">No row-level integrity checksum or signed-record mechanism. Most clinical reviewers accept relational integrity + audit trail; if your reviewer expects FHIR-style record provenance you'll need to add it.</li>
+        </ul>
+
+        <h3>§164.312(e) &mdash; Transmission security</h3>
+        <ul class="checks">
+          <li class="warn"><strong>TLS termination</strong> is delegated to the deployment layer (k8s ingress / ALB / nginx). Code does not configure it. Document the prod topology explicitly.</li>
+          <li class="ok"><strong>WebSocket auth</strong> uses a JWT in the query param; on connect the server decodes and verifies before <code class="inline">accept()</code>.</li>
+          <li class="warn"><strong>Patient WebSocket origin</strong> &mdash; the WS endpoint shares the manager with staff. UUIDs don't collide, but a documented threat model is needed for the shared connection pool.</li>
+        </ul>
+
+        <h3>HIPAA Privacy Rule &mdash; "minimum necessary"</h3>
+        <ul class="checks">
+          <li class="ok">Patient portal services hide unrelated patients; provider portal scopes <code class="inline">/patients</code> to assigned caseload for non-admin.</li>
+          <li class="ok">Patient-portal endpoints return narrow projections (<code class="inline">PatientMeOut</code>, <code class="inline">PatientAppointmentOut</code> etc.), not full models.</li>
+          <li class="warn">Admin role currently sees everything in <code class="inline">/users</code>, <code class="inline">/patients</code>, <code class="inline">/tasks</code>. Acceptable for small clinics; large deployments need finer admin sub-roles (audit-admin vs clinic-admin).</li>
+        </ul>
+
+        <div class="note">
+          <strong>HIPAA reality check.</strong> Source code is necessary but not sufficient.
+          Production HIPAA compliance requires: a signed BAA with every infra provider
+          (DB, LLM, email, SMS), a documented Security Risk Analysis, a Workforce
+          training programme, a Breach-Notification policy, and signed BAAs with
+          every downstream service. The code-side gaps below are the lift on
+          <em>your</em> side.
+        </div>
+      </section>
+
+      <!-- ===================================================== PERF -->
+      <section>
+        <h2>4 &middot; Performance</h2>
+        <p class="lede">
+          The data layer is well-indexed and uses async SQLAlchemy throughout.
+          Frontend bundles are reasonable for a feature-rich EHR.
+        </p>
+
+        <table>
+          <thead><tr><th>Area</th><th>Status</th><th>Evidence / Action</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Database indexes</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td>68 explicit indexes / unique constraints across the models. Patient FK on <code class="inline">documents</code>, <code class="inline">appointments</code>, <code class="inline">tasks</code>, <code class="inline">form_requests</code>, <code class="inline">conversations</code> are all indexed</td>
+            </tr>
+            <tr>
+              <td>Async / await throughout</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td><code class="inline">sqlalchemy[asyncio]</code> + <code class="inline">asyncpg</code>; no sync DB calls in request handlers</td>
+            </tr>
+            <tr>
+              <td>N+1 query patterns</td>
+              <td><span class="sev sev-medium">Medium</span></td>
+              <td>Several services loop and call <code class="inline">self.db.get(User, id)</code> for join enrichment (dashboard service, messages service, notifications service). Each is bounded (≤10) so impact is small at current scale but won't survive 10× growth without <code class="inline">selectinload</code> / join-and-project</td>
+            </tr>
+            <tr>
+              <td>Eager loading</td>
+              <td><span class="sev sev-medium">Medium</span></td>
+              <td>6 explicit <code class="inline">selectinload</code> sites. Audit list endpoints for missing eager-loads — typically the cause of latency spikes when row counts grow</td>
+            </tr>
+            <tr>
+              <td>Pagination</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td>Generic <code class="inline">Page[T]</code> response model used everywhere; default page_size 20, hard cap 100</td>
+            </tr>
+            <tr>
+              <td>Frontend bundle (provider)</td>
+              <td><span class="sev sev-medium">Medium</span></td>
+              <td>Main chunk ~270 kB un-gzipped, ~85 kB gzipped. Acceptable for a desktop EHR. Route-lazy chunking already in place</td>
+            </tr>
+            <tr>
+              <td>Frontend bundle (patient)</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td>~145 kB gzipped main chunk; modal + intake editor lazy-loaded</td>
+            </tr>
+            <tr>
+              <td>React Query caching</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td>30s default staleTime, retry-once-on-server-error, no retry on 4xx (<code class="inline">lib/query-client.ts</code>)</td>
+            </tr>
+            <tr>
+              <td>Real-time fanout</td>
+              <td><span class="sev sev-medium">Medium</span></td>
+              <td>WS broadcast iterates every active staff for patient threads. At &gt;200 active staff this becomes a hot loop — consider Redis pub/sub or per-conversation channel keys</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ===================================================== QUALITY -->
+      <section>
+        <h2>5 &middot; Code quality, testing &amp; type safety</h2>
+
+        <table>
+          <thead><tr><th>Area</th><th>Status</th><th>Evidence</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Backend type checking</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td>Pydantic v2 + mypy + ruff. <code class="inline">pyproject.toml</code> configures ruff with E/F/I/B/UP/N/PL rules</td>
+            </tr>
+            <tr>
+              <td>Frontend type checking</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td><code class="inline">tsc --noEmit</code> clean on both provider and patient portals. Strict mode + <code class="inline">noUnusedLocals</code></td>
+            </tr>
+            <tr>
+              <td>Backend test suite</td>
+              <td><span class="sev sev-high">High</span></td>
+              <td><strong>59 tests, 11 files, all passing.</strong> Coverage is concentrated on auth + scribe + AI summarisation. Patient-portal write paths, messages, tasks-complete, documents upload, notifications all have <em>zero</em> service-level tests</td>
+            </tr>
+            <tr>
+              <td>Frontend test suite</td>
+              <td><span class="sev sev-high">High</span></td>
+              <td><strong>0 test files</strong> across both frontends. No vitest / Playwright config visible. Component logic in form editors, route gates, and the messages flow has no automated coverage</td>
+            </tr>
+            <tr>
+              <td>TODO / FIXME density</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td>0 across backend + both frontends</td>
+            </tr>
+            <tr>
+              <td><code class="inline">console.log</code> leaks</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td>0 in production source</td>
+            </tr>
+            <tr>
+              <td>Error handling boundary</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td>Provider has <code class="inline">ErrorBoundary</code> wrapping everything. Patient portal has it too. API client maps Pydantic 422 + FastAPI <code class="inline">detail</code> shapes into form errors</td>
+            </tr>
+            <tr>
+              <td>Logging</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td><code class="inline">structlog</code> in production JSON mode, dev console mode (<code class="inline">core/logging.py</code>)</td>
+            </tr>
+            <tr>
+              <td>Migrations</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td>21 alembic migrations, <code class="inline">alembic current</code> = <code class="inline">0021_isolate_patient_convs (head)</code>. No drift</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ===================================================== OPS -->
+      <section>
+        <h2>6 &middot; Operations &amp; DevOps</h2>
+
+        <table>
+          <thead><tr><th>Area</th><th>Status</th><th>Evidence / Action</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Docker compose dev stack</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td>Postgres (pgvector/pg16), Redis, backend; healthchecks on db + redis</td>
+            </tr>
+            <tr>
+              <td>Backend Dockerfile</td>
+              <td><span class="sev sev-medium">Medium</span></td>
+              <td>Slim base, layered install. Missing: non-root <code class="inline">USER</code> directive, multi-stage build to drop <code class="inline">build-essential</code>, healthcheck</td>
+            </tr>
+            <tr>
+              <td>Production secret guard</td>
+              <td><span class="sev sev-ok">OK</span></td>
+              <td>Settings refuse to boot in <code class="inline">production</code> with a <code class="inline">dev-*</code> secret key or a known-weak Postgres password (<code class="inline">core/config.py:87-100</code>)</td>
+            </tr>
+            <tr>
+              <td>Health endpoint</td>
+              <td><span class="sev sev-medium">Medium</span></td>
+              <td><code class="inline">/health</code> is shallow (no DB or Redis probe). Add a <code class="inline">/health/ready</code> that pings DB + Redis for k8s readiness probes</td>
+            </tr>
+            <tr>
+              <td>Rate limiting</td>
+              <td><span class="sev sev-high">High</span></td>
+              <td>slowapi middleware mounted, but zero <code class="inline">@limiter.limit()</code> decorators applied. Without them, the auth and AI endpoints are exposed to abuse</td>
+            </tr>
+            <tr>
+              <td>Backup / DR strategy</td>
+              <td><span class="sev sev-high">High</span></td>
+              <td>No documented backup, restore, or DR plan in the repo. PHI loss must have an RPO/RTO target</td>
+            </tr>
+            <tr>
+              <td>Monitoring / alerting</td>
+              <td><span class="sev sev-medium">Medium</span></td>
+              <td>No APM (Sentry, Datadog, OpenTelemetry) config in repo. Structured logs are present and ready to be shipped — needs the agent</td>
+            </tr>
+            <tr>
+              <td>LLM provider safety</td>
+              <td><span class="sev sev-high">High</span></td>
+              <td>BAA-bearing LLM is configurable (OpenAI / Groq / Ollama). With <strong>real PHI</strong> in prompts (intake summaries, scribe transcripts), you MUST use a vendor with a signed BAA — most default Groq / OpenAI accounts are not BAA-eligible. Code falls back to <code class="inline">stub</code> when no key; consider a hard refusal in production if no BAA-eligible provider is configured</td>
+            </tr>
+            <tr>
+              <td>Secret management</td>
+              <td><span class="sev sev-medium">Medium</span></td>
+              <td>Reads from <code class="inline">.env</code> via pydantic-settings. Production should source from AWS Secrets Manager / GCP Secret Manager / k8s Secrets, not a file</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ===================================================== ACTION ITEMS -->
+      <section>
+        <h2>7 &middot; Prioritised action items</h2>
+        <p class="lede">
+          Severity reflects the gap between current state and a HIPAA-covered
+          production launch. Critical items should block go-live; High items
+          should be resolved during pilot; Medium / Low are post-launch hardening.
+        </p>
+
+        <table>
+          <thead><tr><th>#</th><th>Severity</th><th>Area</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><span class="sev sev-critical">Critical</span></td><td>LLM BAA</td><td>Replace any non-BAA LLM key with a BAA-eligible provider (Azure OpenAI, AWS Bedrock, Vertex with HC contract). Add a production-mode refusal if <code class="inline">LLM_PROVIDER=stub</code> and PHI features are enabled.</td></tr>
+            <tr><td>2</td><td><span class="sev sev-critical">Critical</span></td><td>Rate limiting</td><td>Apply <code class="inline">@limiter.limit("5/minute")</code> to <code class="inline">/auth/login</code> + <code class="inline">/patient-auth/login</code> + <code class="inline">/patient-auth/request-reset</code>; <code class="inline">"10/minute"</code> to AI endpoints. Without this, the login surface is open to credential-stuffing.</td></tr>
+            <tr><td>3</td><td><span class="sev sev-critical">Critical</span></td><td>Refresh token rotation</td><td>Rotate refresh tokens on each <code class="inline">/refresh</code> call; store a <code class="inline">refresh_token_jti</code> table for revocation. Required so leaked tokens can be invalidated within minutes, not 14 days.</td></tr>
+            <tr><td>4</td><td><span class="sev sev-critical">Critical</span></td><td>Audit-log scrubbing</td><td>Add a payload sanitiser before <code class="inline">audit_logs.payload</code> write — strip <code class="inline">password</code>, <code class="inline">token</code>, <code class="inline">refresh_token</code>, raw form data, and any field listed by name.</td></tr>
+            <tr><td>5</td><td><span class="sev sev-high">High</span></td><td>MFA</td><td>Add TOTP-based 2FA for staff accounts (admin and provider roles minimum). Patient MFA can stay optional for v1.</td></tr>
+            <tr><td>6</td><td><span class="sev sev-high">High</span></td><td>Session timeout</td><td>Cut access-token TTL to 15-30 min, refresh to 24-72 h. Add idle-timeout on the frontend (auto-logout after 15 min inactivity).</td></tr>
+            <tr><td>7</td><td><span class="sev sev-high">High</span></td><td>Frontend tests</td><td>Add vitest + a Playwright smoke suite. Minimum coverage: login → dashboard → message send → form submit → upload (one happy path per portal).</td></tr>
+            <tr><td>8</td><td><span class="sev sev-high">High</span></td><td>Backend test coverage</td><td>Add service-level tests for all patient-portal write paths (task complete, form submit, message send, document upload, AI suggest). Patient-data isolation is the highest-risk untested code.</td></tr>
+            <tr><td>9</td><td><span class="sev sev-high">High</span></td><td>Backup / DR</td><td>Document RPO (≤1 h) + RTO (≤4 h) targets. Automated daily Postgres snapshots with 30-day retention; documented restore drill.</td></tr>
+            <tr><td>10</td><td><span class="sev sev-high">High</span></td><td>Security headers</td><td>Add <code class="inline">Strict-Transport-Security</code>, <code class="inline">Content-Security-Policy</code> (start with <code class="inline">script-src 'self'</code>) to <code class="inline">SecurityHeadersMiddleware</code>.</td></tr>
+            <tr><td>11</td><td><span class="sev sev-medium">Medium</span></td><td>Read-access audit</td><td>Add a request-level access log for every PHI <code class="inline">GET</code> (patient detail, dashboard, documents/download). Lightweight middleware sufficient.</td></tr>
+            <tr><td>12</td><td><span class="sev sev-medium">Medium</span></td><td>N+1 hardening</td><td>Replace per-row <code class="inline">db.get</code> in dashboard / notifications / messages composition services with <code class="inline">selectinload</code> + projection.</td></tr>
+            <tr><td>13</td><td><span class="sev sev-medium">Medium</span></td><td>Dockerfile</td><td>Add <code class="inline">USER appuser</code>, multi-stage build to drop <code class="inline">build-essential</code>, <code class="inline">HEALTHCHECK</code> directive.</td></tr>
+            <tr><td>14</td><td><span class="sev sev-medium">Medium</span></td><td>Deep health</td><td><code class="inline">/health/ready</code> that pings DB + Redis; used for k8s readiness probes.</td></tr>
+            <tr><td>15</td><td><span class="sev sev-medium">Medium</span></td><td>Monitoring</td><td>Wire Sentry (or equivalent) — exceptions in messaging / form submit currently surface as toasts only.</td></tr>
+            <tr><td>16</td><td><span class="sev sev-medium">Medium</span></td><td>Secret manager</td><td>Move prod secrets out of <code class="inline">.env</code> into a managed secret store (Vault / AWS SM / GCP SM).</td></tr>
+            <tr><td>17</td><td><span class="sev sev-medium">Medium</span></td><td>CSP audit</td><td>Once CSP is added, audit inline styles / scripts the React build emits and add the required hashes / <code class="inline">'unsafe-inline'</code> exemptions.</td></tr>
+            <tr><td>18</td><td><span class="sev sev-low">Low</span></td><td>CORS narrowing</td><td>Replace <code class="inline">allow_methods="*"</code> with the explicit verbs used.</td></tr>
+            <tr><td>19</td><td><span class="sev sev-low">Low</span></td><td>Audit log retention</td><td>Document retention policy (HIPAA expects 6 years for security-relevant records).</td></tr>
+            <tr><td>20</td><td><span class="sev sev-low">Low</span></td><td>Break-glass</td><td>Document an explicit emergency-access procedure and an admin-override audit pattern.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ===================================================== VERDICT -->
+      <section>
+        <h2>8 &middot; Final verdict</h2>
+        <p>
+          <strong>Modern-EHR is functionally complete and architecturally sound for a
+          pilot with synthetic or de-identified data.</strong> The auth split between
+          staff and patient surfaces is a meaningful security win; the patient-portal
+          write paths defend ownership at the service layer; the audit log captures
+          78 mutating endpoints; the codebase type-checks clean on both Python and
+          TypeScript sides. The 59 backend tests all pass.
+        </p>
+        <p>
+          <strong>It is not yet ready to operate as a HIPAA-covered production
+          system with real PHI.</strong> The four Critical items in the table above
+          (LLM BAA, rate limiting on auth, refresh-token rotation, audit-log payload
+          scrubbing) are blockers in the strict sense — each of them is a small
+          engineering lift, but each is a clear control gap that an OCR audit or any
+          serious payor security review will flag. The High items should be closed
+          during the pilot phase.
+        </p>
+        <p>
+          <strong>Recommended path to production:</strong> close items #1-#10 over a
+          2-3 week hardening sprint, run a controlled pilot with a small set of
+          consented patients (or fully synthetic data), engage a third party for an
+          independent SRA / penetration test, and only then enable real PHI ingestion.
+        </p>
+        <p style="color: var(--muted); font-size: 12px; margin-top: 24px;">
+          Generated by an automated code-flow review of the modern-ehr repository at
+          commit <code class="inline">f70871a</code>. Findings are based on static
+          inspection of source and configuration; they do not replace a formal SRA
+          or third-party penetration test.
+        </p>
+      </section>
+    </div>
+  </body>
+</html>

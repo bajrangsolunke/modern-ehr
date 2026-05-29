@@ -9,7 +9,7 @@ interface ModalProps {
   title: string;
   description?: string;
   footer?: React.ReactNode;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "full";
   children: React.ReactNode;
   className?: string;
 }
@@ -19,6 +19,9 @@ const sizes = {
   md: "max-w-xl",
   lg: "max-w-2xl",
   xl: "max-w-4xl",
+  // Edge-to-edge for immersive flows (telehealth, etc). Slight inset
+  // so the rounded corners + close button still feel intentional.
+  full: "max-w-[98vw] min-h-[94vh]",
 };
 
 /**

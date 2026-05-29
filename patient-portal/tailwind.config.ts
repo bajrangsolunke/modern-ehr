@@ -117,6 +117,14 @@ const config: Config = {
           from: { opacity: "0", transform: "translateY(6px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        // Transform-free entry. Use on elements that already carry a
+        // centering transform (e.g. Dialog.Content with -translate-1/2),
+        // otherwise the animation's transform overrides the centering
+        // and the element opens off-center before snapping back.
+        "dialog-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
         shimmer: {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
@@ -124,6 +132,7 @@ const config: Config = {
       },
       animation: {
         "fade-in": "fade-in 0.4s ease-out",
+        "dialog-in": "dialog-in 0.18s ease-out",
         shimmer: "shimmer 2s linear infinite",
       },
     },

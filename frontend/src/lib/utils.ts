@@ -79,6 +79,20 @@ export function formatBytes(bytes: number): string {
   return `${rounded} ${units[i]}`;
 }
 
+/**
+ * Format a number as currency: 1234.5 → "$1,234.50"
+ * Falls back to "—" for null/undefined/NaN.
+ */
+export function formatCurrency(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 export function avatarColor(seed: string) {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;

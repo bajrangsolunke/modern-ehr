@@ -53,6 +53,7 @@ export function MessageThread({
             {!fromPatient && (
               <UserAvatar
                 name={m.sender_name ?? "Care team"}
+                src={m.sender_avatar_url ?? undefined}
                 size="sm"
                 className="self-end"
               />

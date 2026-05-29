@@ -35,16 +35,8 @@ import {
   useSetAppointmentStatus,
   useDeleteAppointment,
 } from "@/features/appointments/hooks/use-appointments";
-import { useStartTelehealth } from "@/features/telehealth/hooks/use-telehealth";
-import { TelehealthModal } from "@/features/telehealth/components/TelehealthModal";
-import type {
-  SoapDraft,
-  TelehealthSessionWithToken,
-} from "@/features/telehealth/api/telehealth-api";
-import { SoapNoteDrawer } from "@/features/patients/components/SoapNoteDrawer";
 import { useAuthStore } from "@/stores/auth-store";
 import { cn, formatDate } from "@/lib/utils";
-import { toast } from "@/lib/toast";
 import type { Appointment, AppointmentStatus } from "@/types";
 
 const STATUS_VARIANT: Record<
@@ -84,26 +76,18 @@ export function AppointmentDetailsModal({
   const canDelete = user?.role === "admin";
   void remove;
 
-  const [telehealthOpen, setTelehealthOpen] = useState(false);
-  const [tSession, setTSession] = useState<TelehealthSessionWithToken | null>(
-    null,
-  );
-  const [pendingDraft, setPendingDraft] = useState<SoapDraft | null>(null);
-  const [soapOpen, setSoapOpen] = useState(false);
-  const start = useStartTelehealth();
-  const currentUser = user;
-
-  const openTelehealth = async () => {
+  // The provider's telehealth flow lives at /visits/telehealth/:id —
+  // we open it in a new tab so the call doesn't compete with the
+  // rest of the EHR. The page itself owns session start, the Daily
+  // iframe, transcript, SOAP generation, and the edit drawer.
+  const openTelehealth = () => {
     if (!appointment) return;
-    try {
-      const session = await start.mutateAsync(appointment.id);
-      setTSession(session);
-      setTelehealthOpen(true);
-    } catch (e) {
-      toast.error("Couldn't start visit", {
-        description: e instanceof Error ? e.message : undefined,
-      });
-    }
+    window.open(
+      `/visits/telehealth/${appointment.id}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+    onOpenChange(false);
   };
 
   if (!appointment) {
@@ -124,7 +108,6 @@ export function AppointmentDetailsModal({
   const ends = endsAt(a);
 
   return (
-    <>
     <Modal
       open={open}
       onOpenChange={onOpenChange}
@@ -155,7 +138,6 @@ export function AppointmentDetailsModal({
               : undefined
           }
           onStartTelehealth={openTelehealth}
-          startPending={start.isPending}
         />
       }
     >
@@ -255,27 +237,6 @@ export function AppointmentDetailsModal({
         </div>
       </div>
     </Modal>
-    <TelehealthModal
-      open={telehealthOpen}
-      session={tSession}
-      viewerUserId={currentUser?.id}
-      onClose={() => setTelehealthOpen(false)}
-      onDraftGenerated={(draft) => {
-        setPendingDraft(draft);
-        setTelehealthOpen(false);
-        setSoapOpen(true);
-      }}
-    />
-    <SoapNoteDrawer
-      open={soapOpen}
-      onOpenChange={(o) => {
-        setSoapOpen(o);
-        if (!o) setPendingDraft(null);
-      }}
-      patientId={a.patientId}
-      prefill={pendingDraft}
-    />
-    </>
   );
 }
 
@@ -307,7 +268,6 @@ function Footer({
   onSetStatus,
   onDelete,
   onStartTelehealth,
-  startPending,
 }: {
   appointment: Appointment;
   isOpen: boolean;
@@ -317,7 +277,6 @@ function Footer({
   onSetStatus: (s: AppointmentStatus) => void;
   onDelete?: () => void;
   onStartTelehealth: () => void;
-  startPending: boolean;
 }) {
   return (
     <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -361,14 +320,15 @@ function Footer({
       </div>
 
       <div className="flex items-center gap-2 ml-auto">
-        <Button
-          className="h-9 bg-info hover:bg-info/90"
-          onClick={onStartTelehealth}
-          disabled={startPending}
-        >
-          <Video className="size-3.5" />
-          {startPending ? "Starting…" : "Start telehealth visit"}
-        </Button>
+        {appointment.modality === "virtual" && (
+          <Button
+            className="h-9 bg-info hover:bg-info/90"
+            onClick={onStartTelehealth}
+          >
+            <Video className="size-3.5" />
+            Start telehealth visit
+          </Button>
+        )}
         {canDelete && onDelete && (
           <Button
             variant="secondary"

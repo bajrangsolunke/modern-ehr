@@ -101,6 +101,7 @@ class PatientAppointmentsService:
                 reason=row.reason,
                 provider_name=provider.full_name if provider else None,
                 provider_specialty=provider.specialty if provider else None,
+                provider_avatar_url=provider.avatar_url if provider else None,
                 service_name=extras[0],
                 invoice_id=extras[1],
                 invoice_balance_cents=extras[2],

@@ -27,7 +27,6 @@ const navItems: NavLeaf[] = [
   { to: ROUTES.docs, label: "Docs" },
   { to: ROUTES.tasks, label: "Tasks" },
   { to: ROUTES.notifications, label: "Notifications" },
-  { to: ROUTES.billing, label: "Billing" },
 ];
 
 export function Topbar() {
@@ -103,6 +102,7 @@ export function Topbar() {
               <button className="flex items-center gap-2.5 pl-1 pr-3 ml-1 h-11 rounded-full bg-[#F1F4F9] hover:bg-[#E6EBF2] transition ring-focus">
                 <UserAvatar
                   name={displayName}
+                  src={me?.avatar_url ?? undefined}
                   size="md"
                   variant="gradient"
                   className="ring-2 ring-white shadow-glow"

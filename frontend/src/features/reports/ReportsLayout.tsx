@@ -7,7 +7,7 @@
  * with one more sidebar entry + nested route.
  */
 import { NavLink, Outlet } from "react-router-dom";
-import { BarChart3, LineChart } from "lucide-react";
+import { BarChart3, LineChart, CreditCard, CalendarCheck, Users, Stethoscope, Gauge } from "lucide-react";
 import { ROUTES } from "@/config/constants";
 import { cn } from "@/lib/utils";
 
@@ -22,8 +22,38 @@ const REPORTS: ReportLink[] = [
   {
     to: ROUTES.reportsInsights,
     label: "Insights",
-    description: "Clinical + operational AI analytics",
+    description: "Live clinic snapshot",
     icon: LineChart,
+  },
+  {
+    to: ROUTES.reportsPayments,
+    label: "Payments",
+    description: "Collections, refunds, A/R aging",
+    icon: CreditCard,
+  },
+  {
+    to: ROUTES.reportsAppointments,
+    label: "Appointments",
+    description: "Volume, status, no-show rate",
+    icon: CalendarCheck,
+  },
+  {
+    to: ROUTES.reportsPatientVolume,
+    label: "Patient Volume",
+    description: "New vs returning, demographics",
+    icon: Users,
+  },
+  {
+    to: ROUTES.reportsClinical,
+    label: "Clinical",
+    description: "Top diagnoses, encounter volume",
+    icon: Stethoscope,
+  },
+  {
+    to: ROUTES.reportsProductivity,
+    label: "Productivity",
+    description: "Per-provider performance",
+    icon: Gauge,
   },
 ];
 

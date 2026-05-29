@@ -6,6 +6,7 @@ export interface ConversationSummary {
   last_message_at: string;
   last_message_preview: string | null;
   participants: string[];
+  headline_avatar_url: string | null;
   unread: boolean;
 }
 
@@ -21,6 +22,7 @@ export interface Message {
   sent_at: string;
   sender_kind: "patient" | "user";
   sender_name: string | null;
+  sender_avatar_url: string | null;
 }
 
 export interface ConversationDetail {

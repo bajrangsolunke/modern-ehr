@@ -1,26 +1,33 @@
-import { useNavigate } from "react-router-dom";
-import {
-  Bell,
-  CalendarClock,
-  CheckCircle2,
-  ClipboardList,
-  FileText,
-  Loader2,
-  MessageCircle,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/ui/error-banner";
-import { StatCard } from "@/components/ui/stat-card";
 import { useDashboard } from "./hooks/use-dashboard";
 import { Greeting } from "./components/Greeting";
-import { NextAppointment } from "./components/NextAppointment";
+import { HeroAppointmentCard } from "./components/HeroAppointmentCard";
 import { RecentMessage } from "./components/RecentMessage";
 import { RecentDocuments } from "./components/RecentDocuments";
+import { HealthMetricCard } from "./components/HealthMetricCard";
+import { TrendChartCard } from "./components/TrendChartCard";
+import { DiagnosisCard } from "./components/DiagnosisCard";
+import { AIInsightsCard } from "./components/AIInsightsCard";
+import { TasksWidget } from "./components/TasksWidget";
+import { HealthJourneyTimeline } from "./components/HealthJourneyTimeline";
+
+// 5-up vitals row: BP, HR, Glucose, plus O2 + Sleep placeholders for the
+// premium dashboard reference. Missing metrics render empty placeholders.
+const VITALS_SLOTS = [
+  "blood_pressure",
+  "heart_rate",
+  "glucose",
+  "oxygen_saturation",
+  "sleep_score",
+] as const;
+
+const TREND_SLOTS = ["hemoglobin", "blood_pressure"] as const;
 
 export function DashboardPage() {
   const { data, isLoading, isError, error, refetch, isFetching } = useDashboard();
-  const navigate = useNavigate();
 
   if (isLoading) {
     return (
@@ -52,165 +59,64 @@ export function DashboardPage() {
     );
   }
 
+  const findMetric = (key: string) =>
+    data.health_metrics.find((m) => m.metric === key);
+
+  const unreadCount = data.recent_message ? 1 : 0;
   const upcomingCount = data.next_appointment ? 1 : 0;
-  const todoCount = data.pending_actions.total;
-  const messageCount = data.recent_message ? 1 : 0;
-  const docsCount = data.recent_documents.length;
 
   return (
-    <div className="space-y-6">
-      <Greeting firstName={data.greeting.first_name} />
+    <div className="space-y-6 lg:space-y-7">
+      <Greeting
+        firstName={data.greeting.first_name}
+        upcomingCount={upcomingCount}
+        unreadCount={unreadCount}
+      />
 
-      {/* Top stat row — same shape as provider StatCard grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-5">
-        <StatCard
-          label="Upcoming visits"
-          value={upcomingCount}
-          icon={<CalendarClock />}
-          accent="primary"
-          hint={
-            upcomingCount > 0 ? "1 visit scheduled" : "Nothing on the calendar"
-          }
-        />
-        <StatCard
-          label="To do"
-          value={todoCount}
-          icon={<ClipboardList />}
-          accent={todoCount > 0 ? "warning" : "success"}
-          hint={
-            todoCount > 0
-              ? `${data.pending_actions.forms_count} forms · ${data.pending_actions.tasks_count} tasks`
-              : "All caught up"
-          }
-        />
-        <StatCard
-          label="New messages"
-          value={messageCount}
-          icon={<MessageCircle />}
-          accent="info"
-          hint={
-            data.recent_message?.sender_name
-              ? `From ${data.recent_message.sender_name}`
-              : "No new replies"
-          }
-        />
-        <StatCard
-          label="Recent docs"
-          value={docsCount}
-          icon={<FileText />}
-          accent="success"
-          hint={docsCount > 0 ? "Shared by your care team" : "Nothing shared yet"}
-        />
+      {/* Hero appointment card — full width */}
+      <HeroAppointmentCard appt={data.next_appointment} />
+
+      {/* Vitals row — 5-up on xl, responsive down */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 lg:gap-4">
+        {VITALS_SLOTS.map((key) => (
+          <HealthMetricCard key={key} metricKey={key} metric={findMetric(key)} />
+        ))}
       </div>
 
-      {/* Two-column equal-height row — cards stretch via grid + h-full */}
-      <div className="grid gap-4 lg:gap-5 lg:grid-cols-2 items-stretch">
-        <NextAppointment appt={data.next_appointment} />
-        <ActionsCard
-          total={data.pending_actions.total}
-          forms={data.pending_actions.forms_count}
-          tasks={data.pending_actions.tasks_count}
-        />
-        <RecentMessage msg={data.recent_message} />
-        <UpdatesCard onOpen={() => navigate("/notifications")} />
-      </div>
+      {/* Asymmetric 12-col grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6">
+        {/* Left main column */}
+        <div className="lg:col-span-8 space-y-5 lg:space-y-6 min-w-0">
+          {/* AI insights — premium banner */}
+          <AIInsightsCard />
 
-      <section className="space-y-3">
-        <h2 className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-          Recent documents
-        </h2>
-        <RecentDocuments docs={data.recent_documents} />
-      </section>
+          {/* Trend charts */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4">
+            {TREND_SLOTS.map((key) => (
+              <TrendChartCard key={key} metricKey={key} metric={findMetric(key)} />
+            ))}
+          </div>
+
+          {/* Documents + diagnosis */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4">
+            <div className="min-w-0">
+              <RecentDocuments docs={data.recent_documents} />
+            </div>
+            <DiagnosisCard condition={data.primary_condition} />
+          </div>
+        </div>
+
+        {/* Right rail */}
+        <aside className="lg:col-span-4 space-y-5 lg:space-y-6">
+          <TasksWidget
+            total={data.pending_actions.total}
+            forms={data.pending_actions.forms_count}
+            tasks={data.pending_actions.tasks_count}
+          />
+          <RecentMessage msg={data.recent_message} />
+          <HealthJourneyTimeline />
+        </aside>
+      </div>
     </div>
-  );
-}
-
-function ActionsCard({
-  total,
-  forms,
-  tasks,
-}: {
-  total: number;
-  forms: number;
-  tasks: number;
-}) {
-  const navigate = useNavigate();
-  return (
-    <Card className="h-full p-6 flex flex-col">
-      <div className="flex items-start gap-4 flex-1">
-        <div
-          className={
-            "size-12 rounded-2xl grid place-items-center shrink-0 " +
-            (total > 0
-              ? "bg-warning/10 text-warning"
-              : "bg-success/10 text-success")
-          }
-        >
-          {total > 0 ? (
-            <ClipboardList className="size-5" />
-          ) : (
-            <CheckCircle2 className="size-5" />
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
-            Things to do
-          </div>
-          {total > 0 ? (
-            <>
-              <div className="text-lg font-bold">
-                You have {total} {total === 1 ? "item" : "items"}
-              </div>
-              <div className="text-sm text-muted-foreground mt-1">
-                {forms} {forms === 1 ? "form" : "forms"} · {tasks}{" "}
-                {tasks === 1 ? "task" : "tasks"}
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="text-lg font-bold">All caught up</div>
-              <p className="text-sm text-muted-foreground mt-1">
-                No pending actions right now.
-              </p>
-            </>
-          )}
-        </div>
-      </div>
-      <div className="pt-4 mt-auto">
-        <Button
-          size="sm"
-          variant={total > 0 ? "default" : "secondary"}
-          onClick={() => navigate("/tasks")}
-        >
-          {total > 0 ? "Open your list" : "Go to Tasks"}
-        </Button>
-      </div>
-    </Card>
-  );
-}
-
-function UpdatesCard({ onOpen }: { onOpen: () => void }) {
-  return (
-    <Card className="h-full p-6 flex flex-col">
-      <div className="flex items-start gap-4 flex-1">
-        <div className="size-12 rounded-2xl bg-info/10 text-info grid place-items-center shrink-0">
-          <Bell className="size-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
-            Updates
-          </div>
-          <div className="text-lg font-bold">Check your activity feed</div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Recent updates from your appointments, messages, and care plan.
-          </p>
-        </div>
-      </div>
-      <div className="pt-4 mt-auto">
-        <Button size="sm" variant="secondary" onClick={onOpen}>
-          Open notifications
-        </Button>
-      </div>
-    </Card>
   );
 }

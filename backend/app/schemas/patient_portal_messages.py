@@ -15,6 +15,7 @@ class MessageOut(BaseModel):
     sent_at: datetime
     sender_kind: str  # "patient" | "user"
     sender_name: str | None = None
+    sender_avatar_url: str | None = None
 
 
 class ConversationOut(BaseModel):
@@ -23,6 +24,11 @@ class ConversationOut(BaseModel):
     last_message_at: datetime
     last_message_preview: str | None = None
     participants: list[str]
+    # Avatar URL of the first non-empty participant (the "headline" name
+    # rendered in the thread list). None when no participant has one on
+    # file. Parallel to `participants` so the FE doesn't need to fetch
+    # them separately.
+    headline_avatar_url: str | None = None
     unread: bool = False
 
 
