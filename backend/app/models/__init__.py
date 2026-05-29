@@ -41,6 +41,8 @@ from app.models.service_catalog import ServiceCatalog, ServiceCategory
 from app.models.invoice import Invoice, InvoiceStatus
 from app.models.charge import Charge
 from app.models.payment import Payment, PaymentMethod, PaymentStatus
+from app.models.provider_education import ProviderEducation
+from app.models.provider_license import ProviderLicense
 from app.models.refund import Refund
 
 __all__ = [
@@ -93,5 +95,7 @@ __all__ = [
     "Payment",
     "PaymentMethod",
     "PaymentStatus",
+    "ProviderEducation",
+    "ProviderLicense",
     "Refund",
 ]

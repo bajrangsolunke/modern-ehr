@@ -7,13 +7,25 @@ from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentUser, DbSession, require_roles
+from app.core.crypto import encrypt_field
 from app.core.security import hash_password
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.patient import Patient
+from app.models.provider_education import ProviderEducation
+from app.models.provider_license import ProviderLicense
 from app.models.user import User, UserRole
 from app.schemas.appointment import AppointmentOut
 from app.schemas.common import Page
-from app.schemas.user import UserCreate, UserInviteResponse, UserOut, UserUpdate
+from app.schemas.user import (
+    ProviderEducationIn,
+    ProviderEducationOut,
+    ProviderLicenseIn,
+    ProviderLicenseOut,
+    UserCreate,
+    UserInviteResponse,
+    UserOut,
+    UserUpdate,
+)
 from app.services import email_service
 from app.email import templates
 from app.services.user_invite_service import UserInviteService
@@ -136,17 +148,37 @@ async def create_user(
             detail="A user with this email already exists",
         )
 
+    user_kwargs = payload.model_dump(
+        exclude={"password", "ssn", "federal_tax_id", "education", "licenses"}
+    )
     user = User(
-        email=payload.email,
+        **user_kwargs,
         hashed_password=hash_password(payload.password) if payload.password else None,
-        full_name=payload.full_name,
-        role=payload.role,
-        specialty=payload.specialty,
-        avatar_url=payload.avatar_url,
+        ssn_encrypted=encrypt_field(payload.ssn),
+        federal_tax_id_encrypted=encrypt_field(payload.federal_tax_id),
     )
     db.add(user)
     await db.flush()
-    await db.refresh(user)
+
+    now = datetime.now(timezone.utc)
+    for ed in payload.education:
+        db.add(
+            ProviderEducation(
+                user_id=user.id,
+                created_at=now,
+                **ed.model_dump(),
+            )
+        )
+    for lic in payload.licenses:
+        db.add(
+            ProviderLicense(
+                user_id=user.id,
+                created_at=now,
+                **lic.model_dump(),
+            )
+        )
+    await db.flush()
+    await db.refresh(user, attribute_names=["education", "licenses"])
 
     await AuditService(db).record_request(
         request,
@@ -154,7 +186,14 @@ async def create_user(
         action="user.create",
         resource_type="user",
         resource_id=str(user.id),
-        payload={"email": user.email, "role": user.role.value},
+        payload={
+            "email": user.email,
+            "role": user.role.value,
+            "has_ssn": payload.ssn is not None,
+            "has_tax_id": payload.federal_tax_id is not None,
+            "education_count": len(payload.education),
+            "license_count": len(payload.licenses),
+        },
     )
     return UserOut.model_validate(user)
 
@@ -388,3 +427,117 @@ async def deactivate_user(
         resource_id=str(user.id),
         payload={"email": user.email},
     )
+
+
+# --- Provider education sub-rows ------------------------------------
+
+@router.get(
+    "/{user_id}/education",
+    response_model=list[ProviderEducationOut],
+)
+async def list_user_education(
+    user_id: UUID, db: DbSession, _current: CurrentUser
+) -> list[ProviderEducationOut]:
+    rows = (
+        await db.execute(
+            select(ProviderEducation).where(ProviderEducation.user_id == user_id)
+        )
+    ).scalars().all()
+    return [ProviderEducationOut.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/{user_id}/education",
+    response_model=ProviderEducationOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[admin_only],
+)
+async def add_user_education(
+    user_id: UUID,
+    payload: ProviderEducationIn,
+    db: DbSession,
+    _current: CurrentUser,
+) -> ProviderEducationOut:
+    if not await db.get(User, user_id):
+        raise HTTPException(status_code=404, detail="User not found")
+    row = ProviderEducation(
+        user_id=user_id,
+        created_at=datetime.now(timezone.utc),
+        **payload.model_dump(),
+    )
+    db.add(row)
+    await db.flush()
+    await db.refresh(row)
+    return ProviderEducationOut.model_validate(row)
+
+
+@router.delete(
+    "/education/{education_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[admin_only],
+)
+async def delete_user_education(
+    education_id: UUID, db: DbSession, _current: CurrentUser
+) -> None:
+    row = await db.get(ProviderEducation, education_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Education record not found")
+    await db.delete(row)
+    await db.flush()
+
+
+# --- Provider licenses sub-rows -------------------------------------
+
+@router.get(
+    "/{user_id}/licenses",
+    response_model=list[ProviderLicenseOut],
+)
+async def list_user_licenses(
+    user_id: UUID, db: DbSession, _current: CurrentUser
+) -> list[ProviderLicenseOut]:
+    rows = (
+        await db.execute(
+            select(ProviderLicense).where(ProviderLicense.user_id == user_id)
+        )
+    ).scalars().all()
+    return [ProviderLicenseOut.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/{user_id}/licenses",
+    response_model=ProviderLicenseOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[admin_only],
+)
+async def add_user_license(
+    user_id: UUID,
+    payload: ProviderLicenseIn,
+    db: DbSession,
+    _current: CurrentUser,
+) -> ProviderLicenseOut:
+    if not await db.get(User, user_id):
+        raise HTTPException(status_code=404, detail="User not found")
+    row = ProviderLicense(
+        user_id=user_id,
+        created_at=datetime.now(timezone.utc),
+        **payload.model_dump(),
+    )
+    db.add(row)
+    await db.flush()
+    await db.refresh(row)
+    return ProviderLicenseOut.model_validate(row)
+
+
+@router.delete(
+    "/licenses/{license_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[admin_only],
+)
+async def delete_user_license(
+    license_id: UUID, db: DbSession, _current: CurrentUser
+) -> None:
+    row = await db.get(ProviderLicense, license_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="License record not found")
+    await db.delete(row)
+    await db.flush()

@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 14
 
+    FIELD_ENCRYPTION_KEY: str = ""
+    """Fernet key for SSN / tax-id encryption. Generate with:
+    python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    Leave blank in dev — the crypto module will derive a fallback from
+    SECRET_KEY. PRODUCTION MUST SET THIS."""
+
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "padmavat"
