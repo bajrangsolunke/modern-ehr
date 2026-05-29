@@ -148,7 +148,7 @@ class RagService:
             await self.db.execute(
                 select(VitalSign)
                 .where(VitalSign.patient_id == patient_id)
-                .order_by(VitalSign.measured_at.desc())
+                .order_by(VitalSign.recorded_at.desc())
                 .limit(10)
             )
         ).scalars().all()
@@ -302,7 +302,7 @@ class RagService:
         # Active medications
         if meds:
             med_lines = "\n".join(
-                f"  - {m.name} {m.dose or ''} {m.frequency or ''} ({m.status})".rstrip()
+                f"  - {m.name} {m.dose or ''} {m.frequency or ''} ({m.status.value})".rstrip()
                 for m in meds
             )
             parts.append(f"=== Active medications ===\n{med_lines}")
@@ -312,7 +312,7 @@ class RagService:
         # Recent vitals
         if vitals:
             vital_lines = "\n".join(
-                f"  - {v.measured_at.date()}: {v.metric} {v.value} {v.unit or ''}".rstrip()
+                f"  - {v.recorded_at.date()}: {v.metric} {v.value} {v.unit or ''}".rstrip()
                 for v in vitals
             )
             parts.append(f"=== Recent vitals ===\n{vital_lines}")
