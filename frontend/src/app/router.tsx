@@ -16,6 +16,9 @@ import { currentUser as mockUser } from "@/mocks";
 const LoginPage = lazy(() =>
   import("@/features/auth").then((m) => ({ default: m.LoginPage }))
 );
+const SetupPage = lazy(() =>
+  import("@/features/auth").then((m) => ({ default: m.SetupPage }))
+);
 const DashboardPage = lazy(() =>
   import("@/features/dashboard").then((m) => ({ default: m.DashboardPage }))
 );
@@ -78,6 +81,8 @@ export function AppRouter() {
       <Routes>
         <Route element={<PublicRoute />}>
           <Route path="/login" element={<LoginPage />} />
+          {/* Staff account setup — token IS the auth; no bearer needed. */}
+          <Route path="/setup" element={<SetupPage />} />
         </Route>
 
         <Route element={<ProtectedRoute />}>

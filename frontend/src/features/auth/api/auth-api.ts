@@ -78,4 +78,12 @@ export const authApi = {
 
   changePassword: (input: PasswordChangeInput): Promise<void> =>
     api.post("/auth/me/password", input),
+
+  // ---- Staff account setup (invite flow) ----
+
+  setupInfo: (token: string): Promise<{ full_name: string; email_masked: string; role: string }> =>
+    api.get("/auth/setup-info", { searchParams: { token }, skipAuth: true }),
+
+  setup: (payload: { token: string; password: string }): Promise<TokenResponse> =>
+    api.post("/auth/setup", payload, { skipAuth: true }),
 };

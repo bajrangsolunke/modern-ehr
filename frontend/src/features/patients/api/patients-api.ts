@@ -176,8 +176,8 @@ export const patientsApi = {
 
   invitePortal: async (
     patientId: string
-  ): Promise<{ setup_url: string; expires_at: string }> =>
-    api.post<{ setup_url: string; expires_at: string }>(
+  ): Promise<{ setup_url: string; expires_at: string; email_queued: boolean }> =>
+    api.post<{ setup_url: string; expires_at: string; email_queued: boolean }>(
       `/patients/${patientId}/portal-invite`,
       {}
     ),

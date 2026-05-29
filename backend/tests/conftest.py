@@ -115,6 +115,24 @@ async def provider_user(db_session: AsyncSession):
 
 
 @pytest_asyncio.fixture()
+async def admin_user(db_session: AsyncSession):
+    """An admin-role User row for tests requiring admin privileges."""
+    from app.models.user import User, UserRole
+
+    u = User(
+        email=f"admin-{uuid.uuid4()}@test.example",
+        full_name="Test Admin",
+        hashed_password="$2b$12$test",
+        role=UserRole.admin,
+        is_active=True,
+    )
+    db_session.add(u)
+    await db_session.flush()
+    await db_session.refresh(u)
+    return u
+
+
+@pytest_asyncio.fixture()
 async def submitted_intake_form(db_session: AsyncSession, sample_patient, provider_user):
     """A submitted-state intake form_request for the sample_patient, ready
     to be approved. Data payload is minimal but valid per IntakeFormPayload."""

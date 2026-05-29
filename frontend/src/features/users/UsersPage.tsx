@@ -6,12 +6,15 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Briefcase,
+  Copy,
   Filter,
   LayoutGrid,
+  Mail,
   Pencil,
   Plus,
   Rows3,
   Search,
+  Send,
   Shield,
   ShieldOff,
   Stethoscope,
@@ -23,7 +26,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
@@ -36,12 +39,14 @@ import { UserDrawer } from "@/features/users/components/UserDrawer";
 import { UserCardGrid } from "@/features/users/components/UserCardGrid";
 import {
   useDeactivateUser,
+  useInviteUser,
   useReactivateUser,
   useUsers,
 } from "@/features/users/hooks/use-users";
 import type { AppUser, UserFilters } from "@/features/users/api/users-api";
 import type { Role } from "@/types";
 import { cn, formatDate } from "@/lib/utils";
+import { toast } from "@/lib/toast";
 
 const ROLE_LABEL: Record<Role, string> = {
   provider: "Provider",
@@ -66,10 +71,16 @@ export function UsersPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<AppUser | null>(null);
   const [pendingDeactivate, setPendingDeactivate] = useState<AppUser | null>(null);
+  const [inviteResult, setInviteResult] = useState<{
+    user: AppUser;
+    setupUrl: string;
+    emailQueued: boolean;
+  } | null>(null);
 
   const { data, isLoading, isError, error, refetch, isFetching } = useUsers(filters);
   const reactivate = useReactivateUser();
   const deactivate = useDeactivateUser();
+  const invite = useInviteUser();
 
   const setFilter = (patch: Partial<UserFilters>) =>
     setFilters((prev) => ({ ...prev, ...patch, page: 1 }));
@@ -168,12 +179,25 @@ export function UsersPage() {
 
       {!isLoading && !isError && data && (
         <>
+          {inviteResult && (
+            <InviteBanner
+              user={inviteResult.user}
+              setupUrl={inviteResult.setupUrl}
+              emailQueued={inviteResult.emailQueued}
+              onClose={() => setInviteResult(null)}
+            />
+          )}
+
           {viewMode === "table" ? (
             <UserTable
               items={data.items}
               onEdit={openEdit}
               onDeactivate={(u) => setPendingDeactivate(u)}
               onReactivate={(u) => reactivate.mutate(u.id)}
+              onInvite={async (u) => {
+                const result = await invite.mutateAsync(u.id);
+                setInviteResult({ user: u, setupUrl: result.setupUrl, emailQueued: result.emailQueued });
+              }}
             />
           ) : (
             <UserCardGrid
@@ -434,11 +458,13 @@ function UserTable({
   onEdit,
   onDeactivate,
   onReactivate,
+  onInvite,
 }: {
   items: AppUser[];
   onEdit: (u: AppUser) => void;
   onDeactivate: (u: AppUser) => void;
   onReactivate: (u: AppUser) => void;
+  onInvite: (u: AppUser) => void;
 }) {
   return (
     <Card className="overflow-hidden p-3 sm:p-4">
@@ -477,6 +503,7 @@ function UserTable({
                 onEdit={() => onEdit(u)}
                 onDeactivate={() => onDeactivate(u)}
                 onReactivate={() => onReactivate(u)}
+                onInvite={() => onInvite(u)}
               />
             ))}
           </tbody>
@@ -491,11 +518,13 @@ function UserRow({
   onEdit,
   onDeactivate,
   onReactivate,
+  onInvite,
 }: {
   user: AppUser;
   onEdit: () => void;
   onDeactivate: () => void;
   onReactivate: () => void;
+  onInvite: () => void;
 }) {
   return (
     <tr
@@ -551,6 +580,11 @@ function UserRow({
             onClick={onEdit}
             icon={<Pencil className="size-3" />}
           />
+          <RowIconButton
+            label="Invite to portal"
+            onClick={onInvite}
+            icon={<Send className="size-3" />}
+          />
           {user.isActive ? (
             <RowIconButton
               label="Deactivate user"
@@ -592,6 +626,66 @@ function Cell({
     >
       {children}
     </td>
+  );
+}
+
+function InviteBanner({
+  user,
+  setupUrl,
+  emailQueued,
+  onClose,
+}: {
+  user: AppUser;
+  setupUrl: string;
+  emailQueued: boolean;
+  onClose: () => void;
+}) {
+  const copyUrl = async () => {
+    await navigator.clipboard.writeText(setupUrl);
+    toast.success("Invite URL copied");
+  };
+
+  return (
+    <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 mb-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+          {emailQueued ? (
+            <>
+              <Mail className="size-4" />
+              Invite sent to {user.email}
+            </>
+          ) : (
+            <>
+              <Send className="size-4" />
+              Invite URL ready · copy &amp; share manually
+            </>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          Dismiss
+        </button>
+      </div>
+      <p className="text-xs text-muted-foreground mt-1 mb-3">
+        {emailQueued
+          ? "The setup link was emailed. You can also copy it below."
+          : "SMTP isn't configured — share this one-time URL with the user directly. It expires in 24 hours."}
+      </p>
+      <div className="flex items-center gap-2">
+        <input
+          readOnly
+          value={setupUrl}
+          className="flex-1 h-9 rounded-full border border-border bg-white px-3 text-xs font-mono ring-focus"
+          onClick={(e) => (e.target as HTMLInputElement).select()}
+        />
+        <Button variant="secondary" size="sm" onClick={copyUrl} className="h-9">
+          <Copy className="size-3.5" /> Copy
+        </Button>
+      </div>
+    </div>
   );
 }
 

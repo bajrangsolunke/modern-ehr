@@ -33,6 +33,7 @@ dependencies = [
     "sse-starlette>=2.1.0",
     "reportlab>=4.2.0",
     "pypdf>=4.0",
+    "aiosmtplib>=3.0",
 ]
 
 [project.optional-dependencies]

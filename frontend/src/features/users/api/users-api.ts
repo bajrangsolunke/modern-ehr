@@ -179,6 +179,19 @@ export const usersApi = {
 
   deactivate: (id: string): Promise<void> => api.delete(`/users/${id}`),
 
+  invite: async (userId: string): Promise<{ setupUrl: string; expiresAt: string; emailQueued: boolean }> => {
+    const dto = await api.post<{
+      setup_url: string;
+      expires_at: string;
+      email_queued: boolean;
+    }>(`/users/${userId}/invite`);
+    return {
+      setupUrl: dto.setup_url,
+      expiresAt: dto.expires_at,
+      emailQueued: dto.email_queued,
+    };
+  },
+
   stats: async (id: string): Promise<UserStats> => {
     const dto = await api.get<BackendUserStats>(`/users/${id}/stats`);
     return {

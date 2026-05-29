@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, status
 
 from app.api.deps import CurrentUser, DbSession, require_roles
 from app.models.patient import PatientStatus, RiskLevel
@@ -19,6 +19,8 @@ from app.schemas.patient_auth import PortalInviteOut
 from app.services.form_request_service import FormRequestService
 from app.services.patient_auth_service import PatientAuthService
 from app.services.patient_service import PatientService
+from app.services import email_service
+from app.email import templates
 
 # Writes (create/update/delete) are restricted to providers + admins.
 # Reads stay open to any active authenticated user — staff still need
@@ -196,12 +198,36 @@ async def invite_to_portal(
     request: Request,
     db: DbSession,
     current: CurrentUser,
+    background_tasks: BackgroundTasks,
 ) -> PortalInviteOut:
     """Provider/admin generates a one-time setup URL the patient uses
-    to set their portal password. The provider copies the URL out-of-
-    band (email/SMS/print) for the first ship; email auto-delivery is
-    a follow-up."""
-    url, expires = await PatientAuthService(db).issue_invite(patient_id)
+    to set their portal password. When SMTP is configured the URL is
+    also emailed to the patient automatically."""
+    service = PatientAuthService(db)
+    url, expires = await service.issue_invite(patient_id)
+
+    # Fetch patient email for notification (already validated in service).
+    from app.models.patient import Patient
+    patient = await db.get(Patient, patient_id)
+    patient_email = patient.email if patient else None
+    patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
+
+    email_queued = False
+    if patient_email:
+        subject, html, text = templates.patient_invite(
+            patient_name=patient_name,
+            setup_url=url,
+            expires_at=expires,
+        )
+        background_tasks.add_task(
+            email_service.send_email,
+            to=patient_email,
+            subject=subject,
+            html=html,
+            text=text,
+        )
+        email_queued = email_service._is_configured()
+
     await AuditService(db).record_request(
         request,
         user_id=current.id,
@@ -209,4 +235,4 @@ async def invite_to_portal(
         resource_type="patient",
         resource_id=str(patient_id),
     )
-    return PortalInviteOut(setup_url=url, expires_at=expires)
+    return PortalInviteOut(setup_url=url, expires_at=expires, email_queued=email_queued)

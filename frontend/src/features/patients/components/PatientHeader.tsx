@@ -45,6 +45,7 @@ export function PatientHeader({ patient, onEdit, onRemove }: Props) {
   const update = useUpdatePatient(patient.id);
   const invite = usePortalInvite();
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [emailQueued, setEmailQueued] = useState<boolean>(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
 
   // Highest-severity unresolved alert for the inline chip in the
@@ -60,6 +61,12 @@ export function PatientHeader({ patient, onEdit, onRemove }: Props) {
   const handleInvite = async () => {
     const result = await invite.mutateAsync(patient.id);
     setInviteUrl(result.setup_url);
+    setEmailQueued(result.email_queued);
+    if (result.email_queued) {
+      toast.success("Invite sent", {
+        description: "Setup link was emailed to the patient.",
+      });
+    }
   };
 
   const copyUrl = async () => {
@@ -192,10 +199,14 @@ export function PatientHeader({ patient, onEdit, onRemove }: Props) {
     {inviteUrl && (
       <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
         <div className="text-sm font-semibold text-primary mb-1">
-          Patient portal invite ready
+          {emailQueued
+            ? "✉ Invite sent · or copy the link below"
+            : "Patient portal invite ready"}
         </div>
         <p className="text-xs text-muted-foreground mb-3">
-          Share this one-time URL with the patient by email, SMS, or in person. It expires in 24 hours.
+          {emailQueued
+            ? "The setup link was emailed to the patient. You can also share it directly."
+            : "Share this one-time URL with the patient by email, SMS, or in person. It expires in 24 hours."}
         </p>
         <div className="flex items-center gap-2">
           <input

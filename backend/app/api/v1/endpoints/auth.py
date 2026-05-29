@@ -13,9 +13,12 @@ from app.schemas.user import (
     SelfUpdate,
     UserCreate,
     UserOut,
+    UserSetupInfoResponse,
+    UserSetupRequest,
 )
 from app.services.audit_service import AuditService
 from app.services.auth_service import AuthService
+from app.services.user_invite_service import UserInviteService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -147,6 +150,41 @@ async def update_me(
     return UserOut.model_validate(current)
 
 
+@router.get("/setup-info", response_model=UserSetupInfoResponse)
+@limiter.limit("30/minute")
+async def user_setup_info(
+    request: Request,
+    token: str,
+    db: DbSession,
+) -> UserSetupInfoResponse:
+    """Unauthenticated endpoint: returns display info for the staff
+    account-setup page. The token IS the auth — no bearer header needed."""
+    info = await UserInviteService(db).get_setup_info(token)
+    return UserSetupInfoResponse(**info)
+
+
+@router.post("/setup", response_model=Token, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
+async def user_setup(
+    request: Request,
+    payload: UserSetupRequest,
+    db: DbSession,
+) -> Token:
+    """Complete staff account setup. Validates the one-time token,
+    stores the hashed password, and returns fresh auth tokens."""
+    tokens = await UserInviteService(db).complete_setup(
+        token=payload.token, password=payload.password
+    )
+    await AuditService(db).record_request(
+        request,
+        user_id=None,
+        action="user.setup_complete",
+        resource_type="user",
+        resource_id=None,
+    )
+    return tokens
+
+
 @router.post("/me/password", status_code=status.HTTP_204_NO_CONTENT)
 async def change_password(
     payload: PasswordChange,
@@ -155,7 +193,7 @@ async def change_password(
     current: CurrentUser,
 ) -> None:
     """Change the signed-in user's password (requires current password)."""
-    if not verify_password(payload.current_password, current.hashed_password):
+    if not current.hashed_password or not verify_password(payload.current_password, current.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect",

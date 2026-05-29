@@ -27,7 +27,7 @@ class AuthService:
             )
         user = User(
             email=payload.email,
-            hashed_password=hash_password(payload.password),
+            hashed_password=hash_password(payload.password) if payload.password else None,
             full_name=payload.full_name,
             role=payload.role,
             specialty=payload.specialty,
@@ -37,7 +37,11 @@ class AuthService:
 
     async def authenticate(self, email: str, password: str) -> User:
         user = await self.users.get_by_email(email)
-        if not user or not verify_password(password, user.hashed_password):
+        if (
+            not user
+            or not user.hashed_password
+            or not verify_password(password, user.hashed_password)
+        ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password",

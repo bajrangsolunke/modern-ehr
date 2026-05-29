@@ -142,6 +142,30 @@ export function useDeactivateUser() {
   });
 }
 
+export function useInviteUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => usersApi.invite(userId),
+    onSuccess: (data) => {
+      // Invalidate so any invite-status badge refreshes.
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.users.all });
+      if (data.emailQueued) {
+        toast.success("Invite sent", {
+          description: "The setup link was emailed to the user.",
+        });
+      } else {
+        toast.success("Invite URL ready", {
+          description: "Copy and share the link manually (SMTP not configured).",
+        });
+      }
+    },
+    onError: (err) =>
+      toast.error("Couldn't generate invite", {
+        description: err instanceof Error ? err.message : undefined,
+      }),
+  });
+}
+
 /** Convenience hook for row-level reactivation — doesn't need a fixed id. */
 export function useReactivateUser() {
   const qc = useQueryClient();

@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from math import ceil
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 
@@ -13,7 +13,10 @@ from app.models.patient import Patient
 from app.models.user import User, UserRole
 from app.schemas.appointment import AppointmentOut
 from app.schemas.common import Page
-from app.schemas.user import UserCreate, UserOut, UserUpdate
+from app.schemas.user import UserCreate, UserInviteResponse, UserOut, UserUpdate
+from app.services import email_service
+from app.email import templates
+from app.services.user_invite_service import UserInviteService
 from app.services.audit_service import AuditService
 
 # User management is admin-only across the board.
@@ -135,7 +138,7 @@ async def create_user(
 
     user = User(
         email=payload.email,
-        hashed_password=hash_password(payload.password),
+        hashed_password=hash_password(payload.password) if payload.password else None,
         full_name=payload.full_name,
         role=payload.role,
         specialty=payload.specialty,
@@ -300,6 +303,53 @@ async def user_appointments(
         )
     ).scalars().all()
     return [AppointmentOut.model_validate(a) for a in items]
+
+
+@router.post(
+    "/{user_id}/invite",
+    response_model=UserInviteResponse,
+    dependencies=[admin_only],
+)
+async def invite_user(
+    user_id: UUID,
+    request: Request,
+    db: DbSession,
+    current: CurrentUser,
+    background_tasks: BackgroundTasks,
+) -> UserInviteResponse:
+    """Admin-only: generate a one-time setup URL for a staff user and
+    optionally email it to them. The user uses the link to set their
+    password and complete account setup."""
+    invite_svc = UserInviteService(db)
+    url, expires = await invite_svc.issue_invite(user_id)
+
+    # Load user for email / display info.
+    user = await db.get(User, user_id)
+    email_queued = False
+    if user and user.email:
+        subject, html, text = templates.user_invite(
+            full_name=user.full_name,
+            setup_url=url,
+            expires_at=expires,
+            role=user.role.value,
+        )
+        background_tasks.add_task(
+            email_service.send_email,
+            to=user.email,
+            subject=subject,
+            html=html,
+            text=text,
+        )
+        email_queued = email_service._is_configured()
+
+    await AuditService(db).record_request(
+        request,
+        user_id=current.id,
+        action="user.invite",
+        resource_type="user",
+        resource_id=str(user_id),
+    )
+    return UserInviteResponse(setup_url=url, expires_at=expires, email_queued=email_queued)
 
 
 @router.delete(

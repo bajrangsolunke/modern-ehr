@@ -12,6 +12,9 @@ class PortalInviteOut(BaseModel):
 
     setup_url: str
     expires_at: datetime
+    email_queued: bool = False
+    """True when SMTP is configured and the email was dispatched as a
+    background task. False means the URL must be shared manually."""
 
 
 class SetupVerifyIn(BaseModel):
