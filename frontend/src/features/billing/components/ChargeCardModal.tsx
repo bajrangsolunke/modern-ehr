@@ -144,9 +144,9 @@ function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
           wallets: { applePay: "never", googlePay: "never" },
           fields: {
             billingDetails: {
-              email: "never",
-              phone: "never",
-              name: "never",
+              // Setting name/email/phone to "never" requires passing
+              // them in confirmParams — Stripe throws IntegrationError
+              // otherwise. Let the PaymentElement collect them.
               address: "never",
             },
           },
