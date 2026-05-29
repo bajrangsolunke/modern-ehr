@@ -2,13 +2,14 @@
 enforces token_type=='patient' so staff tokens can't reach here."""
 from uuid import UUID
 
-from fastapi import APIRouter, Form, Request, UploadFile
+from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
 from pydantic import BaseModel, Field
 
 from app.ai.rag import RagService
 from app.api.deps import CurrentPatient, DbSession
+from app.core.config import settings
 from app.core.rate_limit import limiter
 from app.schemas.ai import AiQuestionResponse
 from app.schemas.patient_auth import PatientMeOut
@@ -20,6 +21,7 @@ class PatientAskIn(BaseModel):
     CurrentPatient. The patient cannot query another patient's chart."""
 
     question: str = Field(..., min_length=1, max_length=2000)
+from app.schemas.invoice import InvoiceOut
 from app.schemas.patient_dashboard import DashboardOut
 from app.schemas.patient_portal_appointments import PatientAppointmentListOut
 from app.schemas.patient_portal_documents import (
@@ -35,18 +37,21 @@ from app.schemas.patient_portal_messages import (
     SendMessageIn,
 )
 from app.schemas.patient_portal_notifications import PatientNotificationListOut
+from app.schemas.payment import StripeInitIn, StripeInitOut
 from app.schemas.patient_portal_tasks import (
     FormDetailOut,
     PatientTaskListOut,
     SubmitFormIn,
 )
 from app.schemas.telehealth import PatientConsentOut
+from app.services.invoice_service import InvoiceService
 from app.services.patient_ai_service import PatientAIService
 from app.services.patient_appointments_service import PatientAppointmentsService
 from app.services.patient_dashboard_service import PatientDashboardService
 from app.services.patient_documents_service import PatientDocumentsService
 from app.services.patient_messages_service import PatientMessagesService
 from app.services.patient_notifications_service import PatientNotificationsService
+from app.services.payment_service import PaymentService
 from app.services.patient_tasks_service import PatientTasksService
 from app.services.telehealth_service import TelehealthService
 
@@ -235,6 +240,7 @@ async def consent_to_telehealth(
     )
     return PatientConsentOut(
         session_id=session.id,
+        provider=settings.VIDEO_PROVIDER,  # type: ignore[arg-type]
         daily_room_url=session.daily_room_url,
         meeting_token=token,
     )
@@ -300,4 +306,37 @@ async def download_my_document(
         headers={
             "Content-Disposition": f'inline; filename="{doc.name}"',
         },
+    )
+
+
+@router.get("/me/invoices", response_model=list[InvoiceOut])
+async def my_invoices(
+    db: DbSession, current: CurrentPatient
+) -> list[InvoiceOut]:
+    """List the signed-in patient's invoices. CurrentPatient is the only
+    auth — staff JWTs can't reach here (token_type='patient' is required)."""
+    return await InvoiceService(db).list_for_patient(current.id)
+
+
+@router.get("/me/invoices/{invoice_id}", response_model=InvoiceOut)
+async def my_invoice(
+    invoice_id: UUID, db: DbSession, current: CurrentPatient
+) -> InvoiceOut:
+    inv = await InvoiceService(db).get(invoice_id)
+    if inv.patient_id != current.id:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    return inv
+
+
+@router.post(
+    "/me/invoices/{invoice_id}/stripe-init", response_model=StripeInitOut
+)
+async def init_my_invoice_payment(
+    invoice_id: UUID, db: DbSession, current: CurrentPatient
+) -> StripeInitOut:
+    inv = await InvoiceService(db).get(invoice_id)
+    if inv.patient_id != current.id:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    return await PaymentService(db).init_stripe(
+        StripeInitIn(invoice_id=invoice_id)
     )

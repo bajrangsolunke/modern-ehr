@@ -27,6 +27,7 @@ const navItems: NavLeaf[] = [
   { to: ROUTES.docs, label: "Docs" },
   { to: ROUTES.tasks, label: "Tasks" },
   { to: ROUTES.notifications, label: "Notifications" },
+  { to: ROUTES.billing, label: "Billing" },
 ];
 
 export function Topbar() {

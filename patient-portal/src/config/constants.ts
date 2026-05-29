@@ -8,6 +8,7 @@ export const ROUTES = {
   docs: "/docs",
   tasks: "/tasks",
   notifications: "/notifications",
+  billing: "/billing",
   settings: "/settings",
   login: "/login",
   setup: "/setup",
