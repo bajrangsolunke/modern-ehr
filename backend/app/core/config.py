@@ -103,6 +103,11 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = True
     SMTP_FROM_EMAIL: str = "no-reply@modern-ehr.health"
     SMTP_FROM_NAME: str = "Modern EHR"
+    # Kill switch — set to true to keep SMTP creds in env but skip
+    # actual sends (e.g. demo days, manual testing where you don't
+    # want to spam real inboxes). RFC-reserved domains (example.com,
+    # *.test, test.example, ...) are dropped regardless of this flag.
+    EMAIL_DISABLED: bool = False
 
     @computed_field
     @property

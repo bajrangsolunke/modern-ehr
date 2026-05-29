@@ -41,6 +41,28 @@ _async_session = async_sessionmaker(
 
 
 # ---------------------------------------------------------------------------
+# Autouse: never hit real SMTP from a test
+# ---------------------------------------------------------------------------
+# Tests use @test.example addresses on User/Patient fixtures. With real
+# SMTP credentials in .env, the patient + user invite endpoints schedule
+# a BackgroundTask that hits the SMTP server — Gmail accepts the message
+# and then bounces it back to the FROM address (NXDOMAIN). That flooded
+# a developer's personal inbox with bounce notifications. Block it at
+# the source: monkeypatch send_email to a no-op for the entire test
+# session. Tests that need to assert on email-send behaviour can still
+# patch their own copy locally.
+
+
+@pytest.fixture(autouse=True)
+def _no_real_smtp(monkeypatch):
+    async def _fake_send(**kwargs):  # noqa: ARG001 — drop-in for signature
+        return False
+
+    monkeypatch.setattr("app.services.email_service.send_email", _fake_send)
+    yield
+
+
+# ---------------------------------------------------------------------------
 # db_session — one transaction per test, rolled back at the end
 # ---------------------------------------------------------------------------
 

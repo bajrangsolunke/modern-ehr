@@ -21,10 +21,43 @@ log = get_logger(__name__)
 
 
 def _is_configured() -> bool:
-    """SMTP is considered live iff SMTP_HOST is non-empty. SMTP_USER /
-    SMTP_PASSWORD may be empty (e.g. mailpit in dev has no auth) — we
-    only require the host."""
+    """SMTP is considered live iff SMTP_HOST is non-empty AND
+    EMAIL_DISABLED is not set. SMTP_USER / SMTP_PASSWORD may be empty
+    (e.g. mailpit in dev has no auth) — we only require the host.
+
+    EMAIL_DISABLED is a kill-switch — set it in .env to keep SMTP
+    credentials but skip actual sends (tests, demo days where you
+    don't want to spam real inboxes, etc.).
+    """
+    if getattr(settings, "EMAIL_DISABLED", False):
+        return False
     return bool((settings.SMTP_HOST or "").strip())
+
+
+# Domains that are reserved for examples/tests per RFC 2606 + common
+# placeholders. Sending to these from a real SMTP guarantees a bounce,
+# so we short-circuit to a log + return False.
+_BOUNCE_GUARANTEED_DOMAINS = {
+    "example.com",
+    "example.org",
+    "example.net",
+    "test.example",
+    "invalid",
+    "localhost",
+    "test",
+}
+
+
+def _is_bounce_guaranteed(addr: str) -> bool:
+    """True if `addr`'s domain is reserved for examples — Gmail / SES
+    will accept the message and then bounce it back to the FROM address,
+    which is how the user ended up with hundreds of NXDOMAIN replies
+    in their personal inbox. Catch those at the application layer."""
+    try:
+        domain = addr.split("@", 1)[1].lower().strip()
+    except IndexError:
+        return True
+    return domain in _BOUNCE_GUARANTEED_DOMAINS or domain.endswith(".test")
 
 
 async def send_email(
@@ -43,6 +76,22 @@ async def send_email(
     if not to_list:
         log.warning("email_skipped_no_recipient", subject=subject)
         return False
+
+    # Drop recipients whose domain is RFC-reserved or a known test
+    # placeholder. If we don't filter them, real SMTP providers accept
+    # the message and then bounce it back to the FROM address — flooding
+    # the sender's inbox with NXDOMAIN replies. Better to skip + log.
+    bounce_targets = [a for a in to_list if _is_bounce_guaranteed(a)]
+    if bounce_targets:
+        log.warning(
+            "email_skipped_bounce_guaranteed_domain",
+            to=bounce_targets,
+            subject=subject,
+            note="RFC-reserved or test placeholder domain — would bounce.",
+        )
+        to_list = [a for a in to_list if not _is_bounce_guaranteed(a)]
+        if not to_list:
+            return False
 
     if not _is_configured():
         log.info(
