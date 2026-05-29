@@ -5,9 +5,21 @@ from uuid import UUID
 from fastapi import APIRouter, Form, Request, UploadFile
 from fastapi.responses import Response
 
+from pydantic import BaseModel, Field
+
+from app.ai.rag import RagService
 from app.api.deps import CurrentPatient, DbSession
 from app.core.rate_limit import limiter
+from app.schemas.ai import AiQuestionResponse
 from app.schemas.patient_auth import PatientMeOut
+from app.services.audit_service import AuditService
+
+
+class PatientAskIn(BaseModel):
+    """Patient-side chart Q&A request. No patient_id — derived from
+    CurrentPatient. The patient cannot query another patient's chart."""
+
+    question: str = Field(..., min_length=1, max_length=2000)
 from app.schemas.patient_dashboard import DashboardOut
 from app.schemas.patient_portal_appointments import PatientAppointmentListOut
 from app.schemas.patient_portal_documents import (
@@ -240,6 +252,39 @@ async def my_ai_suggest_replies(
         conv_id, current.id
     )
     return {"suggestions": suggestions}
+
+
+@router.post("/me/ask", response_model=AiQuestionResponse)
+@limiter.limit("20/minute")
+async def my_chart_qa(
+    request: Request,
+    payload: PatientAskIn,
+    db: DbSession,
+    current: CurrentPatient,
+) -> AiQuestionResponse:
+    """Patient-side AI chart Q&A. The patient is resolved from the JWT
+    (CurrentPatient) — there is NO accepted patient_id field on this
+    endpoint, so a patient can only ever ask about their own chart.
+
+    Safety: the underlying prompt forbids medical advice / diagnosis /
+    medication recommendations and instructs the model to direct the
+    patient to their care team for those questions."""
+    res = await RagService(db).ask_for_patient(
+        payload.question, patient=current
+    )
+    await AuditService(db).record_request(
+        request,
+        user_id=None,
+        action="patient.ask",
+        resource_type="patient",
+        resource_id=str(current.id),
+        payload={
+            "model": res.model,
+            "question_chars": len(payload.question),
+            "citation_count": len(res.citations),
+        },
+    )
+    return res
 
 
 @router.get("/me/documents/{doc_id}/download")
