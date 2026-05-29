@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { MessageCircle, Sparkles, X } from "lucide-react";
 import { ChatThread } from "./ChatThread";
+import { cn } from "@/lib/utils";
 
 export function ChatWidget() {
   // `open` controls whether the panel exists in the DOM.
@@ -58,16 +59,22 @@ export function ChatWidget() {
           role="dialog"
           aria-label="Chat with your care team's AI assistant"
         >
-          <header className="shrink-0 px-4 py-3 bg-primary text-white flex items-center justify-between gap-3">
+          <header
+            className="shrink-0 px-4 py-3.5 text-white flex items-center justify-between gap-3"
+            style={{
+              background:
+                "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.78))",
+            }}
+          >
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="size-9 rounded-full bg-white/15 grid place-items-center shrink-0">
+              <div className="size-10 rounded-full bg-white/20 grid place-items-center shrink-0 ring-2 ring-white/15">
                 <Sparkles className="size-4" />
               </div>
               <div className="min-w-0">
-                <div className="font-semibold text-sm truncate">
+                <div className="font-semibold text-sm truncate leading-tight">
                   Your care assistant
                 </div>
-                <div className="text-[11px] text-white/80 truncate">
+                <div className="text-[11px] text-white/85 truncate leading-tight mt-0.5">
                   Based only on your records · not medical advice
                 </div>
               </div>
@@ -76,7 +83,7 @@ export function ChatWidget() {
               type="button"
               onClick={() => setVisible(false)}
               aria-label="Close chat"
-              className="size-8 rounded-full grid place-items-center hover:bg-white/15 transition shrink-0"
+              className="size-8 rounded-full grid place-items-center hover:bg-white/20 active:bg-white/30 transition shrink-0"
             >
               <X className="size-4" />
             </button>
@@ -88,15 +95,28 @@ export function ChatWidget() {
         </div>
       )}
 
-      {/* Floating FAB — always visible at the bottom-right */}
-      <button
-        type="button"
-        onClick={() => (open ? setVisible(false) : setOpen(true))}
-        aria-label={open ? "Close chat" : "Open chat with care assistant"}
-        className="fixed bottom-6 right-6 z-30 size-14 rounded-full bg-primary text-white shadow-xl hover:scale-105 transition grid place-items-center"
-      >
-        {open ? <X className="size-6" /> : <MessageCircle className="size-6" />}
-      </button>
+      {/* Floating FAB — only when the chat is CLOSED. While the panel
+          is open the header's X is the only close affordance, so the
+          two close buttons aren't fighting each other. */}
+      {!open && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Open chat with care assistant"
+          className={cn(
+            "fixed bottom-6 right-6 z-30 size-14 rounded-full text-white",
+            "grid place-items-center shadow-xl",
+            "transition-all duration-200 hover:scale-105 hover:shadow-2xl",
+            "ring-4 ring-primary/15",
+          )}
+          style={{
+            background:
+              "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8))",
+          }}
+        >
+          <MessageCircle className="size-6" />
+        </button>
+      )}
     </>
   );
 }

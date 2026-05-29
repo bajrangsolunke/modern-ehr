@@ -1,19 +1,25 @@
 /**
  * Patient-portal chat thread. Bubble-style layout, plain-language
- * sample questions, typing-dots loader. Mirrors the provider portal
- * chat but with patient-friendly copy.
+ * sample questions, typing-dots loader, message timestamps, and
+ * patient-friendly citation chips.
  */
-import { useEffect, useRef, useState } from "react";
-import { Send, Sparkles, User } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BookOpen, ChevronDown, Send, Sparkles, User } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { chatApi, type ChatAnswer, type ChatCitation } from "../api/chat-api";
 import { cn } from "@/lib/utils";
 
 type Message =
-  | { role: "user"; content: string }
-  | { role: "ai"; content: string; citations: ChatCitation[]; model: string }
-  | { role: "error"; content: string };
+  | { role: "user"; content: string; ts: number }
+  | {
+      role: "ai";
+      content: string;
+      citations: ChatCitation[];
+      model: string;
+      ts: number;
+    }
+  | { role: "error"; content: string; ts: number };
 
 const SAMPLE_QUESTIONS = [
   "When is my next appointment?",
@@ -21,22 +27,40 @@ const SAMPLE_QUESTIONS = [
   "Summarize my last visit",
 ];
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Minutes-relative timestamp ("just now", "2m", "1h", "3d"). */
+function relTime(ts: number, now: number): string {
+  const s = Math.max(0, Math.floor((now - ts) / 1000));
+  if (s < 30) return "just now";
+  if (s < 90) return "1m";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
+}
+
+// ---------------------------------------------------------------------------
+// Citation chips
+// ---------------------------------------------------------------------------
+
 function CitationLine({ c }: { c: ChatCitation }) {
   if (c.type === "section" && c.name) {
-    const count = typeof c.count === "number" ? ` (${c.count})` : "";
+    const count = typeof c.count === "number" ? ` · ${c.count}` : "";
     return (
-      <li className="text-[11px] text-muted-foreground">
-        <span className="font-semibold text-foreground/70">
-          {c.name}
-          {count}
-        </span>
+      <li className="text-[11px] text-muted-foreground leading-tight">
+        <span className="font-semibold text-foreground/80">{c.name}</span>
+        {count && <span className="text-muted-foreground">{count}</span>}
       </li>
     );
   }
   if (c.snippet) {
     return (
       <li className="text-[11px] text-muted-foreground">
-        <span className="font-semibold text-foreground/70">
+        <span className="font-semibold text-foreground/80">
           {c.name ?? "From your records"}
         </span>
         <p className="italic mt-0.5 line-clamp-2">&ldquo;{c.snippet}&rdquo;</p>
@@ -46,7 +70,7 @@ function CitationLine({ c }: { c: ChatCitation }) {
   return null;
 }
 
-function CitationList({ citations }: { citations: ChatCitation[] }) {
+function CitationChip({ citations }: { citations: ChatCitation[] }) {
   const [open, setOpen] = useState(false);
   if (citations.length === 0) return null;
   return (
@@ -54,12 +78,23 @@ function CitationList({ citations }: { citations: ChatCitation[] }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="text-[11px] text-primary hover:underline font-medium"
+        className={cn(
+          "inline-flex items-center gap-1 rounded-full px-2 py-0.5",
+          "text-[11px] font-medium",
+          "bg-primary/10 text-primary hover:bg-primary/15 transition-colors",
+        )}
       >
-        {open ? "Hide" : "Based on"} · {citations.length}
+        <BookOpen className="size-2.5" />
+        Based on {citations.length} source{citations.length === 1 ? "" : "s"}
+        <ChevronDown
+          className={cn(
+            "size-3 transition-transform",
+            open && "rotate-180",
+          )}
+        />
       </button>
       {open && (
-        <ul className="mt-1.5 space-y-1 pl-2 border-l-2 border-primary/30">
+        <ul className="mt-2 space-y-1 pl-2 border-l-2 border-primary/30">
           {citations.map((c, i) => (
             <CitationLine key={i} c={c} />
           ))}
@@ -69,41 +104,61 @@ function CitationList({ citations }: { citations: ChatCitation[] }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Bubble components
+// ---------------------------------------------------------------------------
+
 function AiBubble({
   content,
   citations,
+  ts,
+  now,
 }: {
   content: string;
   citations: ChatCitation[];
   model: string;
+  ts: number;
+  now: number;
 }) {
   return (
     <div className="flex gap-2 items-end">
-      <div className="size-7 rounded-full bg-primary grid place-items-center shrink-0 text-white">
-        <Sparkles className="size-3.5" />
+      <div
+        className="size-8 rounded-full grid place-items-center shrink-0 text-white shadow-sm"
+        style={{
+          background:
+            "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.75))",
+        }}
+      >
+        <Sparkles className="size-4" />
       </div>
       <div className="max-w-[82%] min-w-0">
         <div className="rounded-2xl rounded-bl-md bg-white border border-border px-3.5 py-2.5 shadow-sm">
-          <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+          <p className="text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground">
             {content}
           </p>
-          <CitationList citations={citations} />
+          <CitationChip citations={citations} />
+        </div>
+        <div className="text-[10px] text-muted-foreground mt-1 ml-1">
+          {relTime(ts, now)}
         </div>
       </div>
     </div>
   );
 }
 
-function UserBubble({ content }: { content: string }) {
+function UserBubble({ content, ts, now }: { content: string; ts: number; now: number }) {
   return (
     <div className="flex gap-2 items-end justify-end">
       <div className="max-w-[82%]">
         <div className="rounded-2xl rounded-br-md bg-primary text-white px-3.5 py-2.5 text-sm leading-relaxed break-words shadow-sm">
           {content}
         </div>
+        <div className="text-[10px] text-muted-foreground mt-1 mr-1 text-right">
+          {relTime(ts, now)}
+        </div>
       </div>
-      <div className="size-7 rounded-full bg-secondary grid place-items-center shrink-0 text-muted-foreground">
-        <User className="size-3.5" />
+      <div className="size-8 rounded-full bg-secondary grid place-items-center shrink-0 text-muted-foreground">
+        <User className="size-4" />
       </div>
     </div>
   );
@@ -112,8 +167,8 @@ function UserBubble({ content }: { content: string }) {
 function ErrorBubble({ content }: { content: string }) {
   return (
     <div className="flex gap-2 items-end">
-      <div className="size-7 rounded-full bg-danger/15 grid place-items-center shrink-0 text-danger">
-        <Sparkles className="size-3.5" />
+      <div className="size-8 rounded-full bg-danger/15 grid place-items-center shrink-0 text-danger">
+        <Sparkles className="size-4" />
       </div>
       <div className="max-w-[82%] rounded-2xl rounded-bl-md bg-danger/5 border border-danger/30 text-danger px-3.5 py-2.5 text-sm leading-relaxed">
         {content}
@@ -125,8 +180,14 @@ function ErrorBubble({ content }: { content: string }) {
 function TypingBubble() {
   return (
     <div className="flex gap-2 items-end">
-      <div className="size-7 rounded-full bg-primary grid place-items-center shrink-0 text-white">
-        <Sparkles className="size-3.5" />
+      <div
+        className="size-8 rounded-full grid place-items-center shrink-0 text-white shadow-sm"
+        style={{
+          background:
+            "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.75))",
+        }}
+      >
+        <Sparkles className="size-4" />
       </div>
       <div className="rounded-2xl rounded-bl-md bg-white border border-border px-3.5 py-3 shadow-sm">
         <div className="flex items-center gap-1">
@@ -143,10 +204,29 @@ function TypingBubble() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 export function ChatThread() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Update "just now / 2m / 1h" stamps each minute without re-rendering
+  // on every animation frame.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Focus the composer when the thread mounts so the user can start
+  // typing immediately.
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -155,29 +235,36 @@ export function ChatThread() {
   const mutation = useMutation({
     mutationFn: (question: string) => chatApi.ask(question),
     onSuccess: (data: ChatAnswer, question) => {
+      const ts = Date.now();
       setMessages((prev) => [
         ...prev,
-        { role: "user", content: question },
+        { role: "user", content: question, ts },
         {
           role: "ai",
           content: data.answer,
           citations: data.citations,
           model: data.model,
+          ts,
         },
       ]);
+      // Refocus so a follow-up question can be typed immediately.
+      requestAnimationFrame(() => textareaRef.current?.focus());
     },
     onError: (err, question) => {
+      const ts = Date.now();
       setMessages((prev) => [
         ...prev,
-        { role: "user", content: question },
+        { role: "user", content: question, ts },
         {
           role: "error",
           content:
             err instanceof Error
               ? err.message
               : "Something went wrong. Please try again.",
+          ts,
         },
       ]);
+      requestAnimationFrame(() => textareaRef.current?.focus());
     },
   });
 
@@ -195,14 +282,23 @@ export function ChatThread() {
     }
   };
 
-  const isEmpty = messages.length === 0 && !mutation.isPending;
+  const isEmpty = useMemo(
+    () => messages.length === 0 && !mutation.isPending,
+    [messages, mutation.isPending],
+  );
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+      <div className="flex-1 overflow-y-auto space-y-4 pr-1">
         {isEmpty && (
           <div className="h-full flex flex-col items-center justify-center text-center px-4 gap-4">
-            <div className="size-12 rounded-2xl bg-primary grid place-items-center text-white shadow-md">
+            <div
+              className="size-12 rounded-2xl grid place-items-center text-white shadow-md"
+              style={{
+                background:
+                  "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.75))",
+              }}
+            >
               <Sparkles className="size-5" />
             </div>
             <div>
@@ -231,7 +327,7 @@ export function ChatThread() {
 
         {messages.map((msg, i) => {
           if (msg.role === "user")
-            return <UserBubble key={i} content={msg.content} />;
+            return <UserBubble key={i} content={msg.content} ts={msg.ts} now={now} />;
           if (msg.role === "ai")
             return (
               <AiBubble
@@ -239,6 +335,8 @@ export function ChatThread() {
                 content={msg.content}
                 citations={msg.citations}
                 model={msg.model}
+                ts={msg.ts}
+                now={now}
               />
             );
           return <ErrorBubble key={i} content={msg.content} />;
@@ -251,15 +349,19 @@ export function ChatThread() {
       <div className="shrink-0 mt-3 flex items-end gap-2">
         <div className="flex-1 relative">
           <Textarea
+            ref={textareaRef}
             rows={1}
-            placeholder="Ask about your appointments, meds, or last visit…"
+            // Short placeholder so it doesn't wrap + clip on the 400px
+            // wide widget. The empty state above tells users WHAT to ask.
+            placeholder="Type your question…"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={mutation.isPending}
             className={cn(
               "text-sm resize-none rounded-2xl border-border bg-white",
-              "min-h-[40px] max-h-32 py-2.5 pl-3.5 pr-10",
+              "min-h-[44px] max-h-32 py-3 pl-3.5 pr-12",
+              "leading-snug",
             )}
           />
           <button
@@ -268,10 +370,10 @@ export function ChatThread() {
             disabled={!draft.trim() || mutation.isPending}
             aria-label="Send"
             className={cn(
-              "absolute right-1.5 bottom-1.5 size-8 rounded-full grid place-items-center transition",
+              "absolute right-2 bottom-2 size-8 rounded-full grid place-items-center transition",
               draft.trim() && !mutation.isPending
-                ? "bg-primary text-white hover:brightness-105 shadow-sm"
-                : "bg-muted text-muted-foreground cursor-not-allowed",
+                ? "bg-primary text-white hover:brightness-105 shadow-sm scale-100"
+                : "bg-muted text-muted-foreground cursor-not-allowed scale-95",
             )}
           >
             <Send className="size-3.5" />
