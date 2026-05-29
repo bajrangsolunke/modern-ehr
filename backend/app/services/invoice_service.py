@@ -39,9 +39,17 @@ class InvoiceService:
         self, payload: InvoiceIssueIn, *, viewer_id: UUID
     ) -> InvoiceOut:
         """Atomically bind a set of uninvoiced charges to a new invoice."""
+        # Row-lock the candidate charges for the duration of this
+        # transaction. Without `FOR UPDATE`, two concurrent issue()
+        # calls could both pass the `invoice_id is None` check, and
+        # the second UPDATE would silently steal the charge from the
+        # first invoice — leaving an "open" invoice with the right
+        # total_cents but zero attached charges.
         rows = (
             await self.db.execute(
-                select(Charge).where(Charge.id.in_(payload.charge_ids))
+                select(Charge)
+                .where(Charge.id.in_(payload.charge_ids))
+                .with_for_update()
             )
         ).scalars().all()
         if len(rows) != len(payload.charge_ids):
@@ -128,7 +136,16 @@ class InvoiceService:
         """Recompute paid_cents + balance_cents + status from succeeded
         payments. Call inside the same transaction as the payment write
         so callers see a consistent snapshot."""
-        inv = await self.db.get(Invoice, invoice_id)
+        # Row-lock the invoice so concurrent recalc() calls (e.g. a
+        # Stripe webhook firing while a front-desk cash payment is
+        # being recorded) serialize cleanly per-invoice.
+        inv = (
+            await self.db.execute(
+                select(Invoice)
+                .where(Invoice.id == invoice_id)
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
         if inv is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found"
@@ -144,7 +161,10 @@ class InvoiceService:
         inv.paid_cents = int(paid)
         inv.balance_cents = max(0, inv.total_cents - inv.paid_cents)
         # Don't overwrite terminal statuses set by void/refund flows.
-        if inv.status not in {"void", "refunded", "draft"}:
+        # void/refunded are terminal — payments against them shouldn't
+        # mutate status. draft is NOT terminal; it should flow to
+        # paid/partially_paid/open like open does.
+        if inv.status not in {"void", "refunded"}:
             if inv.balance_cents == 0 and inv.total_cents > 0:
                 inv.status = "paid"
             elif inv.paid_cents > 0:

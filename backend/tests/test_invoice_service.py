@@ -280,3 +280,108 @@ async def test_list_for_patient_orders_newest_first(
     inv1_idx = next(i for i, x in enumerate(items) if x.id == inv1.id)
     inv2_idx = next(i for i, x in enumerate(items) if x.id == inv2.id)
     assert inv2_idx < inv1_idx
+
+
+@pytest.mark.asyncio
+async def test_issue_with_discount_exceeding_subtotal_clamps_to_zero(
+    db_session, sample_patient, provider_user
+):
+    sv = await ServiceCatalogService(db_session).create(
+        ServiceCatalogCreate(code="T6-CLAMP", name="C", category="visit", price_cents=500)
+    )
+    c = await ChargeService(db_session).create(
+        ChargeCreate(patient_id=sample_patient.id, service_catalog_id=sv.id),
+        viewer_id=provider_user.id,
+    )
+    inv = await InvoiceService(db_session).issue(
+        InvoiceIssueIn(
+            patient_id=sample_patient.id,
+            charge_ids=[c.id],
+            discount_cents=10000,  # absurdly large, should clamp
+        ),
+        viewer_id=provider_user.id,
+    )
+    assert inv.subtotal_cents == 500
+    assert inv.discount_cents == 10000
+    assert inv.total_cents == 0
+    assert inv.balance_cents == 0
+    # zero-total invoice does not become "paid" (recalc gate: total > 0)
+    assert inv.status == "open"
+
+
+@pytest.mark.asyncio
+async def test_recalc_does_not_overwrite_terminal_void_status(
+    db_session, sample_patient, provider_user
+):
+    sv = await ServiceCatalogService(db_session).create(
+        ServiceCatalogCreate(code="T6-TERM", name="T", category="visit", price_cents=1000)
+    )
+    c = await ChargeService(db_session).create(
+        ChargeCreate(patient_id=sample_patient.id, service_catalog_id=sv.id),
+        viewer_id=provider_user.id,
+    )
+    inv = await InvoiceService(db_session).issue(
+        InvoiceIssueIn(patient_id=sample_patient.id, charge_ids=[c.id]),
+        viewer_id=provider_user.id,
+    )
+
+    # Simulate voiding the invoice directly (the void flow lands in P3).
+    from app.models.invoice import Invoice as InvoiceModel
+    row = await db_session.get(InvoiceModel, inv.id)
+    row.status = "void"
+    await db_session.flush()
+
+    # Drop a succeeded payment and recalc — status must NOT flip to paid.
+    from app.models.payment import Payment
+    db_session.add(
+        Payment(
+            invoice_id=inv.id,
+            patient_id=sample_patient.id,
+            method="cash",
+            amount_cents=1000,
+            status="succeeded",
+        )
+    )
+    await db_session.flush()
+    refreshed = await InvoiceService(db_session).recalc(inv.id)
+    assert refreshed.status == "void"
+    # paid_cents IS still recomputed (for accounting), but status stays terminal.
+    assert refreshed.paid_cents == 1000
+
+
+@pytest.mark.asyncio
+async def test_recalc_preserves_notes_and_issued_at(
+    db_session, sample_patient, provider_user
+):
+    sv = await ServiceCatalogService(db_session).create(
+        ServiceCatalogCreate(code="T6-NOTE", name="N", category="visit", price_cents=500)
+    )
+    c = await ChargeService(db_session).create(
+        ChargeCreate(patient_id=sample_patient.id, service_catalog_id=sv.id),
+        viewer_id=provider_user.id,
+    )
+    inv = await InvoiceService(db_session).issue(
+        InvoiceIssueIn(
+            patient_id=sample_patient.id,
+            charge_ids=[c.id],
+            notes="Thanks for visiting",
+        ),
+        viewer_id=provider_user.id,
+    )
+    issued_at_before = inv.issued_at
+
+    from app.models.payment import Payment
+    db_session.add(
+        Payment(
+            invoice_id=inv.id,
+            patient_id=sample_patient.id,
+            method="cash",
+            amount_cents=500,
+            status="succeeded",
+        )
+    )
+    await db_session.flush()
+    refreshed = await InvoiceService(db_session).recalc(inv.id)
+    assert refreshed.notes == "Thanks for visiting"
+    assert refreshed.issued_at == issued_at_before
+    assert refreshed.status == "paid"
