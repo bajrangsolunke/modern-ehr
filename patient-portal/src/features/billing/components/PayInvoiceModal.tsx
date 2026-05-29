@@ -43,7 +43,13 @@ export function PayInvoiceModal({ invoice, onClose }: Props) {
       .initStripe(invoice.id)
       .then((d) => {
         setInit(d);
-        setStripePromise(loadStripe(d.publishableKey));
+        setStripePromise(
+          loadStripe(d.publishableKey, {
+            // Suppress the test-mode dev assistant widget that pins to
+            // the bottom-right of the page.
+            developerTools: { assistant: { enabled: false } },
+          } as Parameters<typeof loadStripe>[1]),
+        );
       })
       .catch((e) =>
         setError(e instanceof Error ? e.message : "Couldn't start payment"),
