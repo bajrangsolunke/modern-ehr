@@ -89,11 +89,12 @@ async def test_freeform_charge_without_catalog(
     assert out.tax_cents == 0
 
 
-@pytest.mark.asyncio
-async def test_freeform_missing_required_fields_rejected(db_session, sample_patient):
-    with pytest.raises(Exception):
+def test_freeform_missing_required_fields_rejected():
+    from uuid import uuid4
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
         # Pydantic root validator should reject: no catalog AND no full freeform fields.
-        ChargeCreate(patient_id=sample_patient.id, quantity=1)
+        ChargeCreate(patient_id=uuid4(), quantity=1)
 
 
 @pytest.mark.asyncio

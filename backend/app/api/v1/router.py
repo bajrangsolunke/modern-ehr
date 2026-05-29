@@ -7,6 +7,7 @@ from app.api.v1.endpoints import (
     appointments,
     auth,
     availability,
+    charges,
     dashboard,
     documents,
     form_requests,
@@ -21,7 +22,6 @@ from app.api.v1.endpoints import (
     patients,
     scribe,
     service_catalog,
-    charges,
     tasks,
     telehealth,
     users,
@@ -36,6 +36,7 @@ api_router.include_router(patient_auth.router)
 api_router.include_router(patient_portal.router)
 api_router.include_router(users.router)
 api_router.include_router(availability.router)
+api_router.include_router(charges.router)
 api_router.include_router(patients.router)
 api_router.include_router(appointments.router)
 api_router.include_router(notes.router)
@@ -55,4 +56,3 @@ api_router.include_router(telehealth.router)
 api_router.include_router(ws.router)
 api_router.include_router(scribe.router)
 api_router.include_router(service_catalog.router)
-api_router.include_router(charges.router)

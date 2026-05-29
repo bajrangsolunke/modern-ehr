@@ -19,7 +19,9 @@ async def create_charge(
 
 @router.get("/{charge_id}", response_model=ChargeOut)
 async def get_charge(
-    charge_id: UUID, db: DbSession, current: CurrentUser  # noqa: ARG001
+    charge_id: UUID,
+    db: DbSession,
+    _current: CurrentUser,
 ) -> ChargeOut:
     return await ChargeService(db).get(charge_id)
 

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.charge import Charge
 from app.models.service_catalog import ServiceCatalog
 from app.schemas.charge import ChargeCreate, ChargeOut
+from app.services.audit_service import AuditService
 
 
 def _compute_tax_cents(taxable_subtotal: int, tax_rate_bp: int) -> int:
@@ -42,10 +43,15 @@ class ChargeService:
             tax_rate_bp = catalog.tax_rate_bp
             taxable = catalog.taxable
         else:
-            # Validated by ChargeCreate.model_validator that these are all set.
-            description = payload.description  # type: ignore[assignment]
-            code = payload.code  # type: ignore[assignment]
-            unit_price_cents = payload.unit_price_cents  # type: ignore[assignment]
+            # ChargeCreate.model_validator guarantees these are set when
+            # no catalog id is provided. Assert so mypy narrows + we get
+            # a clear runtime error if validation is bypassed.
+            assert payload.description is not None
+            assert payload.code is not None
+            assert payload.unit_price_cents is not None
+            description = payload.description
+            code = payload.code
+            unit_price_cents = payload.unit_price_cents
             tax_rate_bp = 0
             taxable = False
 
@@ -94,7 +100,7 @@ class ChargeService:
         return [ChargeOut.model_validate(r) for r in rows]
 
     async def void(
-        self, charge_id: UUID, *, viewer_id: UUID, reason: str  # noqa: ARG002
+        self, charge_id: UUID, *, viewer_id: UUID, reason: str
     ) -> ChargeOut:
         row = await self.db.get(Charge, charge_id)
         if row is None:
@@ -112,4 +118,11 @@ class ChargeService:
         row.voided_by_user_id = viewer_id
         await self.db.flush()
         await self.db.refresh(row)
+        await AuditService(self.db).record(
+            user_id=viewer_id,
+            action="charge.void",
+            resource_type="charge",
+            resource_id=str(row.id),
+            payload={"reason": reason},
+        )
         return ChargeOut.model_validate(row)
