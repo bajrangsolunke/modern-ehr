@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   CalendarClock,
   LayoutGrid,
@@ -6,10 +7,12 @@ import {
   Loader2,
   MapPin,
   Stethoscope,
+  Video,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { SortableTh, TABLE_ROW_BG } from "@/components/ui/sortable-th";
@@ -35,6 +38,25 @@ const STATUS_VARIANT: Record<
 
 function typeLabel(t: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1).replace("-", " ");
+}
+
+/**
+ * Returns true when the appointment is within the join window:
+ * 10 minutes before start through 60 minutes after start, and
+ * the status is one that allows joining (not completed/cancelled/no-show).
+ *
+ * NOTE: The current AppointmentType enum has no telehealth/video kind, so
+ * this helper does not gate on type — the Join button will appear on any
+ * appointment in the joinable window. When a telehealth type is added,
+ * extend this check accordingly.
+ */
+function isJoinable(appt: PatientAppointment): boolean {
+  const blocked = new Set(["completed", "cancelled", "no-show"]);
+  if (blocked.has(appt.status)) return false;
+  const now = Date.now();
+  const start = new Date(appt.starts_at).getTime();
+  if (Number.isNaN(start)) return false;
+  return start - now <= 10 * 60_000 && now - start <= 60 * 60_000;
 }
 
 export function AppointmentsPage() {
@@ -180,6 +202,8 @@ function CardsView({ items }: { items: PatientAppointment[] }) {
 }
 
 function AppointmentCard({ appt }: { appt: PatientAppointment }) {
+  const navigate = useNavigate();
+  const joinable = isJoinable(appt);
   return (
     <Card className="p-5 h-full flex flex-col">
       <div className="flex items-start gap-3 mb-3">
@@ -225,6 +249,18 @@ function AppointmentCard({ appt }: { appt: PatientAppointment }) {
           </div>
         )}
       </dl>
+
+      {joinable && (
+        <div className="pt-4 mt-auto">
+          <Button
+            size="sm"
+            onClick={() => navigate(`/telehealth/${appt.id}`)}
+          >
+            <Video className="size-3.5" />
+            Join video visit
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }
@@ -258,6 +294,8 @@ function ListView({ items }: { items: PatientAppointment[] }) {
 }
 
 function AppointmentRow({ appt }: { appt: PatientAppointment }) {
+  const navigate = useNavigate();
+  const joinable = isJoinable(appt);
   return (
     <tr className="hover:[&_td]:bg-[#EEF2F8] transition">
       <td
@@ -306,9 +344,20 @@ function AppointmentRow({ appt }: { appt: PatientAppointment }) {
         className="px-4 py-2 last:rounded-r-full"
         style={{ background: TABLE_ROW_BG }}
       >
-        <Badge variant={STATUS_VARIANT[appt.status] ?? "neutral"} size="sm">
-          {appt.status}
-        </Badge>
+        <div className="flex items-center justify-end gap-2">
+          <Badge variant={STATUS_VARIANT[appt.status] ?? "neutral"} size="sm">
+            {appt.status}
+          </Badge>
+          {joinable && (
+            <Button
+              size="xs"
+              onClick={() => navigate(`/telehealth/${appt.id}`)}
+            >
+              <Video className="size-3.5" />
+              Join
+            </Button>
+          )}
+        </div>
       </td>
     </tr>
   );
