@@ -14,9 +14,9 @@ import {
   useIssueInvoice,
 } from "@/features/billing/hooks/use-invoices";
 import { useInvoicePayments } from "@/features/billing/hooks/use-payments";
+import { useOpenCharges } from "@/features/billing/hooks/use-charges";
 import { AddChargeModal } from "./AddChargeModal";
 import { TakeCashPaymentModal } from "./TakeCashPaymentModal";
-import { useQuery } from "@tanstack/react-query";
 
 const dollar = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -29,39 +29,6 @@ const statusTone: Record<InvoiceStatus, "warning" | "info" | "success" | "neutra
   refunded: "danger",
 };
 
-interface ChargeRow {
-  id: string;
-  description: string;
-  code: string;
-  quantity: number;
-  totalCents: number;
-  invoiceId: string | null;
-  voidedAt: string | null;
-}
-
-/**
- * Fetch all charges for the patient. There's no dedicated endpoint,
- * so we use the invoices list + a manual fetch via the patient-charges
- * pattern — actually the backend doesn't expose a list-charges-for-patient
- * route. For Phase 1 we approximate: "open charges" = charges added since
- * the last invoice was issued, tracked locally via the create mutation's
- * cache. Until a list endpoint lands, the page only shows charges added
- * during the current session via the create mutation.
- *
- * Actually we already have `chargesApi.create` returning the full row;
- * we'll display the just-added rows from a local state that resets when
- * an invoice is issued. This is acceptable for the v1 happy path: the
- * front desk adds charges → issues invoice in one sitting.
- */
-function useOpenChargesLocal() {
-  // Use React Query as a local cache.
-  return useQuery<ChargeRow[]>({
-    queryKey: ["billing", "openCharges-local"],
-    queryFn: () => Promise.resolve([]),
-    initialData: [],
-  });
-}
-
 interface Props {
   patientId: string;
 }
@@ -69,18 +36,18 @@ interface Props {
 export function PatientBillingTab({ patientId }: Props) {
   const invoices = usePatientInvoices(patientId);
   const issue = useIssueInvoice();
-  const openCharges = useOpenChargesLocal();
+  const openCharges = useOpenCharges(patientId);
+  const openRows = openCharges.data ?? [];
   const [addOpen, setAddOpen] = useState(false);
   const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
 
   const handleIssue = async () => {
-    if (openCharges.data.length === 0) return;
+    if (openRows.length === 0) return;
     await issue.mutateAsync({
       patient_id: patientId,
-      charge_ids: openCharges.data.map((c) => c.id),
+      charge_ids: openRows.map((c) => c.id),
     });
-    openCharges.refetch();
   };
 
   return (
@@ -101,15 +68,13 @@ export function PatientBillingTab({ patientId }: Props) {
             <Button
               size="sm"
               onClick={handleIssue}
-              disabled={
-                openCharges.data.length === 0 || issue.isPending
-              }
+              disabled={openRows.length === 0 || issue.isPending}
             >
               Issue invoice
             </Button>
           </div>
         </div>
-        {openCharges.data.length === 0 ? (
+        {openRows.length === 0 ? (
           <div className="p-5">
             <Empty
               icon={<Receipt className="size-5" />}
@@ -128,7 +93,7 @@ export function PatientBillingTab({ patientId }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {openCharges.data.map((c) => (
+              {openRows.map((c) => (
                 <tr key={c.id}>
                   <td className="px-4 py-2 font-mono text-xs">{c.code}</td>
                   <td className="px-4 py-2">{c.description}</td>
@@ -143,9 +108,7 @@ export function PatientBillingTab({ patientId }: Props) {
                   Pending total
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums font-bold">
-                  {dollar(
-                    openCharges.data.reduce((s, c) => s + c.totalCents, 0),
-                  )}
+                  {dollar(openRows.reduce((s, c) => s + c.totalCents, 0))}
                 </td>
               </tr>
             </tbody>

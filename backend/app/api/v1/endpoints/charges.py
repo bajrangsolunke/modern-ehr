@@ -17,6 +17,21 @@ async def create_charge(
     return await ChargeService(db).create(payload, viewer_id=current.id)
 
 
+@router.get("/by-patient/{patient_id}", response_model=list[ChargeOut])
+async def list_charges_for_patient(
+    patient_id: UUID,
+    db: DbSession,
+    _current: CurrentUser,
+    open_only: bool = False,
+) -> list[ChargeOut]:
+    """List a patient's charges. `open_only=true` for the un-invoiced
+    pending tab; default returns the full history including voided and
+    invoiced rows."""
+    return await ChargeService(db).list_for_patient(
+        patient_id, open_only=open_only
+    )
+
+
 @router.get("/{charge_id}", response_model=ChargeOut)
 async def get_charge(
     charge_id: UUID,

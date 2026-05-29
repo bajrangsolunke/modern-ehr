@@ -89,14 +89,27 @@ class ChargeService:
             )
         return ChargeOut.model_validate(row)
 
-    async def list_for_patient(self, patient_id: UUID) -> list[ChargeOut]:
-        rows = (
-            await self.db.execute(
-                select(Charge)
-                .where(Charge.patient_id == patient_id)
-                .order_by(Charge.created_at.desc())
+    async def list_for_patient(
+        self,
+        patient_id: UUID,
+        *,
+        open_only: bool = False,
+    ) -> list[ChargeOut]:
+        """List charges for a patient.
+
+        `open_only=True` returns only un-invoiced, un-voided charges —
+        the "pending tab" rows the front desk uses to assemble the next
+        invoice."""
+        stmt = (
+            select(Charge)
+            .where(Charge.patient_id == patient_id)
+            .order_by(Charge.created_at.desc())
+        )
+        if open_only:
+            stmt = stmt.where(
+                Charge.invoice_id.is_(None), Charge.voided_at.is_(None)
             )
-        ).scalars().all()
+        rows = (await self.db.execute(stmt)).scalars().all()
         return [ChargeOut.model_validate(r) for r in rows]
 
     async def void(

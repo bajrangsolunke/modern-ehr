@@ -19,7 +19,6 @@ export function useIssueInvoice() {
     mutationFn: (input: InvoiceIssueInput) => invoicesApi.issue(input),
     onSuccess: (inv) => {
       qc.invalidateQueries({ queryKey: ["billing"] });
-      qc.setQueryData(["billing", "openCharges-local"], []);
       toast.success(`Invoice ${inv.number} issued`);
     },
     onError: (err) =>

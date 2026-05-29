@@ -1,22 +1,21 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  chargesApi,
-  type Charge,
-  type ChargeCreateInput,
-} from "../api/charges-api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { chargesApi, type ChargeCreateInput } from "../api/charges-api";
 import { toast } from "@/lib/toast";
+
+export function useOpenCharges(patientId: string | undefined) {
+  return useQuery({
+    queryKey: ["billing", "charges", { patientId, openOnly: true }],
+    queryFn: () => chargesApi.listForPatient(patientId!, { openOnly: true }),
+    enabled: Boolean(patientId),
+  });
+}
 
 export function useCreateCharge() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: ChargeCreateInput) => chargesApi.create(input),
-    onSuccess: (charge) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["billing"] });
-      // Append to the local "open charges this session" list.
-      qc.setQueryData<Charge[]>(
-        ["billing", "openCharges-local"],
-        (prev) => [...(prev ?? []), charge],
-      );
       toast.success("Charge added");
     },
     onError: (err) =>

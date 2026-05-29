@@ -67,6 +67,16 @@ export interface ChargeCreateInput {
 export const chargesApi = {
   create: async (input: ChargeCreateInput): Promise<Charge> =>
     map(await api.post<BackendDto>("/billing/charges", input)),
+  listForPatient: async (
+    patientId: string,
+    opts: { openOnly?: boolean } = {},
+  ): Promise<Charge[]> => {
+    const data = await api.get<BackendDto[]>(
+      `/billing/charges/by-patient/${patientId}`,
+      { searchParams: { open_only: opts.openOnly ?? false } },
+    );
+    return data.map(map);
+  },
   void: async (chargeId: string, reason: string): Promise<Charge> =>
     map(
       await api.post<BackendDto>(`/billing/charges/${chargeId}/void`, {
